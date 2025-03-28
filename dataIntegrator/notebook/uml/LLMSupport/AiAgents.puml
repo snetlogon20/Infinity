@@ -1,0 +1,34 @@
+@startuml
+package "dataIntegrator.LLMSuport.AiAgents" {
+    class SparkAI {
+        +inquiry(prompt: str): str
+    }
+
+    class AIAgent {
+        +inquiry(prompt: str): str
+    }
+
+    class main {
+        +main()
+    }
+
+    class __init__ {
+        +__init__()
+    }
+
+    class AIAgentFactory {
+        +new_agent(agent_type: str): AIAgent
+        +call_agent(agent_type: str, prompt: str): str
+    }
+
+    class DeepSeek {
+        +inquiry(prompt: str): str
+    }
+}
+
+AIAgent <|-- SparkAI
+AIAgent <|-- DeepSeek
+AIAgentFactory --> SparkAI : creates
+AIAgentFactory --> DeepSeek : creates
+main --> AIAgentFactory : calls
+@enduml
