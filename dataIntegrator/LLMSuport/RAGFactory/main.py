@@ -1,4 +1,6 @@
 from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
+from dataIntegrator.common.CommonParameters import CommonParameters
+import os
 
 if __name__ == "__main__":
 
@@ -13,8 +15,11 @@ if __name__ == "__main__":
     # print(response_dict)
 
     # RAG_SQL_inquiry_stocks_code
-    knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_knowledge_base.json"
-    prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_prompts.txt"
+
+    # knowledge_base_file_path = rf"{CommonParameters.basePath}\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_knowledge_base.json"
+    # prompt_file_path = rf"{CommonParameters.basePath}\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_prompts.txt"
+    knowledge_base_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations", "RAG_SQL_inquiry_stocks_code_knowledge_base.json")
+    prompt_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations", "RAG_SQL_inquiry_stocks_code_prompts.txt")
 
     question = """帮我找出花旗， 美国银行，JP 摩根， 苹果，英伟达， 因特尔的股票代码。股票数据需要2023-01-01到2023-12-31之间的数据。不需要冗余数据，返回单一股票代码即可。"""
     response_dict = RAGFactory.run_rag_inquiry(
