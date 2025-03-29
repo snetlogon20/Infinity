@@ -1,0 +1,124 @@
+--Single table indexsysdb.df_tushare_us_stock_daily
+花旗银行 2024年12月15日到 2024年12月16日交易的平均收益率
+花旗银行 2024年12月26日的开盘价
+花旗银行 2024年12月26日的收盘价
+tell me how many stock code do you have between 2002/12/15 to 2024/12/31
+list all the stock code you have
+give me the close point of Citi on 2024/12/13
+show me the average percent change  of Citi between 2024/12/01 to 2024/12/31
+show me the trade date and percent  of Citi change between 2024/12/01 to 2024/12/31
+show me the trade date, percent and volume of Citi change between 2024/12/25 to 2024/12/31
+show me the trade date and biggest percent change  of Citi between 2024/12/15 to 2024/12/31
+show me the trade date and max percent change  of JP morgan between 2022/12/15 to 2024/12/31
+show me the trade date stock code and max percent change  of microsoft between 2022/12/15 to 2024/12/31, i just want the line with max percenr change
+get the trade date and percent change of JP morgan between 2022/12/15 to 2024/12/31, get the trade date and percent change of Citi between 2022/12/15 to 2024/12/31, then join them by trade data, add a column: citi_pct_change - jpm_pct_change, then me the result
+show me the trade date and top 3 percent change  of JP morgan between 2022/12/15 to 2024/12/31
+show me all the stock information of Citi change between 2022/12/22 to 2024/12/31
+
+--indexsysdb.df_tushare_us_stock_basic
+花旗银行 这个股票的英文名称，股票分类和上市日期
+show me the  company name in english, classification and on list date of Citi group
+显示股票分类是 EQ 的这些股票的英文名称，股票分类和上市日期
+显示股票分类是 EQ 的这些股票的英文名称，股票分类和上市日期，按照上市日期排序，每个股票只显示一次即可。
+
+--join table
+show me the trade date and top 5 pct change of Citi between 2022/12/15 to 2024/12/31, please append its english name,股票分类和上市日期 as well
+
+--with plot
+show me the trade date and close point  of Citi  between 2022/12/01 to 2024/12/31, sort the data by trade date. I want a plot on this dataframe let trade_date be X, closed point shall be y.
+show me all the stock information, including trade date, close point of Citi change between 2024/12/20to 2024/12/31. I want a plot on this dataframe let trade data be X, closed point shall be y.
+show me the trade date stock code and max percent change  of microsoft between 2022/12/15 to 2024/12/31, i just want the line with 10 max percenr change. I want a plot on this dataframe let date be X, closed point shall be max percent change. show me the trade date stock code and top 3 max percent change  of microsoft between 2022/12/15 to 2024/12/31, i just want the line with top 3 max percenr change. I want a plot on this dataframe let date be X, closed point shall be max percent change.
+show me all the stock information, including  trade_date of Citi change between 2024/12/20to 2024/12/31. I want a plot on this dataframe let trade_date be X, closed point shall be y.
+帮我把花旗银行在2024年的所有股票数据找出来。按交易日期排序。绘制一个图表，以交易日期为 x 轴，当日收益率为 y 轴。
+
+--voice command
+查询花旗集团（Citi）在 2022 年 12 月 1 日至 2024 年 12 月 31 日期间的交易日期和收盘价，
+按交易日期排序。绘制一个图表，以交易日期为 x 轴，收盘价为 y 轴。
+show me the trade date and close point  of Citi  between 2022 and 2024,
+sort the data by trade date。 I want a plot on this dataframe let trade_date be X,
+closed point shall be y.
+show me the trade date and close point  of JPM  between 2022 and 2024,
+sort the data by trade date。 I want a plot on this dataframe let trade_date be X,
+closed point shall be y.
+
+--busines analysis
+帮我找出花旗， 美国银行，JP 摩根， 苹果，英伟达， 因特尔的股票代码。股票数据需要2023-01-01到2023-12-31之间的数据。
+
+这是一个schema 的描述：    "table_schema": {
+        "sales": {
+            "columns": {
+                "region": "销售区域（North: 北, South: 南, East: 东, West: 西）",
+                "product": "产品类型（Laptop: 笔记本, Phone: 手机, Tablet: 平板）",
+                "amount": "销售金额（美元）",
+                "sale_date": "销售日期（YYYY-MM-DD格式）"
+            }
+        }
+
+以下是us_stock_daily表 的建表语句。请你按照上面这个json转换
+CREATE TABLE indexsysdb.us_stock_daily(
+ts_code    String,
+trade_date String,
+close_point	   float,
+open_point	   float,
+high_point	   float,
+low_point	       float,
+pre_close  float,
+change_point	   float,
+pct_change	float,
+vol	        float,
+amount	    float,
+vwap	    float,
+turnover_ratio	float,
+total_mv	float,
+pe	float,
+pb	float
+)
+ENGINE=SummingMergeTree(trade_date, ts_code)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+这是一个schema 的描述：    "table_schema": {
+        "sales": {
+            "columns": {
+                "region": "销售区域（North: 北, South: 南, East: 东, West: 西）",
+                "product": "产品类型（Laptop: 笔记本, Phone: 手机, Tablet: 平板）",
+                "amount": "销售金额（美元）",
+                "sale_date": "销售日期（YYYY-MM-DD格式）"
+            }
+        }
+
+以下是df_tushare_us_stock_basic表 的建表语句。请你按照上面这个json转换
+CREATE TABLE indexsysdb.df_tushare_us_stock_basic(
+ts_code        String,
+name           Nullable(String),
+enname         String,
+classify       String,
+list_date      String,
+delist_date    Nullable(String)
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code)
+SETTINGS index_granularity = 8192
+
+
+
+
+
+
+
+模板： ["m1","m2"], 字段名称  ts_code    String,
+trade_date String,
+close_point	   float,
+open_point	   float,
+high_point	   float,
+low_point	       float,
+pre_close  float,
+change_point	   float,
+pct_change	float,
+vol	        float,
+amount	    float,
+vwap	    float,
+turnover_ratio	float,
+total_mv	float,
+pe	float,
+pb	float， 按照模板填写，不要保留字段类型
