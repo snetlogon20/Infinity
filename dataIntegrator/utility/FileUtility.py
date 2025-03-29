@@ -1,5 +1,7 @@
 import datetime
 import json
+from dataIntegrator.common.CommonParameters import CommonParameters
+import os
 
 class FileUtility:
     @staticmethod
@@ -13,7 +15,7 @@ class FileUtility:
 
     @staticmethod
     def get_outbound_path():
-        outbound_path = 'D:\\workspace_python\\dataIntegrator\dataIntegrator\\data\\outbound\\'
+        outbound_path = os.path.join(CommonParameters.basePath, 'data', 'outbound')
         return outbound_path
 
     @staticmethod
