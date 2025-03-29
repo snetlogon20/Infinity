@@ -1,0 +1,12 @@
+name: Sync from Gitee
+on:
+  repository_dispatch:
+    types: [gitee-webhook]  # 自定义事件类型（可任意命名）
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Sync Code
+        run: echo "Triggered by Gitee Webhook!"
