@@ -1,0 +1,12 @@
+python -m venv myenv_streamlit
+# 激活虚拟环境
+# 在 Windows 上
+myenv_streamlit\Scripts\activate
+# 在 Linux 或 macOS 上
+source myenv/bin/activate
+# 安装 streamlit
+pip install streamlit
+
+
+streamlit run D:\workspace_python\dataIntegrator\dataIntegrator\test\streamLit\StringlitTest.py
+streamlit run D:\workspace_python\dataIntegrator\dataIntegrator\test\streamLit\ReadExcel.py

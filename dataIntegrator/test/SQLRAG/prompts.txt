@@ -1,0 +1,69 @@
+花旗银行 2024年12月15日到 2024年12月16日交易的平均收益率
+花旗银行 2024年12月13日的开盘价
+花旗银行 2024年12月13日的收盘价
+give me the close point of Citi on 2024/12/13
+show me the average percent change  of Citi between 2024/12/01 to 2024/12/31
+show me the trade date and percent  of Citi change between 2024/12/01 to 2024/12/31
+show me the trade date and percent  of Citi change between 2024/12/25 to 2024/12/31
+show me the trade date and max percent change  of Citi between 2024/12/15 to 2024/12/31
+show me the trade date and max percent change  of JP morgan between 2022/12/15 to 2024/12/31
+get the trade date and percent change of JP morgan between 2022/12/15 to 2024/12/31, get get the trade date and percent change of Citi between 2022/12/15 to 2024/12/31, then join them by trade data, add a column: citi_pct_change - jpm_pct_change, then me the result
+
+这是一个schema 的描述：    "table_schema": {
+        "sales": {
+            "columns": {
+                "region": "销售区域（North: 北, South: 南, East: 东, West: 西）",
+                "product": "产品类型（Laptop: 笔记本, Phone: 手机, Tablet: 平板）",
+                "amount": "销售金额（美元）",
+                "sale_date": "销售日期（YYYY-MM-DD格式）"
+            }
+        }
+
+以下是us_stock_daily表 的建表语句。请你按照上面这个json转换
+CREATE TABLE indexsysdb.us_stock_daily(
+ts_code    String,
+trade_date String,
+close_point	   float,
+open_point	   float,
+high_point	   float,
+low_point	       float,
+pre_close  float,
+change_point	   float,
+pct_change	float,
+vol	        float,
+amount	    float,
+vwap	    float,
+turnover_ratio	float,
+total_mv	float,
+pe	float,
+pb	float
+)
+ENGINE=SummingMergeTree(trade_date, ts_code)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+
+
+
+
+
+
+
+
+
+模板： ["m1","m2"], 字段名称  ts_code    String,
+trade_date String,
+close_point	   float,
+open_point	   float,
+high_point	   float,
+low_point	       float,
+pre_close  float,
+change_point	   float,
+pct_change	float,
+vol	        float,
+amount	    float,
+vwap	    float,
+turnover_ratio	float,
+total_mv	float,
+pe	float,
+pb	float， 按照模板填写，不要保留字段类型

@@ -1,0 +1,10 @@
+[
+    {
+        "name": "col1",
+        "type": "string"
+    },
+    {
+        "name": "col2",
+        "type": "integer"
+    }
+]

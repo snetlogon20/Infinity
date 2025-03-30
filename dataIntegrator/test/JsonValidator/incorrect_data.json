@@ -1,0 +1,6 @@
+{
+    "name": "JohnDoe",
+    "age": -1,
+    "email": "johndoe@example.com",
+    "tags": ["tag1", "tag2"]
+}

@@ -1,0 +1,38 @@
+[
+    {
+        "name": "JohnDoe",
+        "age": 30,
+        "email": "johndoe@example.com",
+        "tags": ["tag1", "tag2"]
+    },
+    {
+        "name": "JaneSmith",
+        "age": 28,
+        "email": "janesmith@example.com",
+        "tags": ["tag3", "tag4"]
+    },
+    {
+        "name": "BobJohnson",
+        "age": 40,
+        "email": "bobjohnson@example.com",
+        "tags": ["tag5", "tag6"]
+    },
+    {
+        "name": "AliceWilliams",
+        "age": 25,
+        "email": "alicewilliams@example.com",
+        "tags": ["tag7", "tag8"]
+    },
+    {
+        "name": "CharlieBrown",
+        "age": 35,
+        "email": "charliebrown@example.com",
+        "tags": ["tag9", "tag10"]
+    },
+    {
+        "name": "EllaDavis",
+        "age": 22,
+        "email": "elladavis@example.com",
+        "tags": ["tag11", "tag12"]
+    }
+]
