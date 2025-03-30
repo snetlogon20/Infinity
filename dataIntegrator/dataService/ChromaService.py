@@ -1,4 +1,5 @@
 from typing import List, Dict, Optional, Union
+
 import chromadb
 from chromadb import Client
 from chromadb.api.types import (
