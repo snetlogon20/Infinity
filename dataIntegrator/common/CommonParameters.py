@@ -4,7 +4,7 @@ import os
 
 class CommonParameters():
 
-    basePath = r"D:\workspace_python\infinity\dataIntegrator"
+    basePath=r"D:\workspace_python\infinity\dataIntegrator"
     #logFilePath=rf"{basePath}\data\log\dataIntegrater.log"
     logFilePath = os.path.join(basePath,'data','log','dataIntegrater.log')
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
