@@ -1,5 +1,3 @@
-import traceback
-from dataIntegrator.common import CommonLogLib
 import os
 
 class CommonParameters():
