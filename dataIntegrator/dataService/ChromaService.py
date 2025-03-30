@@ -1,5 +1,4 @@
 from typing import List, Dict, Optional, Union
-
 import chromadb
 from chromadb import Client
 from chromadb.api.types import (
@@ -11,7 +10,7 @@ from chromadb.api.types import (
 )
 import numpy as np
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
-import openai
+#import openai
 
 # 自定义嵌入模型（例如 OpenAI）
 class OpenAIEmbedder(EmbeddingFunction):
