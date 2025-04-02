@@ -7,7 +7,7 @@ class CommonParameters():
     logFilePath = os.path.join(basePath,'data','log','dataIntegrater.log')
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
     #tuShareToken = "20241124210121-584f5f8b-ebd1-4508-aeb3-434ef64cf790" #From Xianyu
-    clickhouseHostName='192.168.98.147'
+    clickhouseHostName='192.168.98.148'
     clickhouseHostDatabase='indexsysdb'
 
     SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'

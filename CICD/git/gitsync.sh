@@ -29,8 +29,39 @@ git status
 git add .
 git status
 git commit -m "repo sync"
-git remote set-url origin https://github.com/snetlogon20/Infinity.git
-
 
 echo "----Start pushing to GitHub----"
-git push -u origin main
+git remote set-url origin https://github.com/snetlogon20/Infinity.git
+git remote show origin
+cd /D/workspace_python/githubRepo/Infinity/
+
+
+#git push -u origin main
+# 定义最大重试次数和间隔时间
+MAX_RETRIES=6
+RETRY_INTERVAL=600 # 单位：秒（10分钟）
+
+# 初始化变量
+retry_count=0
+push_success=false
+
+# 循环执行 git push
+while [ $retry_count -lt $MAX_RETRIES ]; do
+    echo "Attempt $(($retry_count + 1)) of $MAX_RETRIES: Trying to push to GitHub..."
+
+    # 执行 git push
+    if git push -u origin main; then
+        echo "Push successful!"
+        push_success=true
+        break
+    else
+        echo "Push failed. Retrying in $RETRY_INTERVAL seconds..."
+        retry_count=$((retry_count + 1))
+        sleep $RETRY_INTERVAL
+    fi
+done
+
+# 如果所有重试都失败，则输出错误信息
+if [ "$push_success" = false ]; then
+    echo "All attempts failed. Please check your network or repository settings."
+fi
