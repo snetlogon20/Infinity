@@ -6,11 +6,19 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 # from Streamlit.FlaskClient import FlaskClient
 import streamlit.components.v1 as components
+import datetime
+
+#st.set_page_config(layout="wide")
 
 # 定义包含语音识别功能的 HTML 代码
 html_code = """
 <!DOCTYPE html>
 <html>
+<style>
+    #result {
+        font-size: 12px; /* 可以根据需要调整字体大小 */
+    }
+</style>
 <button id="startButton">Voice Assistance/语音助手</button>
 <p id="result"></p>
 <script>
@@ -20,6 +28,8 @@ html_code = """
   if ('webkitSpeechRecognition' in window) {
     const recognition = new webkitSpeechRecognition();
     recognition.lang = 'zh-CN';
+    //recognition.lang = 'en-GB';
+    //recognition.lang = '{lang_code}';
 
     startButton.addEventListener('click', () => {
       recognition.start();
@@ -80,22 +90,34 @@ class FlaskClient:
             print("question is null")
             return
 
-        url = f"{self.base_url}/rag_inquiry"
-        params = {'question': question}
+        #url = f"{self.base_url}/rag_inquiry"
+        url = f"{self.base_url}/RAG_SQL_inquiry_stock_summary"
+        params = {'question': question, 'agent_type': "spark" }
 
-
+        #call Atlas
         data_frame, explanation_in_English, explanation_in_Mandarin, sql, isPlotRequired, PlotX, PlotY = self.callAtlas(params, url)
+        #call mocked data
         #data_frame, explanation_in_English, explanation_in_Mandarin, sql, isPlotRequired, PlotX, PlotY = self.callMockedData()
 
 
         # 使用st.dataframe显示DataFrame
-        st.write(rf"**解释/Explanation：**")
-        st.write(rf"{explanation_in_Mandarin}/{explanation_in_English}")
+        st.write(rf"**Explanation：**")
+        st.write(rf"{explanation_in_English}/{explanation_in_Mandarin}")
         st.write(rf"**SQL Statement：**")
         st.write(rf"{sql}")
 
-        st.write(rf"**查询结果返回：**")
+        st.write(rf"**Results：**")
         #st.dataframe(data_frame)
+        st.markdown(
+            """
+            <style>
+            .stDataFrame {
+                width: 100% !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
         edited_data_frame = st.data_editor(data_frame)
 
         # 提供 Excel 下载功能
@@ -104,12 +126,9 @@ class FlaskClient:
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 edited_data_frame.to_excel(writer, sheet_name='Sheet1', index=False)
             output.seek(0)
-            st.download_button(
-                label="Download Excel",
-                data=output,
-                file_name="query_results.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            b64 = output.getvalue().hex()
+            href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="query_results.xlsx" style="font-size: 12px;">Download As Excel</a>'
+            st.markdown(href, unsafe_allow_html=True)
 
         # 绘制折线图
         if isPlotRequired == "yes":
@@ -131,7 +150,61 @@ class FlaskClient:
 
         return sql, explanation_in_Mandarin, explanation_in_English, data_frame
 
+    def request_for_financial_inquiry(self, question):
+        print("----------I am started----------")
+
+        if question is None or len(question) == 0:
+            print("question is null")
+            return
+
+        url = f"{self.base_url}/RAG_SQL_inquiry_portfolio_volatility"
+        params = {'question': question}
+
+        print("----------Send inqiury to Atlas----------")
+
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            print("Response from /request_for_rag_inquiry:")
+            print(response.json())
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+
+        response_json = response.json()
+
+
+        #sql = response_json["sql"]
+        explanation_in_Mandarin = response_json["explanation_in_Mandarin"]
+        explanation_in_English = response_json["explanation_in_English"]
+        data_dict = json.loads(response_json["results"])
+
+        dataframes = {}
+        for key, json_str in data_dict.items():
+            dataframes[key] = pd.read_json(json_str)
+
+        print("----------Process of the message from Atlas is done----------")
+
+        try:
+            fig1, ax1 = plt.subplots(figsize=(10, 6))
+            for key, df in dataframes.items():
+                ax1.scatter(df['portfolio_volatility'], df['portfolio_mean'], label=key, s=5)
+                print("========key",key)
+
+            ax1.set_xlabel('Portfolio Volatility')
+            ax1.set_ylabel('Portfolio Mean')
+            ax1.set_title('Scatter Chart of Three Series Data')
+            ax1.legend()
+
+            print("========pyplot", key)
+            st.pyplot(fig1)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+        return sql, explanation_in_Mandarin, explanation_in_English, dataframes
+
+
     def callMockedData(self):
+        print("----------Send inqiury to Mocked Data----------")
+        print("Formatted current time:", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         sql = "1111"
         explanation_in_Mandarin = "2222"
         explanation_in_English = "333"
@@ -143,6 +216,8 @@ class FlaskClient:
         PlotX = "trade_date"
         PlotY = "close_point"
 
+        print("Formatted current time:", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("----------Process of the message from Mocked Data is done----------")
         return data_frame, explanation_in_English, explanation_in_Mandarin, sql, isPlotRequired, PlotX, PlotY
 
     def callAtlas(self, params, url):
@@ -157,7 +232,8 @@ class FlaskClient:
 
         response_json = response.json()
 
-        sql = response_json["sql"]
+        #sql = response_json["sql"]
+        sql = "aaa"
         explanation_in_Mandarin = response_json["explanation_in_Mandarin"]
         explanation_in_English = response_json["explanation_in_English"]
         data_dict = json.loads(response_json["results"])
@@ -210,6 +286,10 @@ if __name__ == "__main__":
                 font-size: 12px;
                 color: white;
             }
+            /* 强制侧边栏菜单文字为白色 */
+            [data-testid="stSidebar"] .stRadio > label {
+                color: white !important;
+            }
         </style>
         """,
         unsafe_allow_html=True
@@ -219,26 +299,54 @@ if __name__ == "__main__":
     st.sidebar.title("Star Atlas")
 
     # 创建侧边栏菜单，使用 st.sidebar.radio 实现列表形式
-    menu = ["SQL RAG", "Rule RAG", "API RAG","Chart/Plot RAG", "Financial Analysis RAG",
-            "Knowledge Base", "Common Queries", "Business Rules", "Knowledge Base",
-            "Meta Configration", "Choose AI Engine"]  # 可以根据需要添加更多菜单选项
-    choice = st.sidebar.radio("RAG is nothing, but quantified data with analysis is gold", menu)
+    menu = ["Any-SQL", "Any-Rule", "Any-API","Any-Chart/Plot", "Any-Financial Analysis",
+            "Knowledge Base", "Common Queries", "Business Rules",
+            "Meta Configration", "Choose Your AI Engine"]  # 可以根据需要添加更多菜单选项
+    choice = st.sidebar.radio("Data Alchemy for Business Decisions", menu)
 
-    if choice == "SQL RAG":
+
+    if choice == "Any-SQL":
         # 添加文本输入框和按钮
         user_input = st.text_area("**Tell me/你的问题:**", height=100, placeholder="Please input question like: show me the average percent change  of Citi between 2024/12/01 to 2024/12/31")
         # 在 Streamlit 中嵌入 HTML 代码
 
+        if 'button_clicked' not in st.session_state:
+            st.session_state.button_clicked = False
+
         if st.button("Go/查询"):
-            print(f"请输入你的问题: {user_input}")
+            st.session_state.button_clicked = True
 
-        components.html(html_code, height=100)
+        components.html(html_code, height=70)
 
-        if user_input is None or len(user_input) == 0:
-            print("question is null")
-            #st.write(f"请输入你的问题/Please fill your question")
-        else:
-            client = FlaskClient()
-            sql, explanation_in_Mandarin, explanation_in_English, data_frame = client.request_for_rag_inquiry(user_input)
+        if st.session_state.button_clicked:
+            if user_input is None or len(user_input) == 0:
+                print("question is null")
+            else:
+                client = FlaskClient()
+                sql, explanation_in_Mandarin, explanation_in_English, data_frame = client.request_for_rag_inquiry(user_input)
+                st.session_state.button_clicked = False
+    if choice == "Any-Financial Analysis":
+        # 添加文本输入框和按钮
+        user_input = st.text_area("**Tell me/你的问题:**", height=100, placeholder="Please input question like: show me the average percent change  of Citi between 2024/12/01 to 2024/12/31")
+        # 在 Streamlit 中嵌入 HTML 代码
+
+        if 'button_clicked' not in st.session_state:
+            st.session_state.button_clicked = False
+
+        if st.button("Go/查询"):
+            st.session_state.button_clicked = True
+
+        components.html(html_code, height=70)
+
+        if st.session_state.button_clicked:
+            if user_input is None or len(user_input) == 0:
+                print("question is null")
+            else:
+                client = FlaskClient()
+                sql, explanation_in_Mandarin, explanation_in_English, data_frame = client.request_for_financial_inquiry(user_input)
+                st.session_state.button_clicked = False
     elif choice == "其他页面":
         st.write("这是其他页面的内容，你可以根据需要进行修改。")
+
+    # language = st.sidebar.radio("Voice Assistant", ["English", "中文"])
+    # lang_code = 'zh-CN' if language == "中文" else 'en-US'
