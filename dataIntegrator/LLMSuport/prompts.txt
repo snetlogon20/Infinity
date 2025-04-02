@@ -43,6 +43,7 @@ closed point shall be y.
 
 --busines analysis
 帮我找出花旗， 美国银行，JP 摩根， 苹果，英伟达， 因特尔的股票代码。股票数据需要2023-01-01到2023-12-31之间的数据。
+Help me find the stock ticker symbols for Citigroup, Bank of America, JPMorgan Chase, Apple, Nvidia, and Intel. I also need their stock data from January 1, 2023, to December 31, 2023. No redundant data is needed—return only the single correct ticker symbol for each company.
 
 这是一个schema 的描述：    "table_schema": {
         "sales": {

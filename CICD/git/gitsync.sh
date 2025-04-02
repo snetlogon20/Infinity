@@ -29,8 +29,9 @@ git status
 git add .
 git status
 git commit -m "repo sync"
-git remote set-url origin https://github.com/snetlogon20/Infinity.git
-
 
 echo "----Start pushing to GitHub----"
+git remote set-url origin https://github.com/snetlogon20/Infinity.git
+git remote show origin
+cd /D/workspace_python/githubRepo/Infinity/
 git push -u origin main
