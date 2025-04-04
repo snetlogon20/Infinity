@@ -18,7 +18,7 @@ class AIAgentFactory:
         return agent_class()
 
     @classmethod
-    def call_agent(cls, agent_type: str, prompt: str, question: str):
+    def call_agent(cls, agent_type: str, prompt: str):
         """直接调用代理功能"""
         agent = cls.new_agent(agent_type)
-        return agent.inquiry(prompt, question)
+        return agent.inquiry(prompt)
