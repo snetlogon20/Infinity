@@ -30,7 +30,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         ts_code = '000001.SH'
         start_date = '20220521'
         end_date = '20241218'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_cn_index_daily_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_cn_index_daily_20220507.csv"
 
         try:
             tuShareService = TuShareCNIndexDailyService()
@@ -47,7 +47,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         print("callTuShareService ended...")
 
     @classmethod
-    def callTuShareChinaStockIndexService(self, ts_code = '603839.SH', start_date = '20220521', end_date = '20241230', csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"):
+    def callTuShareChinaStockIndexService(self, ts_code = '603839.SH', start_date = '20220521', end_date = '20241230', csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"):
         print("callTuShareService started...")
 
         # 002093.SZ 国脉科技
@@ -60,7 +60,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         # ts_code = '603839.SH'
         # start_date = '20220521'
         # end_date = '20241230'
-        # csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
+        # csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
 
         try:
             tuShareService = TuShareChinaStockIndexService()
@@ -82,7 +82,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '20220101'
         end_date = '20220521'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
 
         try:
             tuShareService = TushareShiborDailyService()
@@ -104,7 +104,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '20220101'
         end_date = '20220521'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_lpr_daily_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_lpr_daily_20220507.csv"
 
         try:
             tuShareService = TushareShiborLPRDailyService()
@@ -126,7 +126,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '2018Q1'
         end_date = '2022Q1'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNGDP_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNGDP_20220507.csv"
 
         try:
             tuShareService = TushareCNGDPService()
@@ -148,7 +148,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '200001'
         end_date = '202212'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNMondySupply_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNMondySupply_20220507.csv"
 
         try:
             tuShareService = TushareCNMondySupplyService()
@@ -170,7 +170,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '200001'
         end_date = '202212'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNCPI_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_CNCPI_20220507.csv"
 
         try:
             tuShareService = TushareCNCPIService()
@@ -193,7 +193,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         ts_code = 'C'
         start_date = '20220101'
         end_date = '20241229'
-        csvFilePath= "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_USStock_Daily_20220507.csv"
+        csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_USStock_Daily_20220507.csv"
 
         try:
             tuShareService = TuShareUSStockDailyService()
@@ -216,7 +216,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         exchange = 'DCE'
         fut_type = '1'
         fields = 'ts_code,symbol,name,list_date,delist_date,quote_unit'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FutureBasicInformation_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FutureBasicInformation_20220507.csv"
 
         try:
             tuShareService = TuShareFutureBasicInformationService()
@@ -239,7 +239,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         ts_code = 'JM2304.DCE'
         start_date = '20180101'
         end_date = '20220501'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FutureDaily_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FutureDaily_20220507.csv"
 
         try:
             tuShareService = TuShareFutureDailyService()
@@ -261,7 +261,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '20180101'
         end_date = '20250501'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_USStockBasic_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_USStockBasic_20220507.csv"
 
         try:
             tuShareService = TushareUSStockBasicService()
@@ -284,7 +284,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         ts_code = '00001.HK'
         start_date = '20220101'
         end_date = '20220521'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_HKStockDaily_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_HKStockDaily_20220507.csv"
 
         try:
             tuShareService = TuShareHKStockDailyService()
@@ -306,7 +306,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         exchange = 'FXCM'
         classify = 'INDEX'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.csv"
 
         try:
             tuShareService = TuShareFXOffsoreBasicService()
@@ -329,7 +329,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
         ts_code = 'US30.FXCM'
         start_date = '20220101'
         end_date = '20220521'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.txt"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.txt"
 
         try:
             tuShareService = TuShareFXDailyService()
@@ -351,7 +351,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '20220531'
         end_date = '20220531'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_FX_Offsore_basic_20220507.csv"
 
         try:
             tuShareService = TuShareSGEDailyService()
@@ -373,7 +373,7 @@ class TuShareServiceManager(CommonLib.CommonLib):
 
         start_date = '20220101'
         end_date = '20241231'
-        csvFilePath = "D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\ddf_tushare_us_treasury_yield_cruve_20241201.csv"
+        csvFilePath = r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\ddf_tushare_us_treasury_yield_cruve_20241201.csv"
 
         try:
             tuShareService = TushareUSTreasuryYieldCurveService()

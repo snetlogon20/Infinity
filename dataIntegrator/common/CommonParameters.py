@@ -3,10 +3,11 @@ import os
 class CommonParameters():
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
-    #logFilePath=rf"{basePath}\data\log\dataIntegrater.log"
-    logFilePath = os.path.join(basePath,'data','log','dataIntegrater.log')
+
+    dataPath = r"D:\workspace_python\infinity_data"
+    logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
+
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
-    #tuShareToken = "20241124210121-584f5f8b-ebd1-4508-aeb3-434ef64cf790" #From Xianyu
     clickhouseHostName='192.168.98.148'
     clickhouseHostDatabase='indexsysdb'
 

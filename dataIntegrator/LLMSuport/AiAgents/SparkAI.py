@@ -6,7 +6,7 @@ from dataIntegrator.common.CommonParameters import CommonParameters
 
 class SparkAI(AIAgent):
 
-    def inquiry(self, prompt: str, question: str):
+    def inquiry(self, prompt: str):
         spark = ChatSparkLLM(
             spark_api_url=CommonParameters.SPARKAI_URL,
             spark_app_id=CommonParameters.SPARK_APPID,
@@ -15,7 +15,7 @@ class SparkAI(AIAgent):
             spark_llm_domain=CommonParameters.SPARKAI_DOMAIN,
             streaming=False,
         )
-        print(rf"正在查询 Spark LLM，请稍等/Inquiry Spark LLM for: {question}")
+        print(rf"正在查询 Spark LLM，请稍等/Inquiry Spark LLM for: {prompt}")
         messages = [ChatMessage(role="user", content=prompt)]
         handler = ChunkPrintHandler()
         response = spark.generate([messages], callbacks=[handler])
