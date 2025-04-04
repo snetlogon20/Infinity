@@ -84,6 +84,13 @@ class croma_service:
         for dist, doc in zip(distances, documents):
             print(f"[相似度 {dist:.3f}] {doc}")
 
+
+    # 下载模型
+    def download_model(self, results):
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        save_path = r"D:\workspace_python\infinity_data\model\all-MiniLM-L6-v2"
+        model.save(save_path)
+
 if __name__ == '__main__':
     model_path = r"D:\workspace_python\infinity_data\model\all-MiniLM-L6-v2"
     db_persistent_path = r"D:\workspace_python\infinity_data\chormadb\persistent.db"

@@ -1,0 +1,37 @@
+# Python 3.12 全平台通用核心依赖
+streamlit>=1.42.0
+pandas>=2.2.0
+requests>=2.31.0
+matplotlib>=3.8.4
+numpy>=1.26.4
+scipy>=1.13.0
+scikit-learn>=1.4.2
+seaborn>=0.13.2
+statsmodels>=0.14.1
+sqlalchemy>=2.0.29
+openpyxl>=3.1.4
+numpy-financial>=1.0.0
+mplcursors>=0.5.3
+
+# 平台特定依赖 (自动选择)
+chromadb>=0.4.20; platform_system != "Windows"
+clickhouse-driver>=0.2.7; platform_system != "Darwin"  # Mac 需手动编译
+arch>=5.5.0; platform_system != "Windows"
+
+# 自然语言处理
+nltk>=3.8.1
+sentence-transformers>=2.7.0
+
+# Web 框架
+flask>=3.0.2
+jsonschema>=4.21.1
+
+# 桌面应用
+flet>=0.22.0
+
+# 开发工具
+setuptools>=70.0.0
+wheel>=0.43.0
+
+# 中国金融市场数据 (可选)
+tushare>=1.4.20  # 若需要旧版可改为 tushare==1.2.103
