@@ -15,7 +15,7 @@ class FileUtility:
 
     @staticmethod
     def get_outbound_path():
-        outbound_path = os.path.join(CommonParameters.basePath, 'data', 'outbound')
+        outbound_path = os.path.join(CommonParameters.dataPath, 'data', 'outbound')
         return outbound_path
 
     @staticmethod

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ###################
 # gitee 手工提交
 # /D/workspace_python/infinity/CICD/git/gitsync.sh
@@ -65,3 +67,7 @@ done
 if [ "$push_success" = false ]; then
     echo "All attempts failed. Please check your network or repository settings."
 fi
+
+echo "----Ended----"
+
+read -p "按回车键继续..."
