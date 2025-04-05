@@ -1,6 +1,7 @@
 import pandas as pd
-
+import os
 from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
+from dataIntegrator.common.CommonParameters import CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import matplotlib.pyplot as plt
@@ -67,7 +68,8 @@ class PortfolioVolatilityCalculator(TuShareService):
         return self.results_df
 
     def save_resultset(self, results_df, path):
-        results_df.to_excel(r'D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\PortfolioVolatitity.results.xlsx', index=False, encoding='utf-8')
+        results_df_path = os.path.join(CommonParameters.dataPath,'outbound','PortfolioVolatitity.results.xlsx')
+        results_df.to_excel(results_df_path, index=False)
 
     def display_scatter_chart(self, results_df):
         plt.scatter(results_df['portfolio_volatility'], results_df['portfolio_mean'], alpha=0.7)
@@ -131,7 +133,8 @@ class PortfolioVolatilityCalculator(TuShareService):
 
     def get_color_dict(self, num_colors):
         color_dict = {}
-        cmap = plt.cm.get_cmap('tab20', num_colors)  # 从'matplotlib'选择一个色彩映射，生成指定数量的不同颜色
+        #cmap = plt.cm.get_cmap('tab20', num_colors)  # 从'matplotlib'选择一个色彩映射，生成指定数量的不同颜色
+        cmap = plt.colormaps['tab20'].resampled(num_colors)
         for i in range(num_colors):
             color_dict[i] = cmap(i)  # 按顺序获取颜色
         return color_dict
@@ -156,7 +159,7 @@ class PortfolioVolatilityCalculator(TuShareService):
 
         portfolioVolatilityCalculator = PortfolioVolatilityCalculator(weight_a=0, weight_b=0, portfolio_data=portfolio_data)
         results_df = portfolioVolatilityCalculator.caculate_segma_with_dataframe(portfolio_data)
-        portfolioVolatilityCalculator.save_resultset(results_df,r'D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\PortfolioVolatitity.results.xlsx')
+        portfolioVolatilityCalculator.save_resultset(results_df,r'D:\workspace_python\infinity_data\outbound\PortfolioVolatitity.results.xlsx')
         #portfolioVolatilityCalculator.display_scatter_chart(results_df)
         return results_df
 
@@ -289,6 +292,6 @@ if __name__ == "__main__":
 
 
     # test_pair_by_pair
-    #test_portfolio_pair_by_pair()
+    test_portfolio_pair_by_pair()
 
-    test_portfolio_by_AIAgent()
+    #test_portfolio_by_AIAgent()
