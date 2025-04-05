@@ -1,6 +1,6 @@
 import traceback
 from dataIntegrator.common import CommonLogLib
-import sys
+
 
 class CommonLib():
 

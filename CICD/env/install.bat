@@ -20,10 +20,5 @@ pip install -r D:\workspace_python\infinity\CICD\env\requirements.txt
 # Linux 额外依赖
 sudo apt-get install -y libomp5 libgomp1  # Ubuntu/Debian
 
-pip install sparkai
-pip install --upgrade spark_ai_python
-pip install pydevd-pycharm
-
-
 # 验证脚本 compatibility_check.py
 python D:\workspace_python\infinity\CICD\env\compatibility_check.py
