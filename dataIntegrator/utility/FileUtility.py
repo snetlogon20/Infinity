@@ -19,6 +19,11 @@ class FileUtility:
         return outbound_path
 
     @staticmethod
+    def get_full_outbound_path(*args):
+        outbound_path = os.path.join(CommonParameters.dataPath)
+        return os.path.join(outbound_path, *args)
+
+    @staticmethod
     def get_full_filename_by_timestamp(prefix, surfix):
         outbound_path = FileUtility.get_outbound_path()
         filename = FileUtility.generate_filename_by_timestamp(prefix,surfix)
