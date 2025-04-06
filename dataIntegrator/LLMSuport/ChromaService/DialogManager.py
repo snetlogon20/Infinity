@@ -19,11 +19,8 @@ def test_run_query_in_batch():
 def test_run_query_in_coversation():
     '''
     使用以下提示：
-        Oracle
-        和mysql
-        是什么区别？
-        怎样使用java
-        连接Oracle
+        Oracle和mysql是什么区别？
+        怎样使用java连接Oracle
         给我代码
         怎样使用python连接Oracle
         给我golang的相关代码
