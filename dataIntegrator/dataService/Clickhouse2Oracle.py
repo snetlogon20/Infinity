@@ -39,4 +39,4 @@ if __name__ == "__main__":
             oracleService = OracleService(oracle_config['oracle_client'])
             oracleService.migrate_dataframe_to_oracle(oracle_config)
         except Exception as e:
-            print(f"数据迁移失败：{e}")
+            print(f"Data migration failed: {e}")
