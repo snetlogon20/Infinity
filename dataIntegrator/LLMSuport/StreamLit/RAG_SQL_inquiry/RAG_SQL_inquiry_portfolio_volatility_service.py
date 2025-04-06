@@ -39,7 +39,7 @@ class RAG_SQL_inquiry_portfolio_volatility_service(BaseRAGSQLInquiry):
 
             ax1.set_xlabel('Portfolio Volatility')
             ax1.set_ylabel('Portfolio Mean')
-            ax1.set_title('Scatter Chart of Three Series Data')
+            ax1.set_title('Information ratio of portfolio')
             ax1.legend()
 
             st.pyplot(fig1)
