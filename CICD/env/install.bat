@@ -22,6 +22,9 @@ pip install posthog
 @REM  一键安装
 pip install -r D:\workspace_python\infinity\CICD\env\requirements.txt
 
+@REM Windows 额外依赖
+pip install cx_Oracle
+
 @REM Linux 额外依赖
 sudo apt-get install -y libomp5 libgomp1  # Ubuntu/Debian
 

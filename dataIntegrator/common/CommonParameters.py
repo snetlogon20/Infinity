@@ -8,8 +8,18 @@ class CommonParameters():
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
 
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
+
     clickhouseHostName='192.168.98.148'
     clickhouseHostDatabase='indexsysdb'
+
+    oracle_config = {
+        'host': '192.168.98.129',
+        'port': 1521,
+        'sid': 'orcl',
+        'username': 'citi',
+        'password': 'citi@citi',
+        'oracle_client': r'C:\app\ASUS\product\11.2.0\client_2'
+    }
 
     SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
     SPARKAI_DOMAIN = 'generalv3.5'
