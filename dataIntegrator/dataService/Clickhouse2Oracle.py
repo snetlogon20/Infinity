@@ -5,22 +5,30 @@ from dataIntegrator.dataService.OracleService import OracleService
 if __name__ == "__main__":
 
     data_migration_config_list = [
+        # {
+        #     "queryStatement": """
+        #     SELECT distinct(*)
+        #     FROM indexsysdb.df_tushare_us_stock_daily
+        #     WHERE ts_code = 'C' AND
+        #     trade_date >= '20220101' AND
+        #     trade_date <= '20241231'
+        #     """,
+        #     "target_table": "citi.df_tushare_us_stock_daily"
+        # },
+        # {
+        #     "queryStatement": """
+        #     SELECT distinct(*)
+        #     FROM indexsysdb.df_tushare_us_stock_basic
+        #     """,
+        #     "target_table": "citi.df_tushare_us_stock_basic"
+        # }
+
         {
-            "queryStatement": """
-            SELECT distinct(*)
-            FROM indexsysdb.df_tushare_us_stock_daily
-            WHERE ts_code = 'C' AND
-            trade_date >= '20220101' AND
-            trade_date <= '20241231'
-            """,
-            "target_table": "citi.df_tushare_us_stock_daily"
-        },
-        {
-            "queryStatement": """
-            SELECT distinct(*)
-            FROM indexsysdb.df_tushare_us_stock_basic
-            """,
-            "target_table": "citi.df_tushare_us_stock_basic"
+        "queryStatement": """
+        SELECT distinct(*)
+        FROM indexsysdb.df_sys_calendar
+        """,
+            "target_table": "citi.df_sys_calendar"
         }
     ]
 

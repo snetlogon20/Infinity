@@ -74,7 +74,8 @@ class OracleService(TuShareService):
 
         try:
             # 初始化 Oracle 客户端
-            oracledb.init_oracle_client(lib_dir=oracle_config["oracle_client"])
+            #oracledb.init_oracle_client(lib_dir=oracle_config["oracle_client"])
+            oracledb.init_oracle_client(lib_dir=None)
 
             # 生成 DSN 并建立连接
             dsn = oracledb.makedsn(host, port, sid=sid)

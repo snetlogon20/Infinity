@@ -54,12 +54,9 @@ class RAG_SQL_inquiry_stocks_code(RAGAgent):
         print(response)
         return response
 
+
     @classmethod
-    def process_response(self, response):
-        # 解析结果
-        json_str = response.generations[0][0].text
-        cleaned_json = json_str.replace("```json", "").replace("```", "").strip()
-        print(cleaned_json)
+    def process_response(self, cleaned_json):
 
         # 查询数据
         try:
@@ -94,7 +91,8 @@ class RAG_SQL_inquiry_stocks_code(RAGAgent):
         context = self.retrieve_context(knowledge_base, question)
         prompt = self.load_and_generate_prompts(self.prompt_file_path, context, question)
         response = self.call_ai_agent(agent_type, prompt, question)
-        response_dict = self.process_response(response)
+        cleaned_json = self.parse_response(response)
+        response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
 
         return response_dict
