@@ -1,6 +1,7 @@
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 import pandas as pd
+from sentence_transformers import SentenceTransformer
 
 class ChromaLLMService:
     def __init__(self, model_path):
@@ -17,6 +18,10 @@ class ChromaLLMService:
             self.model_path = r"D:\workspace_python\infinity_data\model\all-MiniLM-L6-v2"
         else:
             self.model_path = model_path
+
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        model.save(model_path)
+
 
     def load_model(self, model_path=None):
         """加载模型"""

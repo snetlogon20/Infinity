@@ -2,9 +2,9 @@ from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
 
 if __name__ == "__main__":
     prompt = "What is the capital of France?"
-
-    result = AIAgentFactory.call_agent("spark", prompt)
+    question = "What is the capital of France?"
+    result = AIAgentFactory.call_agent("spark", prompt, question)
     print(result)
 
-    result = AIAgentFactory.call_agent("deepseek", prompt)
+    result = AIAgentFactory.call_agent("deepseek", prompt, question)
     print(result)

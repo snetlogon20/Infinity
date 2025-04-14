@@ -29,6 +29,14 @@ class RAGAgent(ABC):
         print(response)
         return response
 
+    @classmethod
+    def parse_response(cls, response):
+        # 解析结果
+        json_str = response.generations[0][0].text
+        cleaned_json = json_str.replace("```json", "").replace("```", "").strip()
+        print(cleaned_json)
+        return cleaned_json
+
     def run_single_question(self, agent_type, question):
 
         knowledge_base = self.load_knowledge_base_from_json(self.knowledge_base_file_path)
