@@ -8,14 +8,14 @@ if __name__ == "__main__":
     ##############################
     # RAG_SQL_inquiry_stock_summary
     ##############################
-    knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
-    prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
-
-    question = "花旗银行 2024年12月26日的收盘价"
-    response_dict = RAGFactory.run_rag_inquiry(
-        "RAG_SQL_inquiry_stock_summary", "spark",
-        question, knowledge_base_file_path, prompt_file_path)
-    print(response_dict)
+    # knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
+    # prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
+    #
+    # question = "花旗银行 2024年12月26日的收盘价"
+    # response_dict = RAGFactory.run_rag_inquiry(
+    #     "RAG_SQL_inquiry_stock_summary", "spark",
+    #     question, knowledge_base_file_path, prompt_file_path)
+    # print(response_dict)
 
     ##############################
     # RAG_SQL_inquiry_stocks_code
@@ -28,3 +28,15 @@ if __name__ == "__main__":
     #     "RAG_SQL_inquiry_stocks_code", "spark",
     #     question, knowledge_base_file_path, prompt_file_path)
     # print(response_dict)
+
+    ##############################
+    # RAG_SQL_inquiry_stock_summary
+    ##############################
+    knowledge_base_file_path = rf"D:\workspace_python\infinity\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_general_inquiry.json"
+    prompt_file_path = rf"D:\workspace_python\infinity\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_general_inquiry.txt"
+
+    question = "what's the capital of France"
+    response_dict = RAGFactory.run_rag_inquiry(
+        "RAG_general_inquiry", "spark",
+        question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)

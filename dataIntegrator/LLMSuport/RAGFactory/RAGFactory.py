@@ -3,12 +3,14 @@ from typing import Dict, Type
 
 from dataIntegrator.LLMSuport.RAGFactory.RAG_SQL_inquiry_stock_summary import RAG_SQL_inquiry_stock_summary
 from dataIntegrator.LLMSuport.RAGFactory.RAG_SQL_inquiry_stocks_code import RAG_SQL_inquiry_stocks_code
+from dataIntegrator.LLMSuport.RAGFactory.RAG_general_inquiry import RAG_general_inquiry
 
 
 class RAGFactory:
     _registry: Dict[str, Type[RAGAgent]] = {
         "RAG_SQL_inquiry_stock_summary": RAG_SQL_inquiry_stock_summary,
-        "RAG_SQL_inquiry_stocks_code": RAG_SQL_inquiry_stocks_code
+        "RAG_SQL_inquiry_stocks_code": RAG_SQL_inquiry_stocks_code,
+        "RAG_general_inquiry": RAG_general_inquiry
     }
 
     @classmethod
