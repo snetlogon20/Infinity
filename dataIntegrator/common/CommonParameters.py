@@ -3,6 +3,8 @@ import os
 class CommonParameters():
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
+    rag_configuration_path = os.path.join(basePath, 'LLMSuport', 'RAGFactory', 'configurations')
+
 
     dataPath = r"D:\workspace_python\infinity_data"
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
