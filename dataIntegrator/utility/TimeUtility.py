@@ -3,6 +3,9 @@ from zoneinfo import ZoneInfo
 from typing import Union
 import time
 
+from dataIntegrator.common.CommonParameters import CommonParameters
+
+
 class TimeUtility:
     """
     A utility class for handling various time-related operations.
@@ -115,7 +118,7 @@ class TimeUtility:
         return dt.astimezone(ZoneInfo(target_tz))
 
     @staticmethod
-    def get_current_time(timezone: str = 'UTC') -> datetime.datetime:
+    def get_current_time(timezone: str = CommonParameters.default_time_zone) -> datetime.datetime:
         """Get current time in specified timezone."""
         return datetime.datetime.now(ZoneInfo(timezone))
 

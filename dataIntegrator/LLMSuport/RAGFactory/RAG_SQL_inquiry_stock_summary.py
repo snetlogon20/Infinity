@@ -64,7 +64,6 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
 
             clickhouseService = ClickhouseService()
             data = clickhouseService.getDataFrameWithoutColumnsName(sql)
-            # print(data)
         except Exception as e:
             return {"error": str(e), "sql_attempt": sql}
 
