@@ -41,6 +41,18 @@ class FileUtility:
         except Exception as e:
             print(f"错误: 发生了一个未知错误: {e}")
         return ""
+
+    @staticmethod
+    def write_file(file_path, content):
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(content)
+            print(f"文件 {file_path} 写入成功。")
+        except FileNotFoundError:
+            print(f"错误: 文件路径 {file_path} 未找到。")
+        except Exception as e:
+            print(f"错误: 发生了一个未知错误: {e}")
+
     @staticmethod
     def read_json_file(file_path):
         try:

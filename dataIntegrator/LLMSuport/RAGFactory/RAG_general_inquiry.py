@@ -17,8 +17,12 @@ class RAG_general_inquiry(RAGAgent):
         return json_object
 
     @classmethod
-    def retrieve_context(self, knowledge_base, question):
-        return " "
+    def retrieve_context(self, knowledge_base_file_path, question):
+        context = FileUtility.read_file(knowledge_base_file_path)
+        # context = context.replace("{","{{")
+        # context = context.replace("}", "}}")
+        return context
+        #return ""
 
     @classmethod
     def load_and_generate_prompts(self, prompt_file_path, context, question):
@@ -47,7 +51,8 @@ class RAG_general_inquiry(RAGAgent):
     def run_single_question(self, agent_type, question):
 
         knowledge_base = self.load_knowledge_base_from_json(self.knowledge_base_file_path)
-        context = self.retrieve_context(knowledge_base, question)
+        #context = self.retrieve_context(knowledge_base, question)
+        context = self.retrieve_context(self.knowledge_base_file_path, question)
         prompt = self.load_and_generate_prompts(self.prompt_file_path, context, question)
         response = self.call_ai_agent(agent_type, prompt, question)
         cleaned_json = self.parse_response(response)
