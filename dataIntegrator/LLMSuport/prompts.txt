@@ -5,9 +5,9 @@
 tell me how many stock code do you have between 2002/12/15 to 2024/12/31
 list all the stock code you have
 give me the close point of Citi on 2024/12/13
-show me the average percent change  of Citi between 2024/12/01 to 2024/12/31
+show me the average percent change  of Citi between 2022/12/01 to 2024/12/31
 show me the trade date and percent  of Citi change between 2024/12/01 to 2024/12/31
-show me the trade date, percent and volume of Citi change between 2024/12/25 to 2024/12/31
+show me the trade date, percent and volume of Citi change between 2022/12/25 to 2024/12/31
 show me the trade date and biggest percent change  of Citi between 2024/12/15 to 2024/12/31
 show me the trade date and max percent change  of JP morgan between 2022/12/15 to 2024/12/31
 show me the trade date stock code and max percent change  of microsoft between 2022/12/15 to 2024/12/31, i just want the line with max percenr change

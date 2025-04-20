@@ -2,16 +2,19 @@ import os
 
 class CommonParameters():
 
+    default_time_zone = 'Asia/Shanghai'
+
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
     rag_configuration_path = os.path.join(basePath, 'LLMSuport', 'RAGFactory', 'configurations')
 
 
     dataPath = r"D:\workspace_python\infinity_data"
+    outBoundPath = os.path.join(dataPath,'outbound')
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
 
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
 
-    clickhouseHostName='192.168.98.148'
+    clickhouseHostName='192.168.98.149'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
@@ -22,6 +25,8 @@ class CommonParameters():
         'password': 'citi@citi',
         'oracle_client': r'C:\app\ASUS\product\11.2.0\client_2'
     }
+
+    Default_AI_Engine = 'spark'
 
     SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
     SPARKAI_DOMAIN = 'generalv3.5'
