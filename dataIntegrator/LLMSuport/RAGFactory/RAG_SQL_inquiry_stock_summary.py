@@ -4,6 +4,7 @@ from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
 from dataIntegrator.LLMSuport.RAGFactory.RAGAgent import RAGAgent
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.utility.FileUtility import FileUtility
+import re
 
 class RAG_SQL_inquiry_stock_summary(RAGAgent):
 
@@ -56,6 +57,8 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
 
     @classmethod
     def process_response(self, cleaned_json):
+        # 清理 JSON 字符串，去除非法字符
+        cleaned_json = re.sub(r'[^\x20-\x7E]', '', cleaned_json)
 
         # 查询数据
         try:

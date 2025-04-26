@@ -6,6 +6,7 @@ class CommonParameters():
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
     rag_configuration_path = os.path.join(basePath, 'LLMSuport', 'RAGFactory', 'configurations')
+    reason_chain_configuration_path = os.path.join(basePath, 'LLMSuport', 'ReasonChainFactory', 'configurations')
 
 
     dataPath = r"D:\workspace_python\infinity_data"
