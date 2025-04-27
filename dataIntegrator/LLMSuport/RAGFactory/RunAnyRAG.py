@@ -79,7 +79,7 @@ Now you are going to generate the code for the following steps:
         #         """,
 
         "knowledge_base_file_path": rf"D:\workspace_python\infinity\dataIntegrator\test\FlaskServer\RunFlaskClientTemplate.py",
-        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_python_code_gen.txt"),
+        "prompt_file_path": os.path.join(CommonParameters.mcp_configuration_path, "RAG_python_code_gen.txt"),
     }
     response_dict = RAGFactory.run_rag_inquiry_with_params(params)
     print(response_dict)

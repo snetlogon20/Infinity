@@ -34,7 +34,7 @@ Now you are going to generate the code for the following steps:
     print(response_dict)
     content = response_dict["response_json"]
     content = content.replace("python", rf"'''AI generated at: {TimeUtility.get_formatted_time_with_milliseconds()}'''",1)
-    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\ai_generated.py"
+    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\genearted_code\ai_generated.py"
     FileUtility.write_file(program_path, content)
 
     response_dict = {"program_path":program_path}
@@ -64,7 +64,7 @@ def run_mcp_stock_basic():
     print(response_dict)
     content = response_dict["response_json"]
     content = content.replace("python", rf"'''AI generated at: {TimeUtility.get_formatted_time_with_milliseconds()}'''",1)
-    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\ai_generated.py"
+    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\generated_code\genearted_code\ai_generated.py"
     FileUtility.write_file(program_path, content)
 
     response_dict = {"program_path":program_path}
@@ -78,17 +78,15 @@ def run_mcp_with_question(question):
     params = {
         "agent_type": "spark",
         "rag_model": "RAG_general_inquiry",
-
         "question": question,
-
         "knowledge_base_file_path": rf"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\RunFlaskClientTemplate.py",
-        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_python_code_gen.txt"),
+        "prompt_file_path": os.path.join(CommonParameters.mcp_configuration_path, "RAG_python_code_gen.txt"),
     }
     response_dict = RAGFactory.run_rag_inquiry_with_params(params)
     print(response_dict)
     content = response_dict["response_json"]
     content = content.replace("python", rf"'''AI generated at: {TimeUtility.get_formatted_time_with_milliseconds()}'''",1)
-    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\ai_generated.py"
+    program_path = r"D:\workspace_python\infinity\dataIntegrator\LLMSuport\MCPFactory\genearted_code\ai_generated.py"
     FileUtility.write_file(program_path, content)
 
     response_dict = {"program_path":program_path}
