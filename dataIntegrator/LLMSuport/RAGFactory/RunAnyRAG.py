@@ -5,63 +5,57 @@ import os
 from dataIntegrator.utility.FileUtility import FileUtility
 from dataIntegrator.utility.TimeUtility import TimeUtility
 
-if __name__ == "__main__":
 
-    ##############################
-    # RAG_SQL_inquiry_stock_summary
-    ##############################
-    # knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
-    # prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
-    #
+def RAG_SQL_inquiry_stock_summary():
+    knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
+    prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
     # question = "花旗银行 2024年12月26日的收盘价"
-    # response_dict = RAGFactory.run_rag_inquiry(
-    #     "RAG_SQL_inquiry_stock_summary", "spark",
-    #     question, knowledge_base_file_path, prompt_file_path)
-    # print(response_dict)
+    question = "show me all the stock information of Citi change between 2022/12/22 to 2024/12/31"
+    response_dict = RAGFactory.run_rag_inquiry(
+        "RAG_SQL_inquiry_stock_summary", "spark",
+        question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
 
-    ##############################
-    # RAG_SQL_inquiry_stocks_code
-    ##############################
-    # knowledge_base_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations", "RAG_SQL_inquiry_stocks_code_knowledge_base.json")
-    # prompt_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations", "RAG_SQL_inquiry_stocks_code_prompts.txt")
-    #
-    # question = """帮我找出花旗， 美国银行，JP 摩根， 苹果，英伟达， 因特尔的股票代码。股票数据需要2023-01-01到2023-12-31之间的数据。不需要冗余数据，返回单一股票代码即可。"""
-    # response_dict = RAGFactory.run_rag_inquiry(
-    #     "RAG_SQL_inquiry_stocks_code", "spark",
-    #     question, knowledge_base_file_path, prompt_file_path)
-    # print(response_dict)
 
-    #############################
-    # RAG_general_inquiry
-    #############################
-    # params = {
-    #     "agent_type": "spark",
-    #     "rag_model": "RAG_general_inquiry",
-    #     "question": "what's the capital of France",
-    #     "knowledge_base_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_general_inquiry.json"),
-    #     "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_general_inquiry.txt"),
-    # }
-    #
-    # response_dict = RAGFactory.run_rag_inquiry_with_params(params)
-    # print(response_dict)
+def RAG_SQL_inquiry_stocks_code():
+    knowledge_base_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations",
+                                            "RAG_SQL_inquiry_stocks_code_knowledge_base.json")
+    prompt_file_path = os.path.join(CommonParameters.basePath, "LLMSuport", "RAGFactory", "configurations",
+                                    "RAG_SQL_inquiry_stocks_code_prompts.txt")
+    question = """帮我找出花旗， 美国银行，JP 摩根， 苹果，英伟达， 因特尔的股票代码。股票数据需要2023-01-01到2023-12-31之间的数据。不需要冗余数据，返回单一股票代码即可。"""
+    response_dict = RAGFactory.run_rag_inquiry(
+        "RAG_SQL_inquiry_stocks_code", "spark",
+        question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
 
-    # ##############################
-    # # RAG_workflow_100000_inquiry
-    # ##############################
-    # params = {
-    #     "agent_type": "spark",
-    #     "rag_model": "RAG_general_inquiry",
-    #     "question": "下载, 保存、然后分析数据",
-    #     "knowledge_base_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_workflow_100000_inquiry.json"),
-    #     "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_workflow_100000_inquiry.txt"),
-    # }
-    #
-    # response_dict = RAGFactory.run_rag_inquiry_with_params(params)
-    # print(response_dict)
 
-    ##############################
-    # RAG_workflow_100000_inquiry
-    ##############################
+def RAG_general_inquiry():
+    params = {
+        "agent_type": "spark",
+        "rag_model": "RAG_general_inquiry",
+        "question": "what's the capital of France",
+        "knowledge_base_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_general_inquiry.json"),
+        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_general_inquiry.txt"),
+    }
+    response_dict = RAGFactory.run_rag_inquiry_with_params(params)
+    print(response_dict)
+
+
+def RAG_workflow_100000_inquiry():
+    params = {
+        "agent_type": "spark",
+        "rag_model": "RAG_general_inquiry",
+        "question": "下载, 保存、然后分析数据",
+        "knowledge_base_file_path": os.path.join(CommonParameters.rag_configuration_path,
+                                                 "RAG_workflow_100000_inquiry.json"),
+        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_workflow_100000_inquiry.txt"),
+    }
+    response_dict = RAGFactory.run_rag_inquiry_with_params(params)
+    print(response_dict)
+
+
+def RAG_workflow_100001_inquiry():
+    global result
     params = {
         "agent_type": "spark",
         "rag_model": "RAG_general_inquiry",
@@ -76,30 +70,26 @@ Now you are going to generate the code for the following steps:
     e) open the plot file in mspaint
         """,
 
-#         "question": """
-# Now you are going to generate the code for the following steps:
-#     a) fetch the data of df_tushare_us_stock_basic
-#         1) the question is "显示股票分类是 EQ 的这些股票的英文名称，股票分类和上市日期，按照上市日期排序，每个股票只显示一次即可。"
-#     b) save the data df_tushare_us_stock_basic
-#     c) open the data of df_tushare_us_stock_basic to excel file in excel
-#         """,
+        #         "question": """
+        # Now you are going to generate the code for the following steps:
+        #     a) fetch the data of df_tushare_us_stock_basic
+        #         1) the question is "显示股票分类是 EQ 的这些股票的英文名称，股票分类和上市日期，按照上市日期排序，每个股票只显示一次即可。"
+        #     b) save the data df_tushare_us_stock_basic
+        #     c) open the data of df_tushare_us_stock_basic to excel file in excel
+        #         """,
 
         "knowledge_base_file_path": rf"D:\workspace_python\infinity\dataIntegrator\test\FlaskServer\RunFlaskClientTemplate.py",
-        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_python_code_gen.txt"),
+        "prompt_file_path": os.path.join(CommonParameters.mcp_configuration_path, "RAG_python_code_gen.txt"),
     }
-
     response_dict = RAGFactory.run_rag_inquiry_with_params(params)
     print(response_dict)
-
     content = response_dict["response_json"]
-    content = content.replace("python", rf"'''AI generated at: {TimeUtility.get_formatted_time_with_milliseconds()}'''", 1)
-
+    content = content.replace("python", rf"'''AI generated at: {TimeUtility.get_formatted_time_with_milliseconds()}'''",
+                              1)
     program_path = r"D:\workspace_python\infinity\dataIntegrator\test\FlaskServer\ai_generated.py"
     FileUtility.write_file(program_path, content)
-
     env = os.environ.copy()
     env["MPLBACKEND"] = "Agg"  # 强制使用非交互式后端
-
     import subprocess
     result = subprocess.run(
         ["python", program_path],
@@ -107,6 +97,71 @@ Now you are going to generate the code for the following steps:
         text=True,
         env=env  # 传递修改后的环境变量
     )
-
     print("程序 B 的输出：", result.stdout)
     print("程序 B 的错误（如果有）：", result.stderr)
+
+def reason_chain_10000_inquiry():
+    params = {
+        "agent_type": "spark",
+        "rag_model": "RAG_general_inquiry",
+        "question": """
+
+        """,
+        "knowledge_base_file_path": os.path.join(CommonParameters.rag_configuration_path,"RAG_reasoning_chain.json"),
+        "prompt_file_path": os.path.join(CommonParameters.rag_configuration_path, "RAG_reasoning_chain.txt"),
+    }
+
+    question = ""
+    while True:
+        # 提示用户输入
+        user_input = input("\n是否继续？输入 [:run] 运行，输入 [:exit] 退出: ").strip().lower()
+
+        # 根据输入决定是否退出循环
+        if user_input == ":exit":
+            print("程序已停止。")
+            break
+        elif user_input == ":run":
+            if question.strip() == "":
+                print("你还没有输入任何问题。请先输入问题。")
+                continue
+            print(rf"正在运行你的问题：{question}")
+            params["question"] = question
+            response_dict = RAGFactory.run_rag_inquiry_with_params(params)
+            print(response_dict)
+            question = ""  # 重置 question 为空字符串以便重新输入
+        else:
+            question = question + "\n" + user_input
+            print(rf"你已输入：{question}")
+
+
+if __name__ == "__main__":
+
+    # ##############################
+    # # RAG_SQL_inquiry_stock_summary
+    # ##############################
+    # RAG_SQL_inquiry_stock_summary()
+    #
+    # ##############################
+    # # RAG_SQL_inquiry_stocks_code
+    # ##############################
+    # RAG_SQL_inquiry_stocks_code()
+    #
+    # #############################
+    # # RAG_general_inquiry
+    # #############################
+    # RAG_general_inquiry()
+    #
+    # ##############################
+    # # RAG_workflow_100000_inquiry
+    # ##############################
+    # RAG_workflow_100000_inquiry()
+    #
+    # ##############################
+    # # RAG_workflow_100001_inquiry
+    # ##############################
+    # RAG_workflow_100001_inquiry()
+
+    ##############################
+    # reason_chain_10000_inquiry
+    ##############################
+    reason_chain_10000_inquiry()

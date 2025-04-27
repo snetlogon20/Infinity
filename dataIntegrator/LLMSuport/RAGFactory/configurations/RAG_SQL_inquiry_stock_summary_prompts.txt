@@ -14,8 +14,9 @@
         3. 包含必要的聚合函数（如SUM、COUNT, AVG）
         4. 使用英文列别名, 按照clickhouse 语法，英文别名不可带有任何单引号或多引号。
         5. remember to use English column alias, and the English alias should not contain any single quotes or double quotes.
-        7. the format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd'
-        6. 返回格式：
+        7. the format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',
+        8. fetch all the column from datatable accordingly if you are told to fetch all the stock information
+        9. 返回格式：
         {{
             "sql": "生成的SQL",
             "explanation_in_Mandarin": "解释查询目的和逻辑"
