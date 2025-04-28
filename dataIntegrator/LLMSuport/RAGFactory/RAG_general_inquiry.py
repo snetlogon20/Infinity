@@ -62,10 +62,13 @@ class RAG_general_inquiry(RAGAgent):
         return response_dict
 
     def display_result(self, response, result_dict):
-        if "error" in response:
-            print(f"错误：{response['error']}")
-            if "sql_attempt" in response:
-                print(f"尝试执行的SQL：{response['sql_attempt']}")
-        else:
-            print("response_json", result_dict["response_json"])
+        # if "error" in response:
+        #     print(f"错误：{response['error']}")
+        #     if "sql_attempt" in response:
+        #         print(f"尝试执行的SQL：{response['sql_attempt']}")
+        # else:
+        #     print("response_json", result_dict["response_json"])
+        # return response
+
+        print("response_json", result_dict["response_json"])
         return response

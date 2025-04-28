@@ -16,7 +16,7 @@ class CommonParameters():
 
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
 
-    clickhouseHostName='192.168.98.149'
+    clickhouseHostName='192.168.98.150'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
@@ -35,6 +35,8 @@ class CommonParameters():
     SPARK_APPID = "5f5c4f75"
     SPARK_API_KEY = "7a3136e4cac2160adb122031351fe0a4"
     SPARK_API_SECRET = "0672724ff7d71dc8fbbdcf98614aedb1"
+
+    MOCKED_AI_ANSWER = ""
 
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
