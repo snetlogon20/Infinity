@@ -1,12 +1,14 @@
 from typing import Dict, Type
 
 from dataIntegrator.LLMSuport.AiAgents import AIAgent, SparkAI, DeepSeek
+from dataIntegrator.LLMSuport.AiAgents.MockedAI import MockedAI
 
 
 class AIAgentFactory:
     _registry: Dict[str, Type[AIAgent]] = {
         "spark": SparkAI,
-        "deepseek": DeepSeek
+        "deepseek": DeepSeek,
+        "mockedai": MockedAI
     }
 
     @classmethod

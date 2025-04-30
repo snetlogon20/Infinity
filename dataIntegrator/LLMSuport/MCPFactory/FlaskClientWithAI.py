@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
+#matplotlib.use('TkAgg')  # 使用 TkAgg 后端
 
 class FlaskClientWithAI:
     def __init__(self):
@@ -129,7 +129,6 @@ class FlaskClientWithAI:
             ax.set_ylabel('Close Point')
             ax.grid(True)
             ax.set_xticks(data_frame[PlotX])
-
 
             plt.savefig(param_dict["params"]["plot_file_path"], dpi=300, bbox_inches='tight')
             plt.show()

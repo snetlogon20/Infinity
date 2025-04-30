@@ -19,5 +19,5 @@ class SparkAI(AIAgent):
         messages = [ChatMessage(role="user", content=prompt)]
         handler = ChunkPrintHandler()
         response = spark.generate([messages], callbacks=[handler])
-        print(rf"查询 Spark LLM，已完成, repsone: {response}")
+        print(rf"查询 Spark LLM，已完成, response: {response.generations[0][0].text}")
         return response

@@ -2,22 +2,22 @@
   "table_schema": {
     "indexsysdb.us_stock_daily": {
       "columns": {
-        "ts_code": "股票代码（字符串类型）",
-        "trade_date": "交易日期（YYYY-MM-DD格式的字符串类型）",
-        "close_point": "收盘价（浮点类型）",
-        "open_point": "开盘价（浮点类型）",
-        "high_point": "最高价（浮点类型）",
-        "low_point": "最低价（浮点类型）",
-        "pre_close": "前收盘价（浮点类型）",
-        "change_point": "涨跌点（浮点类型）",
-        "pct_change": "涨跌幅（浮点类型）",
-        "vol": "成交量（浮点类型）",
-        "amount": "成交额（浮点类型）",
-        "vwap": "加权平均价（浮点类型）",
-        "turnover_ratio": "换手率（浮点类型）",
-        "total_mv": "总市值（浮点类型）",
-        "pe": "市盈率（浮点类型）",
-        "pb": "市净率（浮点类型）"
+        "ts_code": "股票代码, stock code（字符串类型）, SQL alias ts_code ",
+        "trade_date": "交易日期, trade date,（YYYY-MM-DD格式的字符串类型）, SQL alias trade_date",
+        "close_point": "收盘价, close point,（浮点类型）, SQL alias close_point",
+        "open_point": "开盘价, open point,（浮点类型）, SQL alias open_point",
+        "high_point": "最高价, high point of the date,（浮点类型）, SQL alias high_point",
+        "low_point": "最低价, low point of the date,（浮点类型）, SQL alias low_point",
+        "pre_close": "前收盘价, pre close point,（浮点类型）, SQL alias pre_close",
+        "change_point": "涨跌点, change points in one date,（浮点类型）, SQL alias change_point）",
+        "pct_change": "涨跌幅, percent of change in one date,（浮点类型）,SQL  alias pct_change",
+        "vol": "成交量, volume in one date,（浮点类型）, SQL alias vol",
+        "amount": "成交额, trade amount in one date ,（浮点类型）, SQL alias amount",
+        "vwap": "加权平均价, volume weighted average price,（浮点类型）, SQL alias vwap",
+        "turnover_ratio": "换手率, turn over ratio,（浮点类型）, SQL alias turnover_ratio",
+        "total_mv": "总市值, total market value,（浮点类型）, SQL alias total_mv",
+        "pe": "市盈率, Price Earnings Ratio,（浮点类型）, SQL alias pe",
+        "pb": "市净率, Price-to-Book Ratio,（浮点类型）, SQL alias pb"
       }
     },
     "indexsysdb.df_tushare_us_stock_basic": {

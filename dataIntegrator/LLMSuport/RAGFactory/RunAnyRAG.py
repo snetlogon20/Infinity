@@ -10,7 +10,9 @@ def RAG_SQL_inquiry_stock_summary():
     knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
     prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
     # question = "花旗银行 2024年12月26日的收盘价"
-    question = "show me all the stock information of Citi change between 2022/12/22 to 2024/12/31"
+    #question = "show me all the stock information of Citi change between 2022/12/22 to 2024/12/31"
+    #question = "show me the trade date, percent change and volume of Citi change between 2022/12/25 to 2024/12/31"
+    question = "show me the trade date, percent change, low point, and volume of Citi change between 2022/12/25 to 2024/12/31"
     response_dict = RAGFactory.run_rag_inquiry(
         "RAG_SQL_inquiry_stock_summary", "spark",
         question, knowledge_base_file_path, prompt_file_path)
@@ -136,10 +138,10 @@ def reason_chain_10000_inquiry():
 
 if __name__ == "__main__":
 
-    # ##############################
-    # # RAG_SQL_inquiry_stock_summary
-    # ##############################
-    # RAG_SQL_inquiry_stock_summary()
+    ##############################
+    # RAG_SQL_inquiry_stock_summary
+    ##############################
+    RAG_SQL_inquiry_stock_summary()
     #
     # ##############################
     # # RAG_SQL_inquiry_stocks_code
@@ -164,4 +166,4 @@ if __name__ == "__main__":
     ##############################
     # reason_chain_10000_inquiry
     ##############################
-    reason_chain_10000_inquiry()
+    # reason_chain_10000_inquiry()
