@@ -1,28 +1,39 @@
 import traceback
 from dataIntegrator.common import CommonLogLib
+from dataIntegrator.common.CustomError import CustomError
 
 
 class CommonLib():
 
     logger = CommonLogLib.CommonLogLib().getLog()
+    customError = CustomError("000000","")
 
-    def __init__(self, LogLib):
+    #def __init__(self, LogLib):
+    def __init__(self):
+        pass
+        # try:
+        #     self.logger.info("CommonLib __init__ started")
+        #
+        #     self.logger.info("CommonLib __init__ completed")
+        # except Exception as e:
+        #     print('Exception', e)
+        #
+        #     print('==============================================')
+        #     print("%s.%s:" % (CommonLogLib, "__init__"))
+        #     print('Exception: ', e)
+        #     info = traceback.format_exc()
+        #     print(info)
+        #     print('==============================================')
+        #
+        # raise e
 
-        try:
-            self.logger.info("CommonLib __init__ started")
+    @classmethod
+    def raise_custom_error(self, error_code, custom_error_message, e=None, log_error=True):
+        error_message = self.customError.get_error_message(error_code, custom_error_message)
+        if log_error == True:
+            self.logger.error(error_message, exc_info=e)
+        raise CustomError(error_code, error_message)
 
-            self.logger.info("CommonLib __init__ completed")
-        except Exception as e:
-            print('Exception', e)
-
-            print('==============================================')
-            print("%s.%s:" % (CommonLogLib, "__init__"))
-            print('Exception: ', e)
-            info = traceback.format_exc()
-            print(info)
-            print('==============================================')
-
-        raise e
 
     @classmethod
     def writeLogInfo(self, className ="unknown", functionName="unknown", event="unknown"):

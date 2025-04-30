@@ -2,6 +2,7 @@ import os
 
 class CommonParameters():
 
+    application_name = "infinity_grid"
     default_time_zone = 'Asia/Shanghai'
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
@@ -12,6 +13,7 @@ class CommonParameters():
 
     dataPath = r"D:\workspace_python\infinity_data"
     outBoundPath = os.path.join(dataPath,'outbound')
+    logPath = os.path.join(dataPath,'log')
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
 
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
