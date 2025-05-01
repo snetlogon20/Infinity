@@ -25,7 +25,9 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
         for item in knowledge_base["table_definitions"]:
             table_name = item["table_name"]
             table_definition = item["table_definition"]
-            context.append(rf"数据表名 {table_name}: 业务范围: {table_definition}")
+            primary_key = item["primary_key"]
+            table_alias = item["table_alias"]
+            context.append(rf"数据表名 {table_name}: 业务范围: {table_definition}, Primary Key: {primary_key}, table_alias: {table_alias}")
 
         # 表结构信息
         context.append("### 表结构说明:")
@@ -65,6 +67,7 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
     def process_response(self, cleaned_json):
         # 清理 JSON 字符串，去除非法字符
         cleaned_json = re.sub(r'[^\x20-\x7E]', '', cleaned_json)
+        cleaned_json = cleaned_json.replace("\\n", "\n")
 
         # 查询数据
         try:

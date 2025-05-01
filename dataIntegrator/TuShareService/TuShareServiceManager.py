@@ -86,7 +86,7 @@ class TuShareServiceManager():
         logger.info("callTuShareShiborDailyService started...")
 
         start_date = '20220101'
-        end_date = '20220521'
+        end_date = '20250521'
         csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
 
         try:
@@ -409,7 +409,7 @@ class TuShareServiceManager():
             # self.callTuShareUSStockDailyService() #5 times daily
             # self.callTuFutureBasicInformationService()
             # self.callTuShareFutureDailyService()
-            self.callTushareUSStockBasicService()
+            #self.callTushareUSStockBasicService()
             # self.callTuShareHKStockDailyService()
             # self.callTuShareFXOffsoreBasicService()
             # self.callTuShareFXDailyService()
