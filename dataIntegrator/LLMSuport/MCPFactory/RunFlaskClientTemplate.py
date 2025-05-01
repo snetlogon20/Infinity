@@ -1,12 +1,12 @@
 import os
 
+from dataIntegrator import CommonLib
 from dataIntegrator.LLMSuport.MCPFactory.FlaskClientWithAI import FlaskClientWithAI
-from dataIntegrator.common.CommonLogLib import CommonLogLib
 from dataIntegrator.common.CommonParameters import CommonParameters
 
 if __name__ == '__main__':
 
-    logger = CommonLogLib.getLog()
+    logger = CommonLib.logger
 
     # Step 0 - Init the program
     client = FlaskClientWithAI()
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     response = client.fetchData(param_dict)
     response_dict["fetch_df_tushare_us_stock_daily"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - fetch_df_tushare_us_stock_daily")
+        logger.error("Failed when - start - fetch_df_tushare_us_stock_daily")
         exit()
 
     logger.info("complete - fetch_df_tushare_us_stock_daily")
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     response = client.saveData(param_dict)
     response_dict["save_df_tushare_us_stock_daily"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - save_df_tushare_us_stock_daily")
+        logger.error("Failed when - start - save_df_tushare_us_stock_daily")
         exit()
 
     logger.info("completed - save_df_tushare_us_stock_daily")
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     response = client.open_file(param_dict)
     response_dict["open_file"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - open - save_df_tushare_us_stock_daily")
+        logger.error("Failed when - open - save_df_tushare_us_stock_daily")
         exit()
 
     logger.info("completed - save_df_tushare_us_stock_daily")
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     response = client.fetchData(param_dict)
     response_dict["fetch_df_tushare_us_stock_basic"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - fetch_df_tushare_us_stock_basic")
+        logger.error("Failed when - start - fetch_df_tushare_us_stock_basic")
         exit()
 
     logger.info("completed - fetch_df_tushare_us_stock_basic")
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     response = client.saveData(param_dict)
     response_dict["save_df_tushare_us_stock_basic"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - fetch_df_tushare_us_stock_basic")
+        logger.error("Failed when - start - fetch_df_tushare_us_stock_basic")
         exit()
 
     logger.info("completed - save_df_tushare_us_stock_basic")
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     response = client.open_file(param_dict)
     response_dict["open_file"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - open_df_tushare_us_stock_basic")
+        logger.error("Failed when - start - open_df_tushare_us_stock_basic")
         exit()
 
     logger.info("completed - open_df_tushare_us_stock_basic")
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     response = client.draw_plot(param_dict)
     response_dict["plot_df_tushare_us_stock_basic"] = response
     if response.get("return_code") != "000000":
-        logger.error("error - start - plot_df_tushare_us_stock_daily")
+        logger.error("Failed when - start - plot_df_tushare_us_stock_daily")
         exit()
 
     logger.info("completed - plot_df_tushare_us_stock_basic")
