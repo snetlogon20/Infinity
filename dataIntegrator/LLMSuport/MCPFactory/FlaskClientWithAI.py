@@ -6,46 +6,54 @@ import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from dataIntegrator import CommonLib
+
 #matplotlib.use('TkAgg')  # 使用 TkAgg 后端
+
+logger = CommonLib.logger
 
 class FlaskClientWithAI:
     def __init__(self):
         self.session = requests.Session()
-        self.logger = logging.getLogger(__name__)
+        logger = logging.getLogger(__name__)
 
     def _make_request(self, param_dict):
-
-        print(f"_make_request started - param_dict: {param_dict}")
 
         """Generic request handler"""
         url = param_dict["params"]["url"]
         try:
+
+            logger.info(f"Http Request: requ_make_request started - param_dict: {param_dict}")
+
             response = self.session.post(
                 url,
                 json=param_dict,
                 headers={'Content-Type': 'application/json'}
             )
+
+            logger.info(f"Got the response successfully - {response}")
+
             response.raise_for_status()
             return True, response.json()
         except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTP error: {str(e)}")
+            logger.error(f"HTTP error: {str(e)}")
             return False, response.json() if response else {'error': str(e)}
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout) as e:
-            self.logger.error(f"Connection error: {str(e)}")
+            logger.error(f"Connection error: {str(e)}")
             return False, {'error': 'Connection failed'}
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"Request failed: {str(e)}")
+            logger.error(f"Request failed: {str(e)}")
             return False, {'error': str(e)}
         except json.JSONDecodeError:
-            self.logger.error("Invalid JSON response")
+            logger.error("Invalid JSON response")
             return False, {'error': 'Invalid server response'}
 
 
     def fetchData(self, param_dict):
         success, response_json = self._make_request(param_dict)
 
-        print(f"fetchData started - param_dict: {param_dict}")
+        logger.info(f"fetchData started - param_dict: {param_dict}")
 
         # Check HTTP request status
         if not success:
@@ -68,10 +76,10 @@ class FlaskClientWithAI:
         # parse Message
         resultset_dict = response_json.get('resultset_dict')
         if resultset_dict:
-            print(f"Data imported successfully. Records count: {len(resultset_dict)}")
+            logger.info(f"Data imported successfully. Records count: {len(resultset_dict)}")
 
             resultset_df = pd.DataFrame(resultset_dict)
-            print(resultset_df.head())
+            logger.info(resultset_df.head())
         else:
             return_code = "999999"
             message = "No data found in the specified range."
@@ -82,12 +90,12 @@ class FlaskClientWithAI:
             "resultset_df": resultset_df
         }
 
-        print(f"fetchData completed - response_dict: {response_dict}")
+        logger.info(f"fetchData completed - response_dict: {response_dict}")
         return response_dict
 
     def saveData(self, param_dict: dict):
 
-        print(f"saveData started - param_dict: {param_dict}")
+        logger.info(f"saveData started - param_dict: {param_dict}")
 
         try:
             dataset_df: pd.DataFrame = param_dict["params"]["resultset_df"]
@@ -106,12 +114,12 @@ class FlaskClientWithAI:
                 "message": rf"save excel failed: {e.with_traceback()} ",
             }
 
-        print(f"saveData completed - response_dict: {response_dict}")
+        logger.info(f"saveData completed - response_dict: {response_dict}")
         return response_dict
 
     def draw_plot(self, param_dict):
 
-        print(f"draw_plot started - param_dict: {param_dict}")
+        logger.info(f"draw_plot started - param_dict: {param_dict}")
 
         try:
 
@@ -144,11 +152,11 @@ class FlaskClientWithAI:
                 "message": rf"draw plot failed: {e.with_traceback()} "
             }
 
-        print(f"draw_plot completed - response_dict: {response_dict}")
+        logger.info(f"draw_plot completed - response_dict: {response_dict}")
         return response_dict
 
     def open_file(self, param_dict: dict):
-        print(f"open_file started - param_dict: {param_dict}")
+        logger.info(f"open_file started - param_dict: {param_dict}")
 
         try:
             action = param_dict["params"]["action"]
@@ -177,7 +185,7 @@ class FlaskClientWithAI:
                 "message": rf"Action executed failed: {e.with_traceback()} ",
             }
 
-        print(f"open_file completed - response_dict: {response_dict}")
+        logger.info(f"open_file completed - response_dict: {response_dict}")
         return response_dict
 
 # if __name__ == '__main__':

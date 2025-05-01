@@ -1,5 +1,5 @@
 import logging
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 from dataIntegrator.common.CommonParameters import CommonParameters
 
 
@@ -15,14 +15,20 @@ class CommonLogLib:
 
                 # 配置handler，拟将日志记录输出至/log/文件夹
                 file_name = CommonParameters.logFilePath
-                file_handler = TimedRotatingFileHandler\
-                    (filename=file_name,
-                     when='MIDNIGHT',
-                     interval=1,
-                     backupCount=10)  # 每天午夜生成alg_name_log.log文件，最多保留30天
+                # file_handler = TimedRotatingFileHandler\
+                #     (filename=file_name,
+                #      when='MIDNIGHT',
+                #      interval=1,
+                #      backupCount=10)  # 每天午夜生成alg_name_log.log文件，最多保留30天
+                file_handler = RotatingFileHandler(
+                    filename=file_name,
+                    maxBytes=10 * 1024 * 1024,  # 10MB
+                    backupCount=5,
+                    encoding="utf-8"
+                )
 
                 # 配置formatter
-                formatter = logging.Formatter('%(levelname)s - %(asctime)s [%(filename)s:%(lineno)d] %(message)s \n')
+                formatter = logging.Formatter('%(levelname)s - %(asctime)s [%(filename)s:%(lineno)d] %(message)s')
                 file_handler.setFormatter(formatter)
 
                 # 添加handler至logger
@@ -33,7 +39,7 @@ class CommonLogLib:
                 console_handler.setFormatter(formatter)
                 logger.addHandler(console_handler)
 
-                logger.info('debug message')
+                logger.info('======== Application Log started ========')
 
             return logger
 

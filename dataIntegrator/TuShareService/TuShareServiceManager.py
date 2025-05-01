@@ -1,3 +1,4 @@
+from dataIntegrator import CommonLib
 from dataIntegrator.TuShareService.TuShareCNIndexDailyService import TuShareCNIndexDailyService
 from dataIntegrator.TuShareService.TuShareChinaStockIndexService import TuShareChinaStockIndexService
 from dataIntegrator.TuShareService.TushareShiborDailyService import TushareShiborDailyService
@@ -14,18 +15,22 @@ from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFX
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
-from dataIntegrator.common import CommonLib
+#from dataIntegrator.common import CommonLib
 
-class TuShareServiceManager(CommonLib.CommonLib):
+#class TuShareServiceManager(CommonLib.CommonLib):
 
+logger = CommonLib.logger
+
+class TuShareServiceManager():
+
+
+    
     def __init__(self):
-        print("__init__ started")
-
-        print("__init__ completed")
+        logger.info("__init__ started")
 
     @classmethod
     def callTuShareCNIndexDailyService(self):
-        print("callTuShareService started...")
+        logger.info("callTuShareService started...")
 
         ts_code = '000001.SH'
         start_date = '20220521'
@@ -41,14 +46,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareService ended...")
+        logger.info("callTuShareService ended...")
 
     @classmethod
     def callTuShareChinaStockIndexService(self, ts_code = '603839.SH', start_date = '20220521', end_date = '20241230', csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"):
-        print("callTuShareService started...")
+        logger.info("callTuShareService started...")
 
         # 002093.SZ 国脉科技
         # 600490.SH 鹏欣资源
@@ -71,17 +76,17 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareService ended...")
+        logger.info("callTuShareService ended...")
 
     @classmethod
     def callTuShareShiborDailyService(self):
-        print("callTuShareShiborDailyService started...")
+        logger.info("callTuShareShiborDailyService started...")
 
         start_date = '20220101'
-        end_date = '20220521'
+        end_date = '20250521'
         csvFilePath= r"D:\workspace_python\dataIntegrator\dataIntegrator\data\outbound\df_tushare_df_tushare_shibor_daily_20220507.csv"
 
         try:
@@ -93,14 +98,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareShiborDailyService ended...")
+        logger.info("callTuShareShiborDailyService ended...")
 
     @classmethod
     def callTushareShiborLPRDailyService(self):
-        print("callTuShareShiborDailyService started...")
+        logger.info("callTuShareShiborDailyService started...")
 
         start_date = '20220101'
         end_date = '20220521'
@@ -115,14 +120,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareShiborDailyService ended...")
+        logger.info("callTuShareShiborDailyService ended...")
 
     @classmethod
     def callTushareCNGDPService(self):
-        print("callTushareCNGDPService started...")
+        logger.info("callTushareCNGDPService started...")
 
         start_date = '2018Q1'
         end_date = '2022Q1'
@@ -137,14 +142,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareCNGDPService ended...")
+        logger.info("callTushareCNGDPService ended...")
 
     @classmethod
     def callTushareCNMondySupplyService(self):
-        print("callTushareCNMondySupplyService started...")
+        logger.info("callTushareCNMondySupplyService started...")
 
         start_date = '200001'
         end_date = '202212'
@@ -159,14 +164,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareCNMondySupplyService ended...")
+        logger.info("callTushareCNMondySupplyService ended...")
 
     @classmethod
     def callTushareCNCPIService(self):
-        print("callTushareCNCPIService started...")
+        logger.info("callTushareCNCPIService started...")
 
         start_date = '200001'
         end_date = '202212'
@@ -181,14 +186,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareCNCPIService ended...")
+        logger.info("callTushareCNCPIService ended...")
 
     @classmethod
     def callTuShareUSStockDailyService(self):
-        print("callTuShareUSStockDailyService started...")
+        logger.info("callTuShareUSStockDailyService started...")
 
         ts_code = 'C'
         start_date = '20220101'
@@ -204,14 +209,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareUSStockDailyService ended...")
+        logger.info("callTuShareUSStockDailyService ended...")
 
     @classmethod
     def callTuFutureBasicInformationService(self):
-        print("callTuShareFutureBasicInformationService started...")
+        logger.info("callTuShareFutureBasicInformationService started...")
 
         exchange = 'DCE'
         fut_type = '1'
@@ -227,14 +232,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareFutureBasicInformationService ended...")
+        logger.info("callTuShareFutureBasicInformationService ended...")
 
     @classmethod
     def callTuShareFutureDailyService(self):
-        print("callTuShareFutureDailyService started...")
+        logger.info("callTuShareFutureDailyService started...")
 
         ts_code = 'JM2304.DCE'
         start_date = '20180101'
@@ -250,14 +255,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareFutureDailyService ended...")
+        logger.info("callTuShareFutureDailyService ended...")
 
     @classmethod
     def callTushareUSStockBasicService(self):
-        print("callTushareUSStockBasicService started...")
+        logger.info("callTushareUSStockBasicService started...")
 
         start_date = '20180101'
         end_date = '20250501'
@@ -272,14 +277,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareUSStockBasicService ended...")
+        logger.info("callTushareUSStockBasicService ended...")
 
     @classmethod
     def callTuShareHKStockDailyService(self):
-        print("callTuShareHKStockDailyService started...")
+        logger.info("callTuShareHKStockDailyService started...")
 
         ts_code = '00001.HK'
         start_date = '20220101'
@@ -295,14 +300,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareHKStockDailyService ended...")
+        logger.info("callTuShareHKStockDailyService ended...")
 
     @classmethod
     def callTuShareFXOffsoreBasicService(self):
-        print("callTuShareFXOffsoreBasicService started...")
+        logger.info("callTuShareFXOffsoreBasicService started...")
 
         exchange = 'FXCM'
         classify = 'INDEX'
@@ -317,14 +322,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareFXOffsoreBasicService ended...")
+        logger.info("callTuShareFXOffsoreBasicService ended...")
 
     @classmethod
     def callTuShareFXDailyService(self):
-        print("callTuShareFXDailyService started...")
+        logger.info("callTuShareFXDailyService started...")
 
         ts_code = 'US30.FXCM'
         start_date = '20220101'
@@ -340,14 +345,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTuShareFXDailyService ended...")
+        logger.info("callTuShareFXDailyService ended...")
 
     @classmethod
     def callTushareSGEDailyService(self):
-        print("callTushareSGEDailyService started...")
+        logger.info("callTushareSGEDailyService started...")
 
         start_date = '20220531'
         end_date = '20220531'
@@ -362,14 +367,14 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareSGEDailyService ended...")
+        logger.info("callTushareSGEDailyService ended...")
 
     @classmethod
     def callTushareUSTreasuryYieldCurveService(self):
-        print("callTushareUSTreasuryYieldCurveService started...")
+        logger.info("callTushareUSTreasuryYieldCurveService started...")
 
         start_date = '20220101'
         end_date = '20241231'
@@ -384,15 +389,15 @@ class TuShareServiceManager(CommonLib.CommonLib):
             tuShareService.saveDateToClickHouse()
 
         except Exception as e:
-            print('Exception', e)
+            logger.info('Exception', e)
             raise e
 
-        print("callTushareUSTreasuryYieldCurveService ended...")
+        logger.info("callTushareUSTreasuryYieldCurveService ended...")
 
     @classmethod
     def callTuShareService(self):
         try:
-            print("callTuShareService started")
+            logger.info("callTuShareService started")
 
             # self.callTuShareCNIndexDailyService()
             # self.callTuShareChinaStockIndexService()
@@ -404,22 +409,28 @@ class TuShareServiceManager(CommonLib.CommonLib):
             # self.callTuShareUSStockDailyService() #5 times daily
             # self.callTuFutureBasicInformationService()
             # self.callTuShareFutureDailyService()
-            self.callTushareUSStockBasicService()
+            #self.callTushareUSStockBasicService()
             # self.callTuShareHKStockDailyService()
             # self.callTuShareFXOffsoreBasicService()
             # self.callTuShareFXDailyService()
             # self.callTushareSGEDailyService() #2 times daily
             #self.callTushareUSTreasuryYieldCurveService()
 
-            print("callTuShareService completed successfully")
+            logger.info("callTuShareService completed successfully")
 
         except Exception as e:
-            print('==============================================', e)
-            print('Exception', e)
-            print('==============================================', e)
+            logger.info('==============================================', e)
+            logger.info('Exception', e)
+            logger.info('==============================================', e)
             raise e
 
-            print("end successfuly")
-
+            logger.info("end successfuly")
 
 ##todo to add the global exception handler
+def main():
+    tuShareServiceManger = TuShareServiceManager()
+    tuShareServiceManger.callTuShareService()
+
+if __name__ == '__main__':
+    main()
+

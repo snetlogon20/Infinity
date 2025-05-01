@@ -1,3 +1,6 @@
+import os
+
+from dataIntegrator import CommonParameters
 from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
 from dataIntegrator.LLMSuport.StreamLit.RAG_SQL_inquiry.RAG_SQL_inquiry import BaseRAGSQLInquiry
 from dataIntegrator.modelService.financialAnalysis.PortforlioVolatility import PortfolioVolatilityCalculator
@@ -10,8 +13,10 @@ class RAG_SQL_inquiry_portfolio_volatility_service(BaseRAGSQLInquiry):
 
     @classmethod
     def inquiry(self, agent_type, question):
-        knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_knowledge_base.json"
-        prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_prompts.txt"
+        # knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_knowledge_base.json"
+        # prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stocks_code_prompts.txt"
+        knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stocks_code_knowledge_base.json")
+        prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stocks_code_prompts.txt")
 
         agent_type = "spark"
         response_dict = RAGFactory.run_rag_inquiry(

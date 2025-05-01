@@ -7,6 +7,7 @@ from dataIntegrator.common.CommonParameters import CommonParameters
 import sys
 
 class TuShareService(CommonLib.CommonLib):
+
     dataFrame = pandas.core.frame.DataFrame
     jsonString = ""
     token = CommonParameters.tuShareToken
@@ -33,13 +34,13 @@ class TuShareService(CommonLib.CommonLib):
         ts.set_token(self.token)
         self.pro = ts.pro_api()
 
-        print("__init__ completed")
+        #print("__init__ completed")
 
     @classmethod
     def getToken(self):
-        print("getToken started")
-
-        print("getToken completed")
+        # print("getToken started")
+        #
+        # print("getToken completed")
 
         return self.token
 

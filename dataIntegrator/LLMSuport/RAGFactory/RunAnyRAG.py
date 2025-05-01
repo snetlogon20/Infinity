@@ -7,12 +7,21 @@ from dataIntegrator.utility.TimeUtility import TimeUtility
 
 
 def RAG_SQL_inquiry_stock_summary():
-    knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
-    prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
+    # knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
+    # prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stock_summary_knowledge_base.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stock_summary_prompts.txt")
+
     # question = "花旗银行 2024年12月26日的收盘价"
     #question = "show me all the stock information of Citi change between 2022/12/22 to 2024/12/31"
     #question = "show me the trade date, percent change and volume of Citi change between 2022/12/25 to 2024/12/31"
-    question = "show me the trade date, percent change, low point, and volume of Citi change between 2022/12/25 to 2024/12/31"
+    #question = "show me the china CPI data as of 2022 Aug."
+    #question = "show me the 期货基本信息 ，期货名称中包含豆的产品."
+    #question = "show me the 美国国债收益率曲线 2022年01月10日当日."
+    #question = "帮我在df_tushare_us_stock_daily找出花旗2024-12-01到2024-12-27的成交额，然后再比较同期df_tushare_stock_daily 中国脉科技的成交额"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02的成交额，然后再比较同期中国股票中 “国脉科技”的成交额"
+    question = "帮我在美国股票信息中找出花旗2024-12-02的pct_change，然后再比较 同期上海银行间同业拆放利率"
     response_dict = RAGFactory.run_rag_inquiry(
         "RAG_SQL_inquiry_stock_summary", "spark",
         question, knowledge_base_file_path, prompt_file_path)

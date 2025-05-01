@@ -1,12 +1,17 @@
 import pandas as pd
 import oracledb
+
+from dataIntegrator import CommonLib, CommonLogLib
 from dataIntegrator.TuShareService.TuShareService import TuShareService
-import sys
 
 from dataIntegrator.common.CommonParameters import CommonParameters
+from dataIntegrator.common.CustomError import CustomError
 
+logger = CommonLib.logger
+commonLib = CommonLib()
 
 class OracleService(TuShareService):
+
 
     def __init__(self, oracle_client):
         super().__init__()
@@ -14,8 +19,8 @@ class OracleService(TuShareService):
 
     def getDataFrameWithoutColumnsName(self, sql):
         """执行 SQL 查询并返回包含列名的 DataFrame"""
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData started")
+        logger.info("prepareData started")
+
         try:
             # 执行 SQL 查询
             cursor = self.oracleClient.cursor()
@@ -29,13 +34,11 @@ class OracleService(TuShareService):
             dataframe = pd.DataFrame(result, columns=columns)
 
         except Exception as e:
-            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
-            raise e
+            raise CustomError("", custom_error_message=rf"sql: {sql}")
         finally:
             cursor.close()
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="execute_query completed")
+        logger.info("execute_query completed")
 
         return dataframe
 
@@ -50,7 +53,7 @@ class OracleService(TuShareService):
             # 将 DataFrame 转换为插入语句
             placeholders = ", ".join([":" + col for col in oracle_columns])
             insert_sql = f"INSERT INTO {oracle_table} ({', '.join(oracle_columns)}) VALUES ({placeholders})"
-            print(insert_sql)
+            logger.info(insert_sql)
 
             # 执行批量插入操作
             cursor = self.oracleClient.cursor()
@@ -59,10 +62,12 @@ class OracleService(TuShareService):
             cursor.close()
 
         except Exception as e:
-            print(f"插入数据到 Oracle 失败：{e}")
-            raise e
+            raise commonLib.raise_custom_error(error_code="000100", custom_error_message=rf"插入数据到 Oracle 失败, sql: {insert_sql}", e=e)
 
+    @classmethod
     def migrate_dataframe_to_oracle(self, oracle_config):
+
+        self.logger.info("migrate_dataframe_to_oracle started")
 
         # 初始化 Oracle 连接
         host = oracle_config["host"]
@@ -80,7 +85,7 @@ class OracleService(TuShareService):
             # 生成 DSN 并建立连接
             dsn = oracledb.makedsn(host, port, sid=sid)
             connection = oracledb.connect(user=username, password=password, dsn=dsn)
-            print("成功连接到 Oracle 数据库！")
+            logger.info("成功连接到 Oracle 数据库！")
 
             # 创建 OracleService 对象
             oracle_service = OracleService(connection)
@@ -90,12 +95,12 @@ class OracleService(TuShareService):
             oracle_columns = dataframe.columns.tolist()
 
             # 将数据插入到 Oracle 表中
-            print(f"将数据插入到 Oracle 表 {oracle_table} 中...")
+            logger.info(f"将数据插入到 Oracle 表 {oracle_table} 中...")
             oracle_service._insert_data_into_oracle(dataframe, oracle_table, oracle_columns)
-            print("数据插入完成！")
+            logger.info("数据插入完成！")
 
         except oracledb.Error as e:
-            print(f"连接或插入数据时出错：{e}")
+            raise commonLib.raise_custom_error(error_code="000100", custom_error_message=rf"插入数据到 Oracle 失败, sql: {oracle_table}", e=e, log_error=False)
 
         finally:
             # 确保连接关闭
