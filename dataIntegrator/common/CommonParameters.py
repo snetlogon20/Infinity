@@ -18,7 +18,7 @@ class CommonParameters():
 
     tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
 
-    clickhouseHostName='192.168.98.150'
+    clickhouseHostName='192.168.98.151'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {

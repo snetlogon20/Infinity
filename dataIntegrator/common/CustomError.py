@@ -10,6 +10,8 @@ class CustomError(Exception):
             "0000001": "Init",
 
             "000100": "Oracle Error",
+            "000101": "ClickHouse Error",
+
             "999999": "Unknown Error",
         }
 

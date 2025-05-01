@@ -1,31 +1,36 @@
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareService import TuShareService
+from clickhouse_driver import Client as ClickhouseClient
 import sys
 import pandas as pd
 
+logger = CommonLib.logger
+commonLib = CommonLib()
 
-class ClickhouseService(TuShareService):
+#class ClickhouseService(TuShareService):
+class ClickhouseService:
+
+    clickhouseClient = ClickhouseClient(host=CommonParameters.clickhouseHostName, database=CommonParameters.clickhouseHostDatabase)
     @classmethod
     def getDataFrame(self, sql, columns):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData started")
+        logger.info("prepareData started")
         try:
             result = self.clickhouseClient.execute(sql)
             dataframe = pd.DataFrame(result)
             dataframe.columns  = columns
 
         except Exception as e:
-            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
-            raise e
+            raise commonLib.raise_custom_error(error_code="000101", custom_error_message=rf"getDataFrame execute sql error, sql: {sql}", e=e)
+            # self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            # raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="execute_query completed")
+        logger.info("execute_query completed")
 
         return dataframe
 
     @classmethod
     def getDataFrameWithoutColumnsName(self, sql):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData started")
+        logger.info(rf"prepareData started - sql: {sql}")
         try:
             cursor = self.clickhouseClient.execute_iter(sql, with_column_types=True)
             columns = [col[0] for col in next(cursor)]
@@ -34,11 +39,11 @@ class ClickhouseService(TuShareService):
             dataframe = pd.DataFrame(result, columns=columns)
 
         except Exception as e:
-            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
-            raise e
+            raise commonLib.raise_custom_error(error_code="000101",custom_error_message=rf"getDataFrameWithoutColumnsName execute sql error, sql: {sql}", e=e)
+            # self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            # raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="execute_query completed")
+        logger.info("execute_query completed")
 
         return dataframe
 
