@@ -1,24 +1,22 @@
 {
   "table_definitions": [
-    {"table_name": "df_tushare_us_stock_daily", "table_definition": "美国股票日交易信息，US stock daily trading data"},
-    {"table_name": "df_tushare_us_stock_basic", "table_definition": "美国股票基本信息，US stock basic information"},
-    {"table_name": "df_sys_calendar", "table_definition": "交易日历，Trading calendar"},
-    {"table_name": "df_tushare_cn_cpi", "table_definition": "中国通胀CPI信息，China Consumer Price Index data"},
-    {"table_name": "df_tushare_cn_index_daily", "table_definition": "中国股票指数日行情，China stock index daily quotes"},
-    {"table_name": "cn_money_supply", "table_definition": "中国货币供应量，China money supply statistics"},
-    {"table_name": "df_tushare_cn_gdp", "table_definition": "中国GDP数据，China Gross Domestic Product statistics"},
-    {"table_name": "df_tushare_future_basic_information", "table_definition": "期货基本信息，Futures contract specifications"},
-    {"table_name": "df_tushare_future_daily", "table_definition": "期货日交易数据，Futures daily trading records"},
-    {"table_name": "df_tushare_fx_daily", "table_definition": "外汇市场日行情，Foreign exchange daily market data"},
-    {"table_name": "df_tushare_fx_offshore__basic", "table_definition": "离岸外汇基础信息，Offshore foreign exchange basic data"},
-    {"table_name": "df_tushare_hk_stock_daily", "table_definition": "香港股票日行情，Hong Kong stock daily trading records"},
-    {"table_name": "df_tushare_sge_daily", "table_definition": "上海黄金交易所日行情，Shanghai Gold Exchange daily quotes"},
-    {"table_name": "df_tushare_shibor", "table_definition": "上海银行间同业拆放利率，Shanghai Interbank Offered Rate data"},
-    {"table_name": "df_tushare_shibor_lpr", "table_definition": "贷款市场报价利率，Loan Prime Rate data"},
-    {"table_name": "df_tushare_stock_daily", "table_definition": "A股日交易数据，A-share daily trading records"},
-    {"table_name": "df_tushare_us_stock_basic", "table_definition": "美国股票基本信息，US stock basic information"},
-    {"table_name": "df_tushare_us_stock_daily", "table_definition": "美国股票日行情，US stock daily trading data"},
-    {"table_name": "df_tushare_us_treasury_yield_cruve", "table_definition": "美国国债收益率曲线，US Treasury yield curve data"}
+      {"table_name": "df_sys_calendar", "table_definition": "交易日历，Trading calendar", "primary_key": "trade_date", "table_alias": "df_sys_calendar"},
+      {"table_name": "df_tushare_us_stock_daily", "table_definition": "美国股票日交易信息，US stock daily trading data", "primary_key": "ts_code,trade_date", "table_alias": "df_tushare_us_stock_daily"},
+      {"table_name": "df_tushare_us_stock_basic", "table_definition": "美国股票基本信息，US stock basic information", "primary_key": "ts_code", "table_alias": "df_tushare_us_stock_basic"},
+      {"table_name": "df_tushare_cn_cpi", "table_definition": "中国通胀CPI信息，China Consumer Price Index data", "primary_key": "trade_date", "table_alias": "df_tushare_cn_cpi"},
+      {"table_name": "df_tushare_cn_index_daily", "table_definition": "中国股票指数日行情，China stock index daily quotes", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_cn_index_daily"},
+      {"table_name": "cn_money_supply", "table_definition": "中国货币供应量，China money supply statistics", "primary_key": "trade_date", "table_alias": "cn_money_supply"},
+      {"table_name": "df_tushare_cn_gdp", "table_definition": "中国GDP数据，China Gross Domestic Product statistics", "primary_key": "quarter", "table_alias": "df_tushare_cn_gdp"},
+      {"table_name": "df_tushare_future_basic_information", "table_definition": "期货基本信息，Futures contract specifications", "primary_key": "ts_code", "table_alias": "df_tushare_future_basic_information"},
+      {"table_name": "df_tushare_future_daily", "table_definition": "期货日交易数据，Futures daily trading records", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_future_daily"},
+      {"table_name": "df_tushare_fx_daily", "table_definition": "外汇市场日行情，Foreign exchange daily market data", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_fx_daily"},
+      {"table_name": "df_tushare_fx_offshore__basic", "table_definition": "离岸外汇基础信息，Offshore foreign exchange basic data", "primary_key": "ts_code", "table_alias": "df_tushare_fx_offshore__basic"},
+      {"table_name": "df_tushare_hk_stock_daily", "table_definition": "香港股票日行情，Hong Kong stock daily trading records", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_hk_stock_daily"},
+      {"table_name": "df_tushare_sge_daily", "table_definition": "上海黄金交易所日行情，Shanghai Gold Exchange daily quotes", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_sge_daily"},
+      {"table_name": "df_tushare_shibor", "table_definition": "上海银行间同业拆放利率，Shanghai Interbank Offered Rate data", "primary_key": "trade_date", "table_alias": "df_tushare_shibor"},
+      {"table_name": "df_tushare_shibor_lpr", "table_definition": "贷款市场报价利率，Loan Prime Rate data", "primary_key": "trade_date", "table_alias": "df_tushare_shibor_lpr"},
+      {"table_name": "df_tushare_stock_daily", "table_definition": "中国股票日交易数据，A-share daily trading records", "primary_key": "ts_code, trade_date", "table_alias": "df_tushare_stock_daily"},
+      {"table_name": "df_tushare_us_treasury_yield_cruve", "table_definition": "美国国债收益率曲线，US Treasury yield curve data", "primary_key": "trade_date", "table_alias": "df_tushare_us_treasury_yield_cruve"}
   ],
   "table_schema": {
     "indexsysdb.df_tushare_us_stock_daily": {
@@ -153,7 +151,7 @@
      "indexsysdb.df_tushare_fx_daily": {
       "columns": {
         "ts_code": "货币对代码, Currency pair code（字符串类型）, SQL alias ts_code",
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "bid_open": "买入开盘价, Bid opening price（浮点类型）, SQL alias bid_open",
         "bid_close": "买入收盘价, Bid closing price（浮点类型）, SQL alias bid_close",
         "bid_high": "买入最高价, Bid highest price（浮点类型）, SQL alias bid_high",
@@ -184,7 +182,7 @@
     "indexsysdb.df_tushare_hk_stock_daily": {
       "columns": {
         "ts_code": "股票代码, Stock code（字符串类型）, SQL alias ts_code",
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "open": "开盘价, Opening price（浮点类型）, SQL alias open",
         "high": "最高价, Highest price（浮点类型）, SQL alias high",
         "low": "最低价, Lowest price（浮点类型）, SQL alias low",
@@ -199,7 +197,7 @@
     "indexsysdb.df_tushare_sge_daily": {
       "columns": {
         "ts_code": "合约代码, Contract code（字符串类型）, SQL alias ts_code",
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "close": "收盘价, Closing price（浮点类型）, SQL alias close",
         "open": "开盘价, Opening price（浮点类型）, SQL alias open",
         "high": "最高价, Highest price（浮点类型）, SQL alias high",
@@ -216,7 +214,7 @@
     },
     "indexsysdb.df_tushare_shibor_daily": {
       "columns": {
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "tenor_on": "隔夜利率, Overnight rate（浮点类型）, SQL alias tenor_on",
         "tenor_1w": "1周利率, 1-week rate（浮点类型）, SQL alias tenor_1w",
         "tenor_2w": "2周利率, 2-week rate（浮点类型）, SQL alias tenor_2w",
@@ -229,7 +227,7 @@
     },
     "indexsysdb.df_tushare_shibor_lpr_daily": {
       "columns": {
-        "trade_date": "发布日期, Publish date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "发布日期, Publish Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "tenor_1y": "1年期LPR, 1-year LPR（浮点类型）, SQL alias tenor_1y",
         "tenor_5": "5年期LPR, 5-year LPR（浮点类型）, SQL alias tenor_5"
       }
@@ -237,7 +235,7 @@
     "indexsysdb.df_tushare_stock_daily": {
       "columns": {
         "ts_code": "股票代码, Stock code（字符串类型）, SQL alias ts_code",
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "open": "开盘价, Opening price（浮点类型）, SQL alias open",
         "high": "最高价, Highest price（浮点类型）, SQL alias high",
         "low": "最低价, Lowest price（浮点类型）, SQL alias low",
@@ -249,39 +247,9 @@
         "amount": "成交额, Trading amount（浮点类型）, SQL alias amount"
       }
     },
-    "indexsysdb.df_tushare_us_stock_basic": {
-      "columns": {
-        "ts_code": "股票代码, Stock code（字符串类型）, SQL alias ts_code",
-        "name": "公司名称, Company name（可为空字符串类型）, SQL alias name",
-        "enname": "英文名称, English name（字符串类型）, SQL alias enname",
-        "classify": "行业分类, Industry classification（字符串类型）, SQL alias classify",
-        "list_date": "上市日期, Listing date（字符串类型）, SQL alias list_date",
-        "delist_date": "退市日期, Delisting date（可为空字符串类型）, SQL alias delist_date"
-      }
-    },
-    "indexsysdb.us_stock_daily": {
-      "columns": {
-        "ts_code": "股票代码, Stock code（字符串类型）, SQL alias ts_code",
-        "trade_date": "交易日期, Trade date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
-        "close_point": "收盘价, Closing price（浮点类型）, SQL alias close_point",
-        "open_point": "开盘价, Opening price（浮点类型）, SQL alias open_point",
-        "high_point": "最高价, Highest price（浮点类型）, SQL alias high_point",
-        "low_point": "最低价, Lowest price（浮点类型）, SQL alias low_point",
-        "pre_close": "前收盘价, Previous closing price（浮点类型）, SQL alias pre_close",
-        "change_point": "价格变动, Price change（浮点类型）, SQL alias change_point",
-        "pct_change": "涨跌幅, Percentage change（浮点类型）, SQL alias pct_change",
-        "vol": "成交量, Trading volume（浮点类型）, SQL alias vol",
-        "amount": "成交额, Trading amount（浮点类型）, SQL alias amount",
-        "vwap": "加权均价, Volume weighted average price（浮点类型）, SQL alias vwap",
-        "turnover_ratio": "换手率, Turnover ratio（浮点类型）, SQL alias turnover_ratio",
-        "total_mv": "总市值, Total market value（浮点类型）, SQL alias total_mv",
-        "pe": "市盈率, Price-earnings ratio（浮点类型）, SQL alias pe",
-        "pb": "市净率, Price-to-book ratio（浮点类型）, SQL alias pb"
-      }
-    },
     "indexsysdb.df_tushare_us_treasury_yield_cruve": {
       "columns": {
-        "trade_date": "日期, Date（YYYY-MM-DD格式字符串类型）, SQL alias trade_date",
+        "trade_date": "日期, Date（YYYYMMDD格式字符串类型）, SQL alias trade_date",
         "m1": "1个月收益率, 1-month yield（浮点类型）, SQL alias m1",
         "m2": "2个月收益率, 2-month yield（浮点类型）, SQL alias m2",
         "m3": "3个月收益率, 3-month yield（浮点类型）, SQL alias m3",
@@ -317,6 +285,7 @@
   ],
   "business_rules": [
     "花旗银行的 ts_code 是'C'",
+    "国脉科技的 ts_code 是'002093.SZ'",
     "花旗银行英文名是Citi",
     "close price is the same as close_point",
     "ts_code of JP morgan is 'JPM'",
