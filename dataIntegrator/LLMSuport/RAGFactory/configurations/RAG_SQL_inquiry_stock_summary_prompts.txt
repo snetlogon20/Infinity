@@ -8,7 +8,7 @@
 
 请按以下要求返回结果：
 1. 使用与问题最相关的字段
-2. 使用clickhouse 语法
+2. 使用clickhouse 语法，尤其是保持### 数据表定义说明和 ### 表结构说明中的表名和字段名称，注意保持原有的大小写。
 3. 包含必要的聚合函数（如SUM、COUNT, AVG）
 4. 字段别名按照 **表结构** 中 alias 后的英文字段名取值
 5. the format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',

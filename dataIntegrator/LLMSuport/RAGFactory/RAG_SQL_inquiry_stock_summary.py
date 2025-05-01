@@ -21,6 +21,12 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
     def retrieve_context(self, knowledge_base, question):
         context = []
 
+        context.append("### 数据表定义说明:")
+        for item in knowledge_base["table_definitions"]:
+            table_name = item["table_name"]
+            table_definition = item["table_definition"]
+            context.append(rf"数据表名 {table_name}: 业务范围: {table_definition}")
+
         # 表结构信息
         context.append("### 表结构说明:")
         for table, schema in knowledge_base["table_schema"].items():
