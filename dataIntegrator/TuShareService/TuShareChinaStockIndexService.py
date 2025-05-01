@@ -1,6 +1,8 @@
+from dataIntegrator import CommonLib
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
 
+logger = CommonLib.logger
 
 class TuShareChinaStockIndexService(TuShareService):
     @classmethod

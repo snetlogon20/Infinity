@@ -1,6 +1,17 @@
 {
+  "table_definitions": [
+    {"table_name": "df_tushare_us_stock_daily", "table_definition": "美国股票日交易信息，US stock daily trading data"},
+    {"table_name": "df_tushare_us_stock_basic", "table_definition": "美国股票基本信息，US stock basic information"},
+    {"table_name": "df_sys_calendar", "table_definition": "交易日历，Trading calendar"},
+    {"table_name": "df_tushare_cn_cpi", "table_definition": "中国通胀CPI信息，China Consumer Price Index data"},
+    {"table_name": "df_tushare_cn_index_daily", "table_definition": "中国股票指数日行情，China stock index daily quotes"},
+    {"table_name": "cn_money_supply", "table_definition": "中国货币供应量，China money supply statistics"},
+    {"table_name": "df_tushare_cn_gdp", "table_definition": "中国GDP数据，China Gross Domestic Product statistics"},
+    {"table_name": "df_tushare_future_basic_information", "table_definition": "期货基本信息，Futures contract specifications"},
+    {"table_name": "df_tushare_future_daily", "table_definition": "期货日交易数据，Futures daily trading records"}
+  ],
   "table_schema": {
-    "indexsysdb.us_stock_daily": {
+    "indexsysdb.df_tushare_us_stock_daily": {
       "columns": {
         "ts_code": "股票代码, stock code（字符串类型）, SQL alias ts_code ",
         "trade_date": "交易日期, trade date,（YYYY-MM-DD格式的字符串类型）, SQL alias trade_date",
@@ -28,6 +39,105 @@
         "classify": "股票分类，数据类型为字符串",
         "list_date": "上市日期，数据类型为字符串",
         "delist_date": "退市日期，数据类型为字符串，可为空"
+      }
+    },
+    "indexsysdb.df_sys_calendar": {
+      "columns": {
+        "trade_date": "交易日期, trade date（字符串类型）, SQL alias trade date",
+        "trade_year": "交易年份, trade year（字符串类型）, SQL alias trade year",
+        "trade_month": "交易月份, trade month（字符串类型）, SQL alias trademonth",
+        "trade_day": "交易日, trade day（字符串类型）, SQL alias trade day",
+        "day_of_week": "星期几, day of week（字符串类型）, SQL alias day of week",
+        "quarter": "季度, quarter（字符串类型）, SQL alias quarter",
+        "calendar_date": "日历日期, calendar date（字符串类型）, SQL alias calendar_date"
+      }
+    },
+    "indexsysdb.df_tushare_cn_cpi": {
+      "columns": {
+        "trade_date": "日期, trade date（字符串类型）, SQL alias Trade Date。该字段通过4位年份和2位月份表示月度信息，如200001表示2000年1月 ",
+        "nt_val": "全国值, national value（浮点类型）, SQL alias National Value",
+        "nt_yoy": "全国同比, national year-over-year（浮点类型）, SQL alias National Year Over Year",
+        "nt_mom": "全国环比, national month-over-month（浮点类型）, SQL alias National Month Over Month",
+        "nt_accu": "全国累计, national accumulated（浮点类型）, SQL alias National Accumulated",
+        "town_val": "城镇值, urban value（浮点类型）, SQL alias Urban Value",
+        "town_yoy": "城镇同比, urban year-over-year（浮点类型）, SQL alias Urban Year Over Year",
+        "town_mom": "城镇环比, urban month-over-month（浮点类型）, SQL alias Urban Month Over Month",
+        "town_accu": "城镇累计, urban accumulated（浮点类型）, SQL alias Urban Accumulated",
+        "cnt_val": "农村值, rural value（浮点类型）, SQL alias Rural Value",
+        "cnt_yoy": "农村同比, rural year-over-year（浮点类型）, SQL alias Rural Year Over Year",
+        "cnt_mom": "农村环比, rural month-over-month（浮点类型）, SQL alias Rural Month Over Month",
+        "cnt_accu": "农村累计, rural accumulated（浮点类型）, SQL alias Rural Accumulated"
+      }
+    },
+    "indexsysdb.df_tushare_cn_index_daily": {
+      "columns": {
+        "ts_code": "股票代码, target symbol code（字符串类型）, SQL alias Stock Code",
+        "trade_date": "交易日期, trade date（YYYY-MM-DD格式的字符串类型）, SQL alias Trade Date",
+        "close": "收盘价, close price（浮点类型）, SQL alias Close Price",
+        "open": "开盘价, open price（浮点类型）, SQL alias Open Price",
+        "high": "最高价, high price（浮点类型）, SQL alias High Price",
+        "low": "最低价, low price（浮点类型）, SQL alias Low Price",
+        "pre_close": "前收盘价, previous close price（浮点类型）, SQL alias Previous Close Price",
+        "change": "涨跌额, price change（浮点类型）, SQL alias Price Change",
+        "pct_chg": "涨跌幅, percentage change（浮点类型）, SQL alias Percentage Change",
+        "vol": "成交量, trading volume（浮点类型）, SQL alias Trading Volume",
+        "amount": "成交额, turnover amount（浮点类型）, SQL alias Turnover Amount"
+      }
+    },
+    "indexsysdb.cn_money_supply": {
+      "columns": {
+        "trade_date": "统计日期, statistical date（字符串类型）, SQL alias Statistical Date",
+        "m0": "流通中货币, money supply M0（浮点类型）, SQL alias Money Supply M0",
+        "m0_yoy": "M0同比, M0 year-over-year（浮点类型）, SQL alias M0 Year Over Year",
+        "m0_mom": "M0环比, M0 month-over-month（浮点类型）, SQL alias M0 Month Over Month",
+        "m1": "狭义货币供应量, money supply M1（浮点类型）, SQL alias Money Supply M1",
+        "m1_yoy": "M1同比, M1 year-over-year（浮点类型）, SQL alias M1 Year Over Year",
+        "m1_mom": "M1环比, M1 month-over-month（浮点类型）, SQL alias M1 Month Over Month",
+        "m2": "广义货币供应量, money supply M2（浮点类型）, SQL alias Money Supply M2",
+        "m2_yoy": "M2同比, M2 year-over-year（浮点类型）, SQL alias M2 Year Over Year",
+        "m2_mom": "M2环比, M2 month-over-month（浮点类型）, SQL alias M2 Month Over Month"
+      }
+    },
+    "indexsysdb.df_tushare_cn_gdp": {
+      "columns": {
+        "quarter": "统计季度, quarter（字符串类型）, SQL alias Statistical Quarter",
+        "gdp": "国内生产总值, gross domestic product（浮点类型）, SQL alias Gross Domestic Product",
+        "gdp_yoy": "GDP同比, GDP year-over-year（浮点类型）, SQL alias GDP Year Over Year",
+        "pi": "第一产业增加值, primary industry（浮点类型）, SQL alias Primary Industry",
+        "pi_yoy": "第一产业同比, primary industry year-over-year（浮点类型）, SQL alias Primary Industry Year Over Year",
+        "si": "第二产业增加值, secondary industry（浮点类型）, SQL alias Secondary Industry",
+        "si_yoy": "第二产业同比, secondary industry year-over-year（浮点类型）, SQL alias Secondary Industry Year Over Year",
+        "ti": "第三产业增加值, tertiary industry（浮点类型）, SQL alias Tertiary Industry",
+        "ti_yoy": "第三产业同比, tertiary industry year-over-year（浮点类型）, SQL alias Tertiary Industry Year Over Year"
+      }
+    },
+    "indexsysdb.df_tushare_future_basic_information": {
+      "columns": {
+        "ts_code": "期货代码, futures code（字符串类型）, SQL alias Futures Code",
+        "symbol": "交易符号, trading symbol（字符串类型）, SQL alias Trading Symbol",
+        "name": "合约名称, contract name（字符串类型）, SQL alias Contract Name",
+        "quote_unit": "报价单位, quotation unit（字符串类型）, SQL alias Quotation Unit",
+        "list_date": "上市日期, listing date（字符串类型）, SQL alias Listing Date",
+        "delist_date": "退市日期, delisting date（字符串类型）, SQL alias Delisting Date"
+      }
+    },
+    "indexsysdb.df_tushare_future_daily": {
+      "columns": {
+        "ts_code": "期货代码, futures code（字符串类型）, SQL alias Futures Code",
+        "trade_date": "交易日期, trade date（YYYY-MM-DD格式的字符串类型）, SQL alias Trade Date",
+        "pre_close": "前收盘价, previous close price（浮点类型）, SQL alias Previous Close Price",
+        "pre_settle": "前结算价, previous settlement price（浮点类型）, SQL alias Previous Settlement Price",
+        "open": "开盘价, open price（浮点类型）, SQL alias Open Price",
+        "high": "最高价, high price（浮点类型）, SQL alias High Price",
+        "low": "最低价, low price（浮点类型）, SQL alias Low Price",
+        "close": "收盘价, close price（浮点类型）, SQL alias Close Price",
+        "settle": "结算价, settlement price（浮点类型）, SQL alias Settlement Price",
+        "change1": "涨跌额, price change（浮点类型）, SQL alias Price Change",
+        "change2": "结算价变动, settlement price change（浮点类型）, SQL alias Settlement Price Change",
+        "vol": "成交量, trading volume（浮点类型）, SQL alias Trading Volume",
+        "amount": "成交额, turnover amount（浮点类型）, SQL alias Turnover Amount",
+        "oi": "持仓量, open interest（浮点类型）, SQL alias Open Interest",
+        "oi_chg": "持仓变化, open interest change（浮点类型）, SQL alias Open Interest Change"
       }
     }
   },
