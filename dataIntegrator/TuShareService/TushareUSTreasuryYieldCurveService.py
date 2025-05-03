@@ -1,10 +1,13 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
+from dataIntegrator import CommonLib
+
+logger = CommonLib.logger
 
 class TushareUSTreasuryYieldCurveService(TuShareService):
     @classmethod
     def prepareDataFrame(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         try:
             self.dataFrame = self.pro.us_tycr(start_date=start_date, end_date=end_date, fields = 'date, m1,m2,m3,m6,y1,y2,y3,y5,y7,y10,y20,y30')
@@ -22,21 +25,19 @@ class TushareUSTreasuryYieldCurveService(TuShareService):
                 'y20',
                 'y30']
 
-            self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                              event="self.dataFrame.shape:" + str(self.dataFrame.shape))
+            logger.info("self.dataFrame.shape:" + str(self.dataFrame.shape))
 
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         return self.dataFrame
 
     @classmethod
     def saveDateToClickHouse(self):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse started")
+        logger.info("saveDateToClickHouse started")
 
         try:
             self.dataFrame = self.dataFrame.replace({None: "Nan"})
@@ -48,13 +49,11 @@ class TushareUSTreasuryYieldCurveService(TuShareService):
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse completed")
+        logger.info("saveDateToClickHouse completed")
 
     @classmethod
     def deleteDateFromClickHouse(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDataFromClickHouse started")
+        logger.info("deleteDataFromClickHouse started")
 
         try:
             del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_us_treasury_yield_cruve DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
@@ -64,5 +63,4 @@ class TushareUSTreasuryYieldCurveService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDateFromClickHouse completed")
+        logger.info("deleteDateFromClickHouse completed")

@@ -1,11 +1,13 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
+from dataIntegrator import CommonLib
 
+logger = CommonLib.logger
 
 class TushareCNMondySupplyService(TuShareService):
     @classmethod
     def prepareDataFrame(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         try:
             self.dataFrame = self.pro.cn_m(start_m=start_date, end_m=end_date)
@@ -24,14 +26,13 @@ class TushareCNMondySupplyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         return self.dataFrame
 
     @classmethod
     def saveDateToClickHouse(self):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse started")
+        logger.info("saveDateToClickHouse started")
 
         try:
             insert_sql_statement =  'insert into indexsysdb.cn_money_supply (trade_date,m0,m0_yoy,m0_mom,m1 ,m1_yoy ,m1_mom ,m2 ,m2_yoy,m2_mom) VALUES'
@@ -40,13 +41,11 @@ class TushareCNMondySupplyService(TuShareService):
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse completed")
+        logger.info("saveDateToClickHouse completed")
 
     @classmethod
     def deleteDateFromClickHouse(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDataFromClickHouse started")
+        logger.info("deleteDataFromClickHouse started")
 
         try:
             del_df_tushare_sql = "ALTER TABLE indexsysdb.cn_money_supply DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
@@ -56,8 +55,7 @@ class TushareCNMondySupplyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDateFromClickHouse completed")
+        logger.info("deleteDateFromClickHouse completed")
 
     # @classmethod
     # def convertDataFrame2JSON(self):

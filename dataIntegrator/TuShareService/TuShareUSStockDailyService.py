@@ -1,12 +1,13 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
+from dataIntegrator import CommonLib
 
+logger = CommonLib.logger
 
 class TuShareUSStockDailyService(TuShareService):
     @classmethod
     def prepareDataFrame(self, ts_code, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData started")
+        logger.info("prepareData started")
 
         try:
             self.dataFrame = self.pro.us_daily(ts_code, start_date=start_date, end_date=end_date) #to check whether ts_code work here
@@ -26,15 +27,13 @@ class TuShareUSStockDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData completed")
+        logger.info("prepareData completed")
 
         return self.dataFrame
 
     @classmethod
     def saveDateToClickHouse(self):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse started")
+        logger.info("saveDateToClickHouse started")
 
         try:
             insert_df_tushare_stock_daily = 'insert into indexsysdb.df_tushare_us_stock_daily (ts_code,trade_date,close_point,open_point,high_point,low_point,pre_close,pct_change,vol,amount,vwap) VALUES'
@@ -44,13 +43,11 @@ class TuShareUSStockDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse completed")
+        logger.info("saveDateToClickHouse completed")
 
     @classmethod
     def deleteDateFromClickHouse(self, ts_code="", start_date="00000000", end_date="00000000"):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDataFromClickHouse started")
+        logger.info("deleteDataFromClickHouse started")
 
         try:
             #del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_us_stock_daily DELETE where ts_code = '%s' and trade_date>= '%s' and trade_date<='%s'" % (ts_code, start_date, end_date)
@@ -61,8 +58,7 @@ class TuShareUSStockDailyService(TuShareService):
             raise e
 
         def deleteDateFromClickHouse(self):
-            self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                              event="deleteDateFromClickHouse completed")
+            logger.info("deleteDateFromClickHouse completed")
 
     # @classmethod
     # def convertDataFrame2JSON(self):
