@@ -8,19 +8,21 @@
 
 请按以下要求返回结果：
 1. 使用与问题最相关的字段
-2. 使用clickhouse 语法，尤其是保持### 数据表定义说明和 ### 表结构说明中的表名和字段名称，注意保持原有的大小写。
+2. 符合 clickhouse 数据库语法。不要采用WITH .. AS语法。尤其是保持### 数据表定义说明和 ### 表结构说明中的表名和字段名称，注意保持原有的大小写。
 3. 包含必要的聚合函数（如SUM、COUNT, AVG）
 4. The format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',
 5. select 字段选择时的别名管理：
     a. 数据表别名：在join后采用数据表原有的全名，不要给一个新名字数据表在join后，新的的别名必须按照 ### 数据表定义说明后 相应 table_alias 后的英文字段名取值。不要随意命名， 举例
-    b. 字段别名：按照数据表别名 + "__" + ### 表结构说明: 中 SQL alias as:后的英文字段名取值
+    b. 具体英文字段名按照 ### 表结构说明: 中 column alias as:后的英文字段。
+    c. 字段别名：必须按照 <数据表别名 + "." + 数据表别名 + "__" + 具体英文字段名> 的方式严格输出。否则后面的程序会输错。
 7. 字段选择
     a) 问题中如果没有说明具体字段，就需要获取整个查询可以用到的全部字段，然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
     b) 问题中如果说需要获取全部字段，就需要获取整个查询可以用到的全部字段，然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
     c) 问题中只提到“信息”、“内容”等模糊表达，说明用户并不明白数据表中的内容，这时你就获取整个查询可以用到的全部字段。然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
-    d) 问题中如果提到具体字段信息，你就要根据### 数据表定义说明和 ### 表结构说明中的表名和字段名称选出具体字段
+    d) 问题中如果提到具体字段信息，你就要根据### 数据表定义说明和 ### 表结构说明中的表名和字段名称选出具体字段。
+    e) 必须使用以上的具体字段名称，不要偷懒使用*，否则会造成后继SQL处理出错。
 8. 如果需求要求按照某个日期(trade_date)比较两张业务表之间的数据，必须先获取交易日历表(df_sys_calendar)作为作左表, 以其trade_date为键值 使用left join 连接第一张业务表的 trade_date，而后再left join 连接其他表的trade_date。而后再按照其他的筛选条件添加筛选。举例：
-        SELECT  df_sys_calendar.trade_date as df_sys_calendar.trade__date,
+        SELECT  df_sys_calendar.trade_date as df_sys_calendar__trade_date,
             SUM(df_tushare_us_stock_daily.amount) AS df_sys_calendar__amount,
             SUM(df_tushare_stock_daily.amount) AS df_tushare_stock_daily__amount
         FROM
@@ -35,15 +37,32 @@
             df_sys_calendar.trade_date
         ORDER BY
             df_sys_calendar.trade_date
-9. 返回格式：
+9. 判断用户除了返回数据外，是否有对数据画图的意图: 如果有提到需要图表、作图、折线图、散点图、画图等，则isPlotRequired就是yes,否则isPlotRequired就是no。
+10. 如果isPlotRequired就是yes，则需判断
+    a) 先确定plotType: 。
+        1) 如果用户未提及使用lineChart或者散点图，默认其为lineChart。
+        2) 作图的其他需根据用户指定的图表类型，可选择的还有scatterChart。
+        2) 如果有除此之外的类型就在feedback中提示：目前只提供lineChart和scatterChart, isPlotRequired 就改成 no。
+    b) 其次开始确定PlotX：默认为 trade_date
+        1) 如果用户有明确提示，你根据需要在PlotX上填写带有完成名称的字段，如上面的例子，plotX 就要填写 df_sys_calendar__trade_date
+        2) 如果用户没有明确提示，你需要根据用户的意图选出带有全称的trade_date。根据上面的例子plotX 就要填写 df_sys_calendar__trade_date
+    c) 然后选择PlotY：
+        1) 如果用户有明确提示，你就根据需要在PlotY上填写带有完成名称的字段，并采用 "," 号分割
+        2) 如果用户没有明确提示，你需要根据用户的意图选出带有全称的字段。这些字段必须是数值类型。PlotY上填写带有完成名称的字段，并采用 "," 号分割
+11. 疑问或者补充信息
+10. 返回格式：
 {{
     "sql": "生成的SQL",
-    "explanation_in_Mandarin": "解释查询目的和逻辑"
-    "explanation_in_English": "Explain the target and logic of the inquiry in English"
-    "isPlotRequired": "是否要求产生图表，yes/no"
-    "PlotX": "X轴字段名"
-    "PlotY": "Y轴字段名"
+    "explanation_in_Mandarin": "解释查询目的和逻辑",
+    "explanation_in_English": "Explain the target and logic of the inquiry in English",
+    "isPlotRequired": "是否要求产生图表，yes/no",
+    "plotType": "默认为lineChart"
+    "PlotX": "X轴字段名",
+    "PlotY": "Y轴字段名",
+    "PlotTitle": "Please give this chart a title according to the logic",
+    "xlabel": "Please give a name for X轴字段名, it shall be in human language",
+    "ylabel": "Please give a name for Y轴字段名, it shall be in human language",
+    "feedback","在过程中产生的疑问，或者需要用户补充的信息"
 }}
-10. 填写返回格式时一定要注意检查，不能带有违反JSON规则的字符。
-11. 生成的SQL记得要进行 beautify，确保人类可读性。
-12. 如果有提到需要图表，请返回PlotX和PlotY字段，否则isPlotRequired就是no。
+11. 填写返回格式时一定要注意检查，不能带有违反JSON规则的字符。
+12. 生成的SQL记得要进行 beautify，确保人类可读性。但是不得修改输出SQL的原始内容
