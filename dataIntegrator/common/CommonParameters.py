@@ -41,6 +41,9 @@ class CommonParameters():
 
     MOCKED_AI_ANSWER = ""
 
+    IS_STREAMLIT_ON = True
+    #IS_STREAMLIT_ON = False
+
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
 

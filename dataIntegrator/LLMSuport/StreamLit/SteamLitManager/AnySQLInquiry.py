@@ -16,10 +16,10 @@ class AnySQLInquiry(SuperInquiry):
     @classmethod
     def request_for_rag_inquiry(self, question):
         if question is None or len(question) == 0:
-            logger("question is null")
+            logger.info("question is null")
             return
 
-        logger("request_for_rag_inquiry started")
+        logger.info("request_for_rag_inquiry started")
 
         try:
             agent_type = CommonParameters.Default_AI_Engine
@@ -30,4 +30,4 @@ class AnySQLInquiry(SuperInquiry):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        logger("request_for_rag_inquiry finished")
+        logger.info("request_for_rag_inquiry finished")

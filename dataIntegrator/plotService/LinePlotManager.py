@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
-
-from dataIntegrator import CommonLib
+import streamlit as st
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import commonLib
 from dataIntegrator.plotService.PlotManagerSuper import PlotManagerSuper
 
@@ -24,7 +24,12 @@ class LinePlotManager(PlotManagerSuper):
 
             # 绘制折线图
             if isPlotRequired != "yes":
+                logger.info(rf"isPlotRequired != yes")
                 return
+
+            if CommonParameters.IS_STREAMLIT_ON:
+                st.write(rf"")
+                st.write(rf"**Plot Diagram：**")
 
             fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -34,6 +39,7 @@ class LinePlotManager(PlotManagerSuper):
                 ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o', label=PlotY_str)
 
             # 设置图表标题和坐标轴标签
+            logger.info(rf"设置图表标题和坐标轴标签")
             ax.set_title(PlotTitle)
             ax.set_xlabel(xlabel)
             plt.xticks(rotation=45)
@@ -43,7 +49,11 @@ class LinePlotManager(PlotManagerSuper):
 
             ax.legend(loc='best')
 
-            plt.show()
+            logger.info(rf"plt.show()")
+            if CommonParameters.IS_STREAMLIT_ON:
+                st.pyplot(fig)
+            else:
+                plt.show()
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"画图失败: {param_dict}", e=e)
 

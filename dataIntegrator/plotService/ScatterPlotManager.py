@@ -1,8 +1,9 @@
 from matplotlib import pyplot as plt
 
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import commonLib
 from dataIntegrator.plotService.PlotManagerSuper import PlotManagerSuper
+import streamlit as st
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -25,7 +26,12 @@ class ScatterPlotManager(PlotManagerSuper):
 
             # 绘制折线图
             if isPlotRequired != "yes":
+                logger.info(rf"isPlotRequired != yes")
                 return
+
+            if CommonParameters.IS_STREAMLIT_ON:
+                st.write(rf"")
+                st.write(rf"**Plot Diagram：**")
 
             fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -36,6 +42,7 @@ class ScatterPlotManager(PlotManagerSuper):
                 ax.scatter(data_frame[PlotX], data_frame[PlotY_str], label=PlotY_str)  # 绘制散点图
 
             # 设置图表标题和坐标轴标签
+            logger.info(rf"设置图表标题和坐标轴标签")
             ax.set_title(PlotTitle)
             ax.set_xlabel(xlabel)
             plt.xticks(rotation=45)
@@ -46,7 +53,12 @@ class ScatterPlotManager(PlotManagerSuper):
             ax.legend(loc='best')
 
             # 显示图表
-            plt.show()
+            logger.info(rf"plt.show()")
+            if CommonParameters.IS_STREAMLIT_ON:
+                st.pyplot(fig)
+            else:
+                plt.show()
+
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"画图失败: {param_dict}", e=e)
 

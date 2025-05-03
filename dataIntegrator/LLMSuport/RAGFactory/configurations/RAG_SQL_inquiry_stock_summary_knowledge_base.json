@@ -285,6 +285,7 @@
   ],
   "business_rules": [
     "花旗银行的 ts_code 是'C'",
+    "苹果的 ts_code 是'AAPL'",
     "国脉科技的 ts_code 是'002093.SZ'",
     "花旗银行英文名是Citi",
     "close price is the same as close_point",

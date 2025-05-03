@@ -11,8 +11,13 @@ class PlotManager:
     def draw_plot(self, param_dict):
         logger.info(rf"start - draw_plot, param_dict: {param_dict} ")
 
+        if param_dict.get("isPlotRequired", "no") == "no":
+            logger.info(rf"isPlotRequired == no, so just skipped")
+            return
+
         try:
-            plotType = param_dict.get("plotType", " ")
+            plotType = param_dict.get("plotType", "lineChart")
+            logger.info(rf"plotType: {plotType}")
 
             match plotType:
                 case "lineChart":

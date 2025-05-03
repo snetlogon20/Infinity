@@ -8,6 +8,9 @@ import pandas as pd
 from io import BytesIO
 import matplotlib.pyplot as plt
 
+from dataIntegrator.plotService.PlotManager import PlotManager
+
+
 class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
 
     @classmethod
@@ -30,13 +33,16 @@ class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
         plotType = response_dict["plotType"]
         PlotX = response_dict["PlotX"]
         PlotY = response_dict["PlotY"]
-        feedback = response_dict["feedback"]
+        #feedback = response_dict["feedback"]
         param_dict = response_dict
 
         edited_data_frame = self.write_form(data_frame, explanation_in_English, explanation_in_Mandarin, sql)
         self.write_excel(edited_data_frame)
         #self.draw_plot(PlotX, PlotY, data_frame, isPlotRequired)
-        self.draw_plot(param_dict)
+        #self.draw_plot(param_dict)
+
+        plotManager = PlotManager()
+        plotManager.draw_plot(param_dict)
 
         return response_dict
 
