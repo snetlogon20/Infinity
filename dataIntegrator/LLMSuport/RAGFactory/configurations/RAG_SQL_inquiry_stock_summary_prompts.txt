@@ -30,7 +30,6 @@
 5. the format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',
 6. 问题中如果没有说明具体字段，就使用*获取全部字段。
 7. 如果需求要求按照某个日期(trade_date)比较两张业务表之间的数据，必须先获取交易日历表(df_sys_calendar)作为作左表, 以其trade_date为键值 连接第一张业务表的 trade_date，而后再连接其他表的trade_date。而后再按照其他的筛选条件添加筛选。举例：
-
 8. 返回格式：
 {{
     "sql": "生成的SQL",

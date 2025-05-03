@@ -1,5 +1,5 @@
---drop table indexsysdb.cn_cpi
-CREATE TABLE indexsysdb.us_stock_daily(
+--drop table indexsysdb.df_tushare_us_stock_daily
+CREATE TABLE indexsysdb.df_tushare_us_stock_daily(
 ts_code    String,
 trade_date String,
 close_point	   float,

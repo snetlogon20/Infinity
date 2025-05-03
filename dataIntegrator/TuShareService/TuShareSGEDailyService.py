@@ -1,31 +1,29 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
+from dataIntegrator import CommonLib
 
+logger = CommonLib.logger
 
 class TuShareSGEDailyService(TuShareService):
     @classmethod
     def prepareDataFrame(self, trade_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData started")
+        logger.info("prepareData started")
 
         try:
             self.dataFrame = self.pro.sge_daily(trade_date=trade_date)
-            self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                              event="self.dataFrame.shape:" + str(self.dataFrame.shape))
+            logger.info("self.dataFrame.shape:" + str(self.dataFrame.shape))
 
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="prepareData completed")
+        logger.info("prepareData completed")
 
         return self.dataFrame
 
     @classmethod
     def saveDateToClickHouse(self):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse started")
+        logger.info("saveDateToClickHouse started")
 
         try:
             insert_df_tushare_stock_daily = 'insert into indexsysdb.df_tushare_sge_daily (ts_code,trade_date,close,open,high,low,price_avg,change,pct_change,vol,amount,oi,settle_vol,settle_dire) VALUES'
@@ -35,13 +33,11 @@ class TuShareSGEDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse completed")
+        logger.info("saveDateToClickHouse completed")
 
     @classmethod
     def deleteDateFromClickHouse(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDataFromClickHouse started")
+        logger.info("deleteDataFromClickHouse started")
 
         try:
             del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_sge_daily DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
@@ -50,8 +46,7 @@ class TuShareSGEDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDateFromClickHouse completed")
+        logger.info("deleteDateFromClickHouse completed")
 
     # @classmethod
     # def convertDataFrame2JSON(self):
