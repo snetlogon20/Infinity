@@ -1,11 +1,13 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
+from dataIntegrator import CommonLib
 
+logger = CommonLib.logger
 
 class TushareShiborDailyService(TuShareService):
     @classmethod
     def prepareDataFrame(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         try:
             self.dataFrame = self.pro.shibor(start_date=start_date, end_date=end_date)
@@ -16,14 +18,13 @@ class TushareShiborDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="prepareData started")
+        logger.info("prepareData started")
 
         return self.dataFrame
 
     @classmethod
     def saveDateToClickHouse(self):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse started")
+        logger.info("saveDateToClickHouse started")
 
         try:
             insert_sql_statement = 'insert into indexsysdb.df_tushare_shibor_daily (trade_date,tenor_on,tenor_1w,tenor_2w,tenor_1m,tenor_3m,tenor_6m,tenor_9m,tenor_1y) VALUES'
@@ -32,13 +33,11 @@ class TushareShiborDailyService(TuShareService):
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="saveDateToClickHouse completed")
+        logger.info("saveDateToClickHouse completed")
 
     @classmethod
     def deleteDateFromClickHouse(self, start_date, end_date):
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDataFromClickHouse started")
+        logger.info("deleteDataFromClickHouse started")
 
         try:
             del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_shibor_daily DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
@@ -48,8 +47,7 @@ class TushareShiborDailyService(TuShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="deleteDateFromClickHouse completed")
+        logger.info("deleteDateFromClickHouse completed")
 
     # @classmethod
     # def convertDataFrame2JSON(self):

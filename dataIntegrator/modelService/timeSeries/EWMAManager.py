@@ -3,7 +3,8 @@ from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from dataIntegrator import TuShareServiceManager
+from dataIntegrator.TuShareService.TuShareServiceManager import TuShareServiceManager
+#from dataIntegrator import TuShareServiceManager
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 from dataIntegrator.modelService.timeSeries.EWMAAnalyst import EWMAManager
@@ -27,7 +28,7 @@ class EWMAAnalyster:
         end_date  = self.params['backtest_end_date']
 
         tuShareServiceManager = TuShareServiceManager()
-        tuShareServiceManager.callTuShareChinaStockIndexService(ts_code=ts_code, start_date=start_date, end_date=end_date)
+        tuShareServiceManager.callTuShareChinaStockIndexService({ts_code:ts_code, start_date:start_date, end_date:end_date})
 
     def analysis_date(self):
         self.refresh_data()

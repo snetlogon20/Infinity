@@ -86,8 +86,12 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
             "explanation_in_English": result["explanation_in_English"],
             "results": data,
             "isPlotRequired": result["isPlotRequired"],
+            "plotType": result["plotType"],
             "PlotX": result["PlotX"],
             "PlotY": result["PlotY"],
+            "PlotTitle": result["PlotTitle"],
+            "xlabel": result["xlabel"],
+            "ylabel": result["ylabel"]
         }
 
         return response_dict

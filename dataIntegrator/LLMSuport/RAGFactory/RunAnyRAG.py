@@ -2,6 +2,7 @@ from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
 from dataIntegrator.common.CommonParameters import CommonParameters
 import os
 
+from dataIntegrator.plotService.PlotManager import PlotManager
 from dataIntegrator.utility.FileUtility import FileUtility
 from dataIntegrator.utility.TimeUtility import TimeUtility
 
@@ -21,11 +22,22 @@ def RAG_SQL_inquiry_stock_summary():
     #question = "show me the 美国国债收益率曲线 2022年01月10日当日."
     #question = "帮我在df_tushare_us_stock_daily找出花旗2024-12-01到2024-12-27的成交额，然后再比较同期df_tushare_stock_daily 中国脉科技的成交额"
     #question = "帮我在美国股票信息中找出花旗2024-12-02的成交额，然后再比较同期中国股票中 “国脉科技”的成交额"
-    question = "帮我在美国股票信息中找出花旗2024-12-02的pct_change，然后再比较 同期上海银行间同业拆放利率"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息， 和同期上海黄金交易所日行情中的所有信息"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息，比较同期中国股票中 “国脉科技”的成交额 和同期上海黄金交易所日行情中的所有信息"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息，比较同期中国股票中 “国脉科技”的成交额 和同期上海黄金交易所日行情中的所有信息。 作图"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息，比较同期中国股票中 “国脉科技”的收益率 和同期上海黄金交易所日行情中的所有信息。 作图时把美股的当日收益率, 国脉科技的收益率、黄金收益率和同业拆放利率的各类利率当作Y 轴"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的交易量，交易金额，然后再比较同期中国股票中 “国脉科技”的交易量*500倍，交易金额*500倍。 作图"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的交易量，交易金额，然后再比较同期中国股票中 “国脉科技”的交易量*500倍，交易金额*500倍。 用散点图"
+    question = "帮我在美国股票信息中找出花旗2024-10-02到2024-10-31的交易量，交易金额，然后再比较同期摩根大通的交易量，交易金额。 用折线图"
     response_dict = RAGFactory.run_rag_inquiry(
-        "RAG_SQL_inquiry_stock_summary", "spark",
+        "RAG_SQL_inquiry_stock_summary", CommonParameters.Default_AI_Engine,
         question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
+
+    param_dict = response_dict
+    plotManager = PlotManager()
+    plotManager.draw_plot(param_dict)
+
 
 
 def RAG_SQL_inquiry_stocks_code():

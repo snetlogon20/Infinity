@@ -8,12 +8,13 @@ import pandas as pd
 from io import BytesIO
 import matplotlib.pyplot as plt
 
+from dataIntegrator.plotService.PlotManager import PlotManager
+
+
 class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
 
     @classmethod
     def inquiry(self, agent_type, question):
-        # knowledge_base_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_knowledge_base.json"
-        # prompt_file_path = rf"D:\workspace_python\dataIntegrator\dataIntegrator\LLMSuport\RAGFactory\configurations\RAG_SQL_inquiry_stock_summary_prompts.txt"
 
         knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stock_summary_knowledge_base.json")
         prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_SQL_inquiry_stock_summary_prompts.txt")
@@ -29,35 +30,54 @@ class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
         explanation_in_English = response_dict["explanation_in_English"]
         data_frame = response_dict["results"]
         isPlotRequired = response_dict["isPlotRequired"]
+        plotType = response_dict["plotType"]
         PlotX = response_dict["PlotX"]
         PlotY = response_dict["PlotY"]
+        #feedback = response_dict["feedback"]
+        param_dict = response_dict
 
         edited_data_frame = self.write_form(data_frame, explanation_in_English, explanation_in_Mandarin, sql)
         self.write_excel(edited_data_frame)
-        self.draw_plot(PlotX, PlotY, data_frame, isPlotRequired)
+        #self.draw_plot(PlotX, PlotY, data_frame, isPlotRequired)
+        #self.draw_plot(param_dict)
+
+        plotManager = PlotManager()
+        plotManager.draw_plot(param_dict)
 
         return response_dict
 
     @classmethod
-    def draw_plot(cls, PlotX, PlotY, data_frame, isPlotRequired):
+    #def draw_plot(cls, PlotX, PlotY, data_frame, isPlotRequired):
+    def draw_plot(cls, param_dict):
+        isPlotRequired = param_dict.get("isPlotRequired", "no")
+        PlotX = param_dict["PlotX"]
+        PlotY = param_dict["PlotY"]
+        data_frame = param_dict["results"]
+
         # 绘制折线图
-        if isPlotRequired == "yes":
-            st.write(rf"")
-            st.write(rf"**Plot Diagram：**")
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.plot(data_frame[PlotX], data_frame[PlotY], marker='o')
+        if isPlotRequired != "yes":
+            pass
 
-            # 设置图表标题和坐标轴标签
-            ax.set_title('Close Point Over Trade Date')
-            ax.set_xlabel('Trade Date')
-            plt.xticks(rotation=45)
-            ax.set_ylabel('Close Point')
-            ax.grid(True)
-            ax.set_xticks(data_frame['trade_date'])
+        st.write(rf"")
+        st.write(rf"**Plot Diagram：**")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        #ax.plot(data_frame[PlotX], data_frame[PlotY], marker='o')
+        split_PlotY_list = PlotY.split(',')
+        for item in split_PlotY_list:
+            PlotY_str = item.strip()
+            ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o')
 
-            # ax.set_xticklabels(data_frame['trade_date'].dt.strftime('%Y-%m-%d'))
-            # 在 Streamlit 中显示图表
-            st.pyplot(fig)
+        # 设置图表标题和坐标轴标签
+        ax.set_title('Close Point Over Trade Date')
+        ax.set_xlabel('Trade Date')
+        plt.xticks(rotation=45)
+        ax.set_ylabel('Close Point')
+        ax.grid(True)
+        ax.set_xticks(data_frame[PlotX])
+
+        # ax.set_xticklabels(data_frame['trade_date'].dt.strftime('%Y-%m-%d'))
+        # 在 Streamlit 中显示图表
+        st.pyplot(fig)
 
     @classmethod
     def write_form(cls, data_frame, explanation_in_English, explanation_in_Mandarin, sql):
