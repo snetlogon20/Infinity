@@ -10,34 +10,40 @@
 1. 使用与问题最相关的字段
 2. 使用clickhouse 语法，尤其是保持### 数据表定义说明和 ### 表结构说明中的表名和字段名称，注意保持原有的大小写。
 3. 包含必要的聚合函数（如SUM、COUNT, AVG）
-4. 字段别名按照 **表结构** 中 alias 后的英文字段名取值
-6. 数据表在join后，新的的别名必须按照 ### 数据表定义说明后 相应 table_alias 后的英文字段名取值。不要随意命名， 举例
-        SELECT  df_sys_calendar.trade_date,
-            SUM(df_tushare_us_stock_daily.amount) AS us_amount,
-            SUM(df_tushare_stock_daily.amount) AS cn_amount
+4. The format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',
+5. select 字段选择时的别名管理：
+    a. 数据表别名：在join后采用数据表原有的全名，不要给一个新名字数据表在join后，新的的别名必须按照 ### 数据表定义说明后 相应 table_alias 后的英文字段名取值。不要随意命名， 举例
+    b. 字段别名：按照数据表别名 + "__" + ### 表结构说明: 中 SQL alias as:后的英文字段名取值
+7. 字段选择
+    a) 问题中如果没有说明具体字段，就需要获取整个查询可以用到的全部字段，然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
+    b) 问题中如果说需要获取全部字段，就需要获取整个查询可以用到的全部字段，然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
+    c) 问题中只提到“信息”、“内容”等模糊表达，说明用户并不明白数据表中的内容，这时你就获取整个查询可以用到的全部字段。然后按照以上 "select 字段选择时的别名管理" 的要求对具体字段改名。
+    d) 问题中如果提到具体字段信息，你就要根据### 数据表定义说明和 ### 表结构说明中的表名和字段名称选出具体字段
+8. 如果需求要求按照某个日期(trade_date)比较两张业务表之间的数据，必须先获取交易日历表(df_sys_calendar)作为作左表, 以其trade_date为键值 使用left join 连接第一张业务表的 trade_date，而后再left join 连接其他表的trade_date。而后再按照其他的筛选条件添加筛选。举例：
+        SELECT  df_sys_calendar.trade_date as df_sys_calendar.trade__date,
+            SUM(df_tushare_us_stock_daily.amount) AS df_sys_calendar__amount,
+            SUM(df_tushare_stock_daily.amount) AS df_tushare_stock_daily__amount
         FROM
-            indexsysdb.df_sys_calendar AS df_sys_calendar
+            df_sys_calendar AS df_sys_calendar
         LEFT JOIN
-            indexsysdb.df_tushare_us_stock_daily AS df_tushare_us_stock_daily ON df_sys_calendar.trade_date = df_tushare_us_stock_daily.trade_date AND df_tushare_us_stock_daily.ts_code = 'C'
+            df_tushare_us_stock_daily AS df_tushare_us_stock_daily ON df_sys_calendar.trade_date = df_tushare_us_stock_daily.trade_date AND df_tushare_us_stock_daily.ts_code = 'C'
         LEFT JOIN
-            indexsysdb.df_tushare_stock_daily AS df_tushare_stock_daily ON df_sys_calendar.trade_date = df_tushare_stock_daily.trade_date AND df_tushare_stock_daily.ts_code = '002093.SZ'
+            df_tushare_stock_daily AS df_tushare_stock_daily ON df_sys_calendar.trade_date = df_tushare_stock_daily.trade_date AND df_tushare_stock_daily.ts_code = '002093.SZ'
         WHERE
             df_sys_calendar.trade_date BETWEEN '20241201' AND '20241227'
         GROUP BY
             df_sys_calendar.trade_date
         ORDER BY
             df_sys_calendar.trade_date
-5. the format of trade_date is 'yyyymmdd' rather than 'yyyy-mm-dd',
-6. 问题中如果没有说明具体字段，就使用*获取全部字段。
-7. 如果需求要求按照某个日期(trade_date)比较两张业务表之间的数据，必须先获取交易日历表(df_sys_calendar)作为作左表, 以其trade_date为键值 连接第一张业务表的 trade_date，而后再连接其他表的trade_date。而后再按照其他的筛选条件添加筛选。举例：
-8. 返回格式：
+9. 返回格式：
 {{
     "sql": "生成的SQL",
     "explanation_in_Mandarin": "解释查询目的和逻辑"
-    "explanation_in_English": "Explain the targe and logic of the inquiry in English"
+    "explanation_in_English": "Explain the target and logic of the inquiry in English"
     "isPlotRequired": "是否要求产生图表，yes/no"
     "PlotX": "X轴字段名"
     "PlotY": "Y轴字段名"
 }}
-9. 填写返回格式时一定要注意检查，不能带有违反JSON规则的字符。
-10如果有提到需要图表，请返回PlotX和PlotY字段，否则isPlotRequired就是no。
+10. 填写返回格式时一定要注意检查，不能带有违反JSON规则的字符。
+11. 生成的SQL记得要进行 beautify，确保人类可读性。
+12. 如果有提到需要图表，请返回PlotX和PlotY字段，否则isPlotRequired就是no。

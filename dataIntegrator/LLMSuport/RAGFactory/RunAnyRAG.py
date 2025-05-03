@@ -21,7 +21,8 @@ def RAG_SQL_inquiry_stock_summary():
     #question = "show me the 美国国债收益率曲线 2022年01月10日当日."
     #question = "帮我在df_tushare_us_stock_daily找出花旗2024-12-01到2024-12-27的成交额，然后再比较同期df_tushare_stock_daily 中国脉科技的成交额"
     #question = "帮我在美国股票信息中找出花旗2024-12-02的成交额，然后再比较同期中国股票中 “国脉科技”的成交额"
-    question = "帮我在美国股票信息中找出花旗2024-12-02的pct_change，然后再比较 同期上海银行间同业拆放利率"
+    #question = "帮我在美国股票信息中找出花旗2024-12-02的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息， 和同期上海黄金交易所日行情中的所有信息"
+    question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息，比较同期中国股票中 “国脉科技”的成交额 和同期上海黄金交易所日行情中的所有信息"
     response_dict = RAGFactory.run_rag_inquiry(
         "RAG_SQL_inquiry_stock_summary", "spark",
         question, knowledge_base_file_path, prompt_file_path)

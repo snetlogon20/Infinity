@@ -10,7 +10,9 @@ commonLib = CommonLib()
 #class ClickhouseService(TuShareService):
 class ClickhouseService:
 
-    clickhouseClient = ClickhouseClient(host=CommonParameters.clickhouseHostName, database=CommonParameters.clickhouseHostDatabase)
+    clickhouseClient = ClickhouseClient(
+        host=CommonParameters.clickhouseHostName,
+        database=CommonParameters.clickhouseHostDatabase)
     @classmethod
     def getDataFrame(self, sql, columns):
         logger.info("prepareData started")
@@ -32,6 +34,7 @@ class ClickhouseService:
     def getDataFrameWithoutColumnsName(self, sql):
         logger.info(rf"prepareData started - sql: {sql}")
         try:
+            #self.clickhouseClient.execute('USE indexsysdb')
             cursor = self.clickhouseClient.execute_iter(sql, with_column_types=True)
             columns = [col[0] for col in next(cursor)]
             result = list(cursor)
