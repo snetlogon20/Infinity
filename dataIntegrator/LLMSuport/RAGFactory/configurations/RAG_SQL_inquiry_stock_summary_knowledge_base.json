@@ -196,7 +196,7 @@
     },
     "df_tushare_sge_daily": {
       "columns": {
-        "ts_code": "合约代码, Contract code（字符串类型）, column alias as:ts_code",
+        "ts_code": "合约代码、产品, Contract code（字符串类型）, column alias as:ts_code",
         "trade_date": "交易日期, Trade Date（YYYYMMDD格式字符串类型）, column alias as:trade_date",
         "close": "收盘价, Closing price（浮点类型）, column alias as:close",
         "open": "开盘价, Opening price（浮点类型）, column alias as:open",

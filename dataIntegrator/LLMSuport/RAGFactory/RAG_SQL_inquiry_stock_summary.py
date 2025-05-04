@@ -86,12 +86,14 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
             "explanation_in_English": result["explanation_in_English"],
             "results": data,
             "isPlotRequired": result["isPlotRequired"],
-            "plotType": result["plotType"],
-            "PlotX": result["PlotX"],
-            "PlotY": result["PlotY"],
-            "PlotTitle": result["PlotTitle"],
-            "xlabel": result["xlabel"],
-            "ylabel": result["ylabel"]
+            "plotRequirement": {
+                "plotType": result["plotRequirement"]["plotType"],
+                "PlotX": result["plotRequirement"]["PlotX"],
+                "PlotY": result["plotRequirement"]["PlotY"],
+                "PlotTitle": result["plotRequirement"]["PlotTitle"],
+                "xlabel": result["plotRequirement"]["xlabel"],
+                "ylabel": result["plotRequirement"]["ylabel"]
+            }
         }
 
         return response_dict
@@ -131,6 +133,6 @@ class RAG_SQL_inquiry_stock_summary(RAGAgent):
             print("查询结果/Result：")
             print(result_dict["results"])
             print("isPlotRequired:", result_dict["isPlotRequired"])
-            print("PlotX:", result_dict["PlotX"])
-            print("PlotY:", result_dict["PlotY"])
+            print("PlotX:", result_dict["plotRequirement"]["PlotX"])
+            print("PlotY:", result_dict["plotRequirement"]["PlotY"])
         return response

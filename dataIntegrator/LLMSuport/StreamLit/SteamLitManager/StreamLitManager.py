@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 
+from dataIntegrator import CommonParameters
 from dataIntegrator.LLMSuport.ChromaService.ChromaDialogAgent import ChromaDialogAgent
 from dataIntegrator.LLMSuport.StreamLit.RAG_SQL_inquiry.RAG_SQL_inquiry_mock_data_service import \
     RAG_SQL_inquiry_mock_data_service
@@ -87,6 +88,9 @@ if __name__ == "__main__":
         format_func=lambda x: x.upper(),
         key="sidebar_menu"
     )
+
+    #Chang the status of streamLit to ON
+    CommonParameters.IS_STREAMLIT_ON = True
 
     if choice == "Any-SQL":
         # 添加文本输入框和按钮

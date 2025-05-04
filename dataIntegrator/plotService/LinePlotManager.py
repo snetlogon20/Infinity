@@ -15,12 +15,12 @@ class LinePlotManager(PlotManagerSuper):
 
         try:
             isPlotRequired = param_dict.get("isPlotRequired", "no")
-            PlotX = param_dict.get("PlotX", "None")
-            PlotY = param_dict.get("PlotY", "None")
             data_frame = param_dict.get("results", "None")
-            PlotTitle = param_dict.get("PlotTitle", "None")
-            xlabel = param_dict.get("xlabel", "None")
-            ylabel = param_dict.get("ylabel", "None")
+            PlotX = param_dict.get('plotRequirement', {}).get("PlotX", "None")
+            PlotY = param_dict.get('plotRequirement', {}).get("PlotY", "None")
+            PlotTitle = param_dict.get('plotRequirement', {}).get("PlotTitle", "None")
+            xlabel = param_dict.get('plotRequirement', {}).get("xlabel", "None")
+            ylabel = param_dict.get('plotRequirement', {}).get("ylabel", "None")
 
             # 绘制折线图
             if isPlotRequired != "yes":
@@ -49,10 +49,12 @@ class LinePlotManager(PlotManagerSuper):
 
             ax.legend(loc='best')
 
-            logger.info(rf"plt.show()")
+            # 显示图表
             if CommonParameters.IS_STREAMLIT_ON:
+                logger.info(rf"st.pyplot(fig)")
                 st.pyplot(fig)
             else:
+                logger.info(rf"plt.show()")
                 plt.show()
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"画图失败: {param_dict}", e=e)
