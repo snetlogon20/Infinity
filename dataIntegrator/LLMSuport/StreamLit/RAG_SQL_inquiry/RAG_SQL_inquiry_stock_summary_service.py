@@ -6,8 +6,8 @@ from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-import matplotlib.pyplot as plt
 
+from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
 from dataIntegrator.plotService.PlotManager import PlotManager
 
 
@@ -29,55 +29,20 @@ class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
         explanation_in_Mandarin = response_dict["explanation_in_Mandarin"]
         explanation_in_English = response_dict["explanation_in_English"]
         data_frame = response_dict["results"]
-        isPlotRequired = response_dict["isPlotRequired"]
-        plotType = response_dict["plotType"]
-        PlotX = response_dict["PlotX"]
-        PlotY = response_dict["PlotY"]
-        #feedback = response_dict["feedback"]
+
         param_dict = response_dict
 
         edited_data_frame = self.write_form(data_frame, explanation_in_English, explanation_in_Mandarin, sql)
         self.write_excel(edited_data_frame)
-        #self.draw_plot(PlotX, PlotY, data_frame, isPlotRequired)
-        #self.draw_plot(param_dict)
 
         plotManager = PlotManager()
         plotManager.draw_plot(param_dict)
 
+        #param_dict = response_dict
+        generalLinearRegression = GeneralLinearRegression()
+        generalLinearRegression.run_linear_regression_by_AI(param_dict)
+
         return response_dict
-
-    @classmethod
-    #def draw_plot(cls, PlotX, PlotY, data_frame, isPlotRequired):
-    def draw_plot(cls, param_dict):
-        isPlotRequired = param_dict.get("isPlotRequired", "no")
-        PlotX = param_dict["PlotX"]
-        PlotY = param_dict["PlotY"]
-        data_frame = param_dict["results"]
-
-        # 绘制折线图
-        if isPlotRequired != "yes":
-            pass
-
-        st.write(rf"")
-        st.write(rf"**Plot Diagram：**")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        #ax.plot(data_frame[PlotX], data_frame[PlotY], marker='o')
-        split_PlotY_list = PlotY.split(',')
-        for item in split_PlotY_list:
-            PlotY_str = item.strip()
-            ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o')
-
-        # 设置图表标题和坐标轴标签
-        ax.set_title('Close Point Over Trade Date')
-        ax.set_xlabel('Trade Date')
-        plt.xticks(rotation=45)
-        ax.set_ylabel('Close Point')
-        ax.grid(True)
-        ax.set_xticks(data_frame[PlotX])
-
-        # ax.set_xticklabels(data_frame['trade_date'].dt.strftime('%Y-%m-%d'))
-        # 在 Streamlit 中显示图表
-        st.pyplot(fig)
 
     @classmethod
     def write_form(cls, data_frame, explanation_in_English, explanation_in_Mandarin, sql):

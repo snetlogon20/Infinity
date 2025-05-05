@@ -12,6 +12,7 @@ class CustomError(Exception):
             "000100": "Oracle Error",
             "000101": "ClickHouse Error",
             "000102": "Plot Error",
+            "000103": "Error in Linear regression",
 
             "999999": "Unknown Error",
         }
