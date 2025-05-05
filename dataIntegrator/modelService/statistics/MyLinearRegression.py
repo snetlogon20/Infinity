@@ -462,5 +462,5 @@ if __name__ == "__main__":
     # 根据输入的 股票代码逐个计算线性回归
     init()
     test_linear_regression("C")
-    test_linear_regression("JPM")
-    test_linear_regression("TreasuryRate_C")
+    # test_linear_regression("JPM")
+    # test_linear_regression("TreasuryRate_C")

@@ -16,7 +16,7 @@ class PlotManager:
             return
 
         try:
-            plotType = param_dict.get("plotType", "lineChart")
+            plotType = param_dict.get('plotRequirement', {}).get("plotType", "lineChart")
             logger.info(rf"plotType: {plotType}")
 
             match plotType:

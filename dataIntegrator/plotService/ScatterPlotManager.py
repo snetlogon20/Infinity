@@ -12,17 +12,30 @@ class ScatterPlotManager(PlotManagerSuper):
 
     @classmethod
     def draw_plot(self, param_dict):
-        logger.info(rf"start - draw_plot, param_dict: {param_dict} ")
+        logger.info(rf"start - draw_plot")
 
         try:
             isPlotRequired = param_dict.get("isPlotRequired", "no")
-            PlotX = param_dict.get("PlotX", "None")
-            PlotY = param_dict.get("PlotY", "None")
             data_frame = param_dict.get("results", "None")
-            data_frame.to_excel(rf"D:\workspace_python\infinity_data\outbound\df_tushare_us_stock_daily.xlsx")
-            PlotTitle = param_dict.get("PlotTitle", "None")
-            xlabel = param_dict.get("xlabel", "None")
-            ylabel = param_dict.get("ylabel", "None")
+            PlotX = param_dict.get('plotRequirement', {}).get("PlotX", "None")
+            PlotY = param_dict.get('plotRequirement', {}).get("PlotY", "None")
+            PlotTitle = param_dict.get('plotRequirement', {}).get("PlotTitle", "None")
+            xlabel = param_dict.get('plotRequirement', {}).get("xlabel", "None")
+            ylabel = param_dict.get('plotRequirement', {}).get("ylabel", "None")
+
+        except Exception as e:
+            raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"Draw plot failed when parsing parameters", e=e)
+
+        try:
+
+            logger.info(rf"""
+                isPlotRequired: {isPlotRequired},
+                PlotX: {PlotX},
+                PlotY: {PlotY},
+                PlotTitle: {PlotTitle},
+                xlabel: {xlabel},
+                ylabel: {ylabel}
+            """)
 
             # 绘制折线图
             if isPlotRequired != "yes":
@@ -53,13 +66,14 @@ class ScatterPlotManager(PlotManagerSuper):
             ax.legend(loc='best')
 
             # 显示图表
-            logger.info(rf"plt.show()")
             if CommonParameters.IS_STREAMLIT_ON:
+                logger.info(rf"st.pyplot(fig)")
                 st.pyplot(fig)
             else:
+                logger.info(rf"plt.show()")
                 plt.show()
 
         except Exception as e:
-            raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"画图失败: {param_dict}", e=e)
+            raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"draw plot failed", e=e)
 
 
