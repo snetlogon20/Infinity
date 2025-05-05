@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
+from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
 from dataIntegrator.plotService.PlotManager import PlotManager
 
 
@@ -34,9 +35,12 @@ class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
         edited_data_frame = self.write_form(data_frame, explanation_in_English, explanation_in_Mandarin, sql)
         self.write_excel(edited_data_frame)
 
-
         plotManager = PlotManager()
         plotManager.draw_plot(param_dict)
+
+        #param_dict = response_dict
+        generalLinearRegression = GeneralLinearRegression()
+        generalLinearRegression.run_linear_regression_by_AI(param_dict)
 
         return response_dict
 
