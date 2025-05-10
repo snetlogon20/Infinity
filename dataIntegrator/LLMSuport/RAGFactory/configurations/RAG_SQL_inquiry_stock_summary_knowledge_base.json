@@ -293,6 +293,7 @@
     "收盘价就是 close price",
     "平均收益率就是 avg(pct_change)",
     "df_tushare_us_stock_daily 和 df_tushare_us_stock_basic 的join key 是ts_code",
-    "图标就是plot, scatter chart, line chart"
+    "图标就是plot, scatter chart, line chart",
+    "人民币对美元的汇率就是ts_code = USDCNH.FXCM"
   ]
 }

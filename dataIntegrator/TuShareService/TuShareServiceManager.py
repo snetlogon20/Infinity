@@ -437,7 +437,7 @@ class TuShareServiceManager():
             logger.info("callTuShareService started")
 
             start_date = "20240101"
-            end_date = "20250502"
+            end_date = "20241231"
             start_quarter = "2024Q1"
             end_quarter = "2025Q1"
 
