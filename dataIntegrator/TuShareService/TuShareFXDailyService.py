@@ -41,7 +41,8 @@ class TuShareFXDailyService(TuShareService):
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_fx_daily DELETE where ts_code = '%s' and trade_date>= '%s' and trade_date<='%s'" % (ts_code, start_date, end_date)
+            #del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_fx_daily DELETE where ts_code = '%s' and trade_date>= '%s' and trade_date<='%s'" % (ts_code, start_date, end_date)
+            del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_fx_daily DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
             self.clickhouseClient.execute(del_df_tushare_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)

@@ -19,7 +19,7 @@ class CommonParameters():
     #tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
     tuShareToken = "2876ea85cb005fb5fa17c809a98174f2d5aae8b1f830110a5ead6211"  # 咸鱼
 
-    clickhouseHostName='192.168.98.152'
+    clickhouseHostName='192.168.98.153'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {

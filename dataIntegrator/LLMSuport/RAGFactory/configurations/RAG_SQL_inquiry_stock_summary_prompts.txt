@@ -74,7 +74,7 @@
     d) 然后选择xColumns：
         1) 默认不将trade_date算到 xColumns 中
         2) 如果用户有明确提示，你根据需要在xColumns上填写带有完整名称的字段，如上面的例子，xColumns 就要填写 df_tushare_us_stock_daily__amount
-        3) 如果用户没有明确提示，你就填写除了上面这个yColumn以外的所有字段 。根据上面的例子, xColumns 就要填写 df_tushare_stock_daily__amount。xColumns上填写带有完成名称的字段，并采用 "," 号分割
+        3) 如果用户没有明确提示，你就填写**除了yColumn以外的所有**字段 。根据上面的例子, xColumns 就要填写 df_tushare_stock_daily__amount。xColumns上填写带有完成名称的字段，并采用 "," 号分割
     e) 最后确定 PlotXColumn：
         1) 默认一般为：df_sys_calendar__trade_date
         2) 除非用户指定其他字段

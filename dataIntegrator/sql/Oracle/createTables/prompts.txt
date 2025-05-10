@@ -1,0 +1,296 @@
+你有一个clickhouse建表语句，请将其转换为Oracle建表语句。
+以下是cliekhouse 建表语句模板
+
+CREATE TABLE indexsysdb.df_tushare_us_stock_daily(
+ts_code    String,
+trade_date String,
+close_point	   float,
+open_point	   float,
+high_point	   float,
+low_point	       float,
+pre_close  float,
+change_point	   float,
+pct_change	float,
+vol	        float,
+amount	    float,
+vwap	    float,
+turnover_ratio	float,
+total_mv	float,
+pe	float,
+pb	float
+)
+ENGINE=SummingMergeTree(trade_date, ts_code)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+以下是oracle 建表语句模板
+CREATE TABLE citi.df_tushare_us_stock_daily(
+    ts_code          VARCHAR2(255) NOT NULL,
+    trade_date       VARCHAR2(255) NOT NULL,
+    close_point      NUMBER NOT NULL,
+    open_point       NUMBER NOT NULL,
+    high_point       NUMBER NOT NULL,
+    low_point        NUMBER NOT NULL,
+    pre_close        NUMBER NOT NULL,
+    change_point     NUMBER NOT NULL,
+    pct_change       NUMBER NOT NULL,
+    vol              NUMBER NOT NULL,
+    amount           NUMBER NOT NULL,
+    vwap             NUMBER NOT NULL,
+    turnover_ratio   NUMBER NOT NULL,
+    total_mv         NUMBER NOT NULL,
+    pe               NUMBER NOT NULL,
+    pb               NUMBER NOT NULL,
+    CONSTRAINT pk_us_stock_daily PRIMARY KEY (trade_date, ts_code)
+);
+使用这个模板已经成功在Oracle中建立了数据表，并成功将数据从clickhouse表中的数据导入到Oracle表中。
+
+现在给你以下多个clickhouse的建表语句，需要你根据以上模板完成Oracle转换
+drop table indexsysdb.df_tushare_cn_cpi
+CREATE TABLE indexsysdb.df_tushare_cn_cpi(
+trade_date    String,
+nt_val       Float64,
+nt_yoy       Float64,
+nt_mom       Float64,
+nt_accu      Float64,
+town_val     Float64,
+town_yoy     Float64,
+town_mom     Float64,
+town_accu    Float64,
+cnt_val      Float64,
+cnt_yoy      Float64,
+cnt_mom      Float64,
+cnt_accu     Float64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date)
+SETTINGS index_granularity = 8192
+
+
+drop table indexsysdb.df_tushare_cn_index_daily;
+CREATE TABLE indexsysdb.df_tushare_cn_index_daily(
+ts_code	String,
+trade_date	String,
+close	Float64,
+open	Float64,
+high	Float64,
+low	Float64,
+pre_close	Float64,
+change	Float64,
+pct_chg	Float64,
+vol	Float64,
+amount Float64
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code,trade_date)
+SETTINGS index_granularity = 8192
+
+drop table indexsysdb.cn_money_supply;
+CREATE TABLE indexsysdb.cn_money_supply(
+trade_date     String,
+m0        Float64,
+m0_yoy    Float64,
+m0_mom    Float64,
+m1        Float64,
+m1_yoy    Float64,
+m1_mom    Float64,
+m2        Float64,
+m2_yoy    Float64,
+m2_mom    Float64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date)
+SETTINGS index_granularity = 8192
+
+
+drop table indexsysdb.df_tushare_cn_gdp;
+CREATE TABLE indexsysdb.df_tushare_cn_gdp(
+quarter	   String,
+gdp        Float64,
+gdp_yoy    Float64,
+pi         Float64,
+pi_yoy     Float64,
+si         Float64,
+si_yoy     Float64,
+ti         Float64,
+ti_yoy     Float64
+)
+ENGINE=SummingMergeTree(quarter)
+order by (quarter)
+SETTINGS index_granularity = 8192
+
+drop table indexsysdb.df_tushare_future_basic_information;
+CREATE TABLE indexsysdb.df_tushare_future_basic_information(
+ts_code        String,
+symbol         String,
+name           String,
+quote_unit     String,
+list_date      String,
+delist_date    String
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code)
+SETTINGS index_granularity = 8192
+
+
+drop table indexsysdb.df_tushare_future_daily;
+CREATE TABLE indexsysdb.df_tushare_future_daily(
+ts_code        String,
+trade_date     String,
+pre_close     Float64,
+pre_settle    Float64,
+open          Float64,
+high          Float64,
+low           Float64,
+close         Float64,
+settle        Float64,
+change1       Float64,
+change2       Float64,
+vol           Float64,
+amount        Float64,
+oi            Float64,
+oi_chg        Float64
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code, trade_date)
+SETTINGS index_granularity = 8192
+
+
+drop table indexsysdb.df_tushare_fx_daily
+CREATE TABLE indexsysdb.df_tushare_fx_daily(
+ts_code        String,
+trade_date     String,
+bid_open      Float64,
+bid_close     Float64,
+bid_high      Float64,
+bid_low       Float64,
+ask_open      Float64,
+ask_close     Float64,
+ask_high      Float64,
+ask_low       Float64,
+tick_qty        Int64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+drop table indexsysdb.df_tushare_fx_offshore_basic
+CREATE TABLE indexsysdb.df_tushare_fx_offshore_basic(
+ts_code              String,
+name                 String,
+classify             String,
+exchange             String,
+min_unit             Float64,
+max_unit             Float64,
+pip                  Float64,
+pip_cost             Float64,
+traget_spread        Float64,
+min_stop_distance    Float64,
+trading_hours         Nullable(String),
+break_time            Nullable(String)
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code, name )
+SETTINGS index_granularity = 8192
+
+drop table indexsysdb.cn_cpi
+CREATE TABLE indexsysdb.df_tushare_hk_stock_daily(
+ts_code        String,
+trade_date     String,
+open          Float64,
+high          Float64,
+low           Float64,
+close         Float64,
+pre_close     Float64,
+change        Float64,
+pct_chg       Float64,
+vol           Float64,
+amount        Float64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+CREATE TABLE indexsysdb.df_tushare_sge_daily(
+ts_code         String,
+trade_date      String,
+close          Float64,
+open           Float64,
+high           Float64,
+low            Float64,
+price_avg      Float64,
+change         Float64,
+pct_change     Float64,
+vol            Float64,
+amount         Float64,
+oi             Float64,
+settle_vol     Nullable(Float64),
+settle_dire     Nullable(String)
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date, ts_code )
+SETTINGS index_granularity = 8192
+
+CREATE TABLE indexsysdb.df_tushare_shibor_daily(
+trade_date	 String,
+tenor_on Float64,
+tenor_1w Float64,
+tenor_2w Float64,
+tenor_1m Float64,
+tenor_3m Float64,
+tenor_6m Float64,
+tenor_9m Float64,
+tenor_1y Float64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date)
+SETTINGS index_granularity = 8192
+
+drop table indexsysdb.df_tushare_shibor_lpr_daily;
+CREATE TABLE indexsysdb.df_tushare_shibor_lpr_daily(
+trade_date	 String,
+tenor_1y Float64,
+tenor_5 Float64
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date)
+SETTINGS index_granularity = 8192
+
+
+drop table indexsysdb.df_tushare_stock_daily;
+CREATE TABLE indexsysdb.df_tushare_stock_daily(
+ts_code	String,
+trade_date	String,
+open	Float64,
+high	Float64,
+low	Float64,
+close	Float64,
+pre_close	Float64,
+change	Float64,
+pct_chg	Float64,
+vol	Float64,
+amount Float64
+)
+ENGINE=SummingMergeTree(ts_code)
+order by (ts_code,trade_date)
+SETTINGS index_granularity = 8192
+
+--drop table indexsysdb.df_tushare_us_treasury_yield_cruve
+CREATE TABLE indexsysdb.df_tushare_us_treasury_yield_cruve(
+	trade_date    String,
+    m1    float,
+    m2    float,
+    m3    float,
+    m6    float,
+    y1    float,
+    y2    float,
+    y3    float,
+    y5    float,
+    y7    float,
+    y10   float,
+    y20   float,
+    y30   float
+)
+ENGINE=SummingMergeTree(trade_date)
+order by (trade_date)
+SETTINGS index_granularity = 8192
