@@ -50,7 +50,8 @@ class LinePlotManager(PlotManagerSuper):
             split_PlotY_list = PlotY.split(',')
             for item in split_PlotY_list:
                 PlotY_str = item.strip()
-                ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o', label=PlotY_str)
+                #ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o', label=PlotY_str)
+                ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o')
 
             # 设置图表标题和坐标轴标签
             logger.info(rf"设置图表标题和坐标轴标签")

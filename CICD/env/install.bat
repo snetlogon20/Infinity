@@ -20,6 +20,7 @@ pip install posthog
 
 
 @REM  一键安装
+pip freeze > D:\workspace_python\infinity\dataIntegrator\test\cicd\requirements_20250517.txt
 pip install -r D:\workspace_python\infinity\CICD\env\requirements.txt
 
 @REM Windows 额外依赖

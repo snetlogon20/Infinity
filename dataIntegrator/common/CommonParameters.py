@@ -42,7 +42,8 @@ class CommonParameters():
     MOCKED_AI_ANSWER = ""
 
     #Keep the parameter when you are running PlotManager standalone (not within StreamLit)
-    IS_STREAMLIT_ON = False
+    #IS_STREAMLIT_ON = False
+    IS_STREAMLIT_ON = True
 
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
