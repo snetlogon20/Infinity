@@ -50,6 +50,7 @@
 9. 判断用户除了返回数据外，是否有对数据画图的意图:
     a) 如果问题中有提到需要图表、作图、折线图、散点图、画图等，则isPlotRequired就是yes。否则isPlotRequired就是no。
     b) 如果问题中有提到需要线性分析、回归分析、线性回归分析、Linear regression、Linear analysis, Linear regression analysis，则isLinearRegressionRequired就是yes。否则isLinearRegressionRequired就是no。
+    c) 如果问题中有提到需要蒙特卡洛模拟/Montecarlo分析，则isMontecarloRequired就是yes。否则isMontecarloRequired就是no
 10. JSON 返回 "plotRequirement"字段内容填写。
     a) 如果isPlotRequired就是yes，则需根据要求填写以下内容. 如果isPlotRequired就是no，则需保留键值，但是在字段值上填写" "。
     b) 先确定plotType: 。
@@ -82,10 +83,20 @@
         1) 填写在 yColumn 和 xColumns 中字段必须从之前生成的SQL select 字段中获取。生成每个字段后，立即检查是否符合上述规则。
         2) plotRequirement 和 linearRequirement 分属2个不同的数据字段。不要混淆、也不要把plotRequirement的规则作用到linearRequirement上。
         3) 如发现错误，必须重新生成。
+11.JSON 返回“MontecarloRequirement"字段内容填写。
+    a) 如果isMonteCarloRequired就是yes ，则需根据要求填写以下内容
+    b) 'stock': 用户指定的股票代码，
+    c) 'start_date': '用户指定的trade date开始日期'，'end_date':'用户指定的trade_date结束日期',
+    d) 'init_value': 用户指定的初始值',
+    e) 'analysis_column': 用户指定的需要分析的字段'
+    f) 't': 用户指定的最小分析单位，8.01为一天，是个浮点数，默认为8.01
+    g) 'times':用户指定的分析时常，为具体天数，是个整数，默认为10
+    h) 'series':用户指定需要模拟的假设次数，是个整数，默认为1000i)'alpha':用户指定的置信度，默认是0.05，j)'distribution_type':'用户指定的分布，可以选择的有normal(正态分布)/l0gnormal(对数正态分布)/historical(历史分布g)下面的JSON是格式模板，我需要你根据上面的要求填写到以下模板中
+    i) 'alpha':用户指定的置信度，默认是0.05，
+    j) 'distribution_type':'用户指定的分布，可以选择的有normal(正态分布)/lognormal(对数正态分布)/historical(历史分布)', 默认是lognormal分布'
+    g)下面的JSON是格式模板，我需要你根据上面的要求填写到以下模板中
 
-
-11. 疑问或者补充信息
-10. 返回JSON格式:
+12. 返回JSON格式:
 {{
     "sql": "生成的SQL",
     "explanation_in_Mandarin": "解释查询目的和逻辑",
@@ -98,7 +109,7 @@
         "PlotTitle": "Please give this chart a title according to the logic of the chart/plot",
         "xlabel": "Please give a name for X轴字段名, it shall be in human language",
         "ylabel": "Please give a name for Y轴字段名, it shall be in human language",
-    }}
+    }},
     "isLinearRegressionRequired": "是否要求进行线性回归分析，yes/no",
     "linearRequirement" = {{
         "plotType": "默认为lineChart",
@@ -110,10 +121,22 @@
         "ylabel": "Please give a name for yColumn字段名 for linearRequirement, it shall be in human language",
         "if_run_test": "false",
         "X_given_test_source_path": "",
-    }}
+    }},
+    "isMonteCarloRequired":"是否要求进行蒙特卡罗分析，yes/no，默认no",
+    "MonteCarloRequirement":{{
+        'market':'US', 'stock':'C',
+        'start_date': '需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询开始日期，'end_date':'需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询结束日期'
+        'init_value': '需要根据]SON["sq1"]中的字段全名，结合用户问题，填写用户指定的初始值的字段
+        'analysis_column': '需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定需要分析的字段',
+        't': 0.01，
+        'times': 10,
+        'series': 1000,
+        'alpha': 0.05.
+        'distribution_type': 'lognormal' # normal/lognormal/historical
+    }},
     "feedback","在过程中产生的疑问，或者需要用户补充的信息"
 }}
 
-11 # 后果声明
+13 # 后果声明
 a) 填写返回JSON格式时一定要注意检查，每个字段必须填写。不能带有违反JSON规则的字符。
 b) 输出的SQL记得要进行 beautify，确保人类可读性。但是不得修改输出SQL的原始内容。

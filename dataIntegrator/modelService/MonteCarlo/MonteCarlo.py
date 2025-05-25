@@ -6,6 +6,7 @@ import scipy.stats as stats
 from matplotlib import pyplot as plt
 
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
+from dataIntegrator.plotService.LinePlotManager import LinePlotManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
 
@@ -123,20 +124,50 @@ class MonteCarlo:
         start_date = simulat_params.get("start_date","Unknown")
         end_date = simulat_params.get("end_date", "Unknown")
 
-        # 图表标注
-        plt.axhline(var, color='red', linestyle='--',
-                    label=f'VaR ({alpha * 100}%): {var:.2f}')
-        plt.title(f"Monte Carlo Simulation ({dist_type})\n"
-                  f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
-                  f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
-                  )
-        plt.legend()
-        plt.show()
+        # # 图表标注
+        # plt.axhline(var, color='red', linestyle='--',
+        #             label=f'VaR ({alpha * 100}%): {var:.2f}')
+        # plt.title(f"Monte Carlo Simulation ({dist_type})\n"
+        #           f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
+        #           f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
+        #           )
+        # plt.legend()
+        # plt.show()
+        #
+        # # 转换为DataFrame
+        # df = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
+        # return df
 
-        # 转换为DataFrame
-        df = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
-        return df
+        dataframe = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
+        df_pivot_MC = dataframe.pivot(index='Step', columns='Path', values='Value').reset_index(drop=True)
+        df_pivot_MC.columns = [f"path{col}" for col in df_pivot_MC.columns]
+        print(df_pivot_MC)
 
+        df_pivot_MC.reset_index(inplace=True)
+        df_pivot_MC['step'] = df_pivot_MC.index
+        df_pivot_MC = df_pivot_MC.reindex(columns=['step'] + [col for col in df_pivot_MC.columns if col != 'step'])
+
+        column_names = df_pivot_MC.columns.tolist()
+        path_columns = [col for col in column_names if col.startswith ("path")]
+        yColumn = ",".join(path_columns)
+
+        param_dict = {}
+        param_dict["isPlotRequired"] = "yes"
+        param_dict["results"] = df_pivot_MC
+
+        param_dict["plotRequirement"] = {}
+
+        param_dict["plotRequirement"]["PlotX"] = "index"
+        param_dict["plotRequirement"]["PlotY"] = yColumn
+
+        param_dict["plotRequirement"]["plotTitle"] =  f"Monte Carlo Simulation ({dist_type})\n"
+        f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
+        f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
+
+        param_dict["plotRequirement"]["xlabel"] = "days"
+        param_dict["plotRequirement"]["ylabel"] = "points"
+        linePlotManager = LinePlotManager()
+        linePlotManager.draw_plot(param_dict)
 
 def get_dataset(market, stock, start_date, end_date):
     if market == "US":

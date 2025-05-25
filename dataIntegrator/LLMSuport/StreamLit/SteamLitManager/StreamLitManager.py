@@ -11,9 +11,13 @@ from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.AnyFinancialInquiry impo
 from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.AnySQLInquiry import AnySQLInquiry
 from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.RAGChatBot import RAGChatBot
 from dataIntegrator.common.CommonLib import CommonLib
+from dataIntegrator.common.CustomError import CustomError
 from dataIntegrator.utility.FileUtility import FileUtility
 
 st.set_page_config(layout="wide")
+
+logger = CommonLib.logger
+commonLib = CommonLib()
 
 class StreamLitManager(CommonLib):
     def __init__(self, base_url='http://127.0.0.1:5000'):
@@ -111,6 +115,7 @@ if __name__ == "__main__":
                 service.request_for_rag_inquiry(user_input)
                 #manager.callMockedData()
                 st.session_state.button_clicked = False
+
 
     if choice == "Any-Financial Analysis":
         # 添加文本输入框和按钮

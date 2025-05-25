@@ -41,9 +41,9 @@ if __name__ == "__main__":
         {
             "queryStatement": """
         SELECT distinct(*)
-        FROM indexsysdb.df_tushare_fx_offshore_basic
+        FROM indexsysdb.df_tushare_fx_daily
         """,
-            "target_table": "citi.df_tushare_fx_offshore_basic"
+            "target_table": "citi.df_tushare_fx_daily"
         }
     ]
 
