@@ -17,6 +17,9 @@ conda activate py39_test
 conda create --name py312_test --clone py312
 conda activate py312_test
 
+
+pip freeze > D:\workspace_python\infinity\dataIntegrator\notebook\conda\requirements.txt
+
 ##############################################
 # 开始安装
 ##############################################

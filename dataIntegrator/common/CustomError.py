@@ -13,6 +13,7 @@ class CustomError(Exception):
             "000101": "ClickHouse Error",
             "000102": "Plot Error",
             "000103": "Error in Linear regression",
+            "000104": "Error in RAG service",
 
             "999999": "Unknown Error",
         }

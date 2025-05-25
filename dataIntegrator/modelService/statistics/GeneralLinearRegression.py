@@ -153,6 +153,9 @@ class GeneralLinearRegression:
         param_dict = {}
 
         param_dict["isLinearRegressionRequired"] = param_dict_in.get("isLinearRegressionRequired", "no")
+        if param_dict["isLinearRegressionRequired"] == "no":
+            return
+
         param_dict["result"] = param_dict_in.get("results", "None")
 
         param_dict["plotType"] = param_dict_in.get('linearRequirement', {}).get("plotType", "lineChart")
