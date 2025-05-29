@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from dataIntegrator import CommonLib
 from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
 from dataIntegrator.utility.FileUtility import FileUtility
 
@@ -34,7 +35,7 @@ class RAGAgent(ABC):
         # 解析结果
         json_str = response.generations[0][0].text
         cleaned_json = json_str.replace("```json", "").replace("```", "").strip()
-        print(cleaned_json)
+        print("cleaned_json:", cleaned_json)
         return cleaned_json
 
     def run_single_question(self, agent_type, question):
