@@ -13,6 +13,7 @@ class SparkAI(AIAgent):
     @classmethod
     def inquiry(self, prompt: str, question: str):
         spark = ChatSparkLLM(
+            request_timeout=CommonParameters.SPARKAI_URL_REQUEST_TIMEOUT,
             spark_api_url=CommonParameters.SPARKAI_URL,
             spark_app_id=CommonParameters.SPARK_APPID,
             spark_api_key=CommonParameters.SPARK_API_KEY,

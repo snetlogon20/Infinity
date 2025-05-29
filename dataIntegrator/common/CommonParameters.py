@@ -33,6 +33,7 @@ class CommonParameters():
 
     Default_AI_Engine = 'spark'
 
+    SPARKAI_URL_REQUEST_TIMEOUT = 120
     SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
     SPARKAI_DOMAIN = 'generalv3.5'
     SPARK_APPID = "5f5c4f75"

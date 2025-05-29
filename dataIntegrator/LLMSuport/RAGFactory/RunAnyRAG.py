@@ -170,13 +170,22 @@ def reason_chain_10000_inquiry():
             question = question + "\n" + user_input
             print(rf"你已输入：{question}")
 
+def rag_uml_txt2uml_inquiry():
+    question = "请按照要求生成 Database UML和建表语句,并按照JSON格式返回"
+
+    #knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2uml.json")
+    knowledge_base_file_path = rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\Letter of Credit Requirement_RAG.txt"
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2uml_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2uml", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
 
 if __name__ == "__main__":
 
     ##############################
     # RAG_SQL_inquiry_stock_summary
     ##############################
-    RAG_SQL_inquiry_stock_summary()
+    # RAG_SQL_inquiry_stock_summary()
     #
     # ##############################
     # # RAG_SQL_inquiry_stocks_code
@@ -202,3 +211,8 @@ if __name__ == "__main__":
     # reason_chain_10000_inquiry
     ##############################
     # reason_chain_10000_inquiry()
+
+    ##############################
+    # rag_uml_txt2uml_inquiry
+    ##############################
+    rag_uml_txt2uml_inquiry()

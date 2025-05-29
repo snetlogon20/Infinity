@@ -8,6 +8,7 @@ from dataIntegrator.LLMSuport.StreamLit.RAG_SQL_inquiry.RAG_SQL_inquiry_mock_dat
 from dataIntegrator.LLMSuport.StreamLit.RAG_SQL_inquiry.RAG_SQL_inquiry_portfolio_volatility_service import \
     RAG_SQL_inquiry_portfolio_volatility_service
 from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.AnyFinancialInquiry import AnyFinancialInquiry
+from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.AnyRequirement import AnyRequirement
 from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.AnySQLInquiry import AnySQLInquiry
 from dataIntegrator.LLMSuport.StreamLit.SteamLitManager.RAGChatBot import RAGChatBot
 from dataIntegrator.common.CommonLib import CommonLib
@@ -80,7 +81,7 @@ if __name__ == "__main__":
 
     # 侧边栏菜单
     menu = [
-        "Any-SQL", "Any-Rule", "Any-API",
+        "Any-SQL", "Any-Rule", "Any-API","Any-Requirement",
         "Any-Chart/Plot", "Any-Financial Analysis","CHAT-BOT",
         "Knowledge Base", "Common Queries",
         "Business Rules", "Meta Configration",
@@ -133,6 +134,24 @@ if __name__ == "__main__":
                 print("question is null")
             else:
                 service = AnyFinancialInquiry()
+                service.request_for_rag_inquiry(user_input)
+                st.session_state.button_clicked = False
+    if choice == "Any-Requirement":
+        # 添加文本输入框和按钮
+        user_input = st.text_area("**Tell me/你的问题:**", height=100, placeholder="Please input question like: 请按照要求生成 Database UML和建表语句,并按照JSON格式返回")
+        # 在 Streamlit 中嵌入 HTML 代码
+
+        if 'button_clicked' not in st.session_state:
+            st.session_state.button_clicked = False
+
+        if st.button("Go/生成"):
+            st.session_state.button_clicked = True
+
+        if st.session_state.button_clicked:
+            if user_input is None or len(user_input) == 0:
+                print("question is null")
+            else:
+                service = AnyRequirement()
                 service.request_for_rag_inquiry(user_input)
                 st.session_state.button_clicked = False
     if choice == "CHAT-BOT":

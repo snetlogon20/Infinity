@@ -1,0 +1,71 @@
+你是一个资深的银行需求分析师和开发人员，请根据以下信息生成 plant UML：
+
+{context}
+
+**用户问题**:
+{question}
+
+请按以下要求返回结果：
+1. create_table_uml_statement 字段
+    a) 采用 Plant UML 语法填充所有数据表的 数据库模式图（Database Schema Diagram）
+    b) 在 Plant uml 的生成过程中字符串上不要用""(双引号)包裹。避免和 JSON 格式产生冲突
+2. create_table_sql_statement 字段
+    a) 采用 Clickhouse 语法
+    b) 在中填充所有数据表的建表语句
+    c) 生成过程中如果遇到有Enum的值，只要设置为String类型即可
+    d) 在 SQL 的生成过程中字符串上不要用""(双引号)包裹。避免和 JSON 格式产生冲突
+    e) *SQL语句中不要带有回车*
+3. 以下返回格式只是样例，供参考。 具体根据以上用户的问题和实际提供的业务表，依次填充以下JSON。 填充必须符合JSON规范.
+4. 返回格式：
+{{
+    "create_table_sql_statement": [
+      {{
+      "table_name": "table1",
+      "create_table_sql": "create table1 xxxxx"
+      }},
+      {{
+      "table_name": "table2",
+      "create_table_sql": "create table2 xxxxx"
+      }}
+    ],
+    "create_table_uml_statement": "@startuml
+        entity Core_LC_Master_Data {{
+            LC_ID : String,
+            Applicant_ID : String,
+            Beneficiary_ID : String,
+            Issuing_Bank_ID : String,
+            Advising_Bank_ID : String,
+            LC_Type : String,
+            LC_Currency : String,
+            LC_Amount : Decimal(15, 2),
+            Issue_Date : Date,
+            Expiry_Date : Date,
+            Latest_Shipment_Date : Date,
+            LC_Description : String
+        }}
+        entity Documentary_Compliance {{
+            Document_ID : String,
+            LC_ID_Ref : String,
+            Document_Type : String,
+            Document_Status : String,
+            Submission_Date : Date,
+            Review_Date : Date,
+            Discrepancy_Details : String,
+            Document_Reference_Number : String
+        }}
+        entity Transaction_Tracking {{
+            Transaction_ID : String,
+            LC_ID_Ref : String,
+            Transaction_Date : Date,
+            Transaction_Type : String,
+            Party_Involved : String,
+            Transaction_Status : String,
+            Previous_Transaction_ID : String
+        }}
+        Core_LC_Master_Data ||--o{{ Documentary_Compliance : contains
+        Core_LC_Master_Data ||--o{{ Transaction_Tracking : contains
+        @enduml",
+    "explanation_in_Mandarin": "解释查询目的和逻辑",
+    "explanation_in_English": "Explain the targe and logic of the inquiry in English",
+    "feedback","在过程中产生的疑问，或者需要用户补充的信息"
+}}
