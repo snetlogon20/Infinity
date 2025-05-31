@@ -11,7 +11,7 @@ import re
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-class RAG_UML_txt2uml(RAGAgent):
+class RAG_UML_uml2schema(RAGAgent):
 
     def __init__(self, knowledge_base_file_path, prompt_file_path):
         self.knowledge_base_file_path = knowledge_base_file_path
@@ -19,7 +19,7 @@ class RAG_UML_txt2uml(RAGAgent):
 
     @classmethod
     def load_knowledge_base_from_json(self, file_path):
-        json_object = FileUtility.read_file(file_path)
+        json_object = FileUtility.read_json_file(file_path)
         return json_object
 
     @classmethod
@@ -27,8 +27,13 @@ class RAG_UML_txt2uml(RAGAgent):
         context = []
 
         # 用户需求说明
-        context.append("### 用户需求说明:")
-        context.append(knowledge_base)
+        context.append("### 1. UML diagram:")
+        uml_diagram = knowledge_base["UML_Diagram"]
+        context.append(uml_diagram)
+
+        context.append("### 2. User requirements:")
+        requirements = knowledge_base["requirements"]
+        context.append(requirements)
 
         return "\n".join(context)
 
@@ -39,6 +44,7 @@ class RAG_UML_txt2uml(RAGAgent):
 
         # 生成增强提示词
         prompt = prompt_template.format(context=context, question=question)
+        #prompt = prompt_template
         return prompt
 
     @classmethod
@@ -49,6 +55,8 @@ class RAG_UML_txt2uml(RAGAgent):
         response = AIAgentFactory.call_agent(agent_type, prompt, question)
         print(response)
         return response
+
+
 
     @classmethod
     def parse_response(cls, response):
@@ -65,13 +73,6 @@ class RAG_UML_txt2uml(RAGAgent):
 
     @classmethod
     def process_response(self, cleaned_json):
-
-        cleaned_json = re.sub(
-            r'(@startuml)(.*?)(@enduml)',
-            lambda m: m.group(1) + m.group(2).replace('\n', '\\n') + m.group(3),
-            cleaned_json,
-            flags=re.DOTALL
-        )
         try:
             response_dict = json.loads(cleaned_json)
         except CustomError as e:
@@ -91,8 +92,7 @@ class RAG_UML_txt2uml(RAGAgent):
         cleaned_json = self.parse_response(response)
         response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
-        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\create_table.json")
-
+        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\schema.json")
 
         return response_dict
 
@@ -109,15 +109,23 @@ class RAG_UML_txt2uml(RAGAgent):
 
     def display_result(self, response, result_dict):
         try:
-            print(result_dict["create_table_sql_statement"])
-            create_table_sql_statement_list = result_dict["create_table_sql_statement"]
-            for create_table_sql_statement_dict in create_table_sql_statement_list:
-                print(create_table_sql_statement_dict["table_name"])
-                print(create_table_sql_statement_dict["create_table_sql"])
+            print(result_dict["table_definitions"])
+            table_definitions_list = result_dict["table_definitions"]
+            for table_definition in table_definitions_list:
+                print(table_definition["table_name"])
+                print(table_definition["table_definition"])
+                print(table_definition["primary_key"])
+                print(table_definition["table_alias"])
 
-            print(result_dict["create_table_uml_statement"])
-            print(result_dict["explanation_in_Mandarin"])
-            print(result_dict["explanation_in_English"])
+            table_schema_dict = result_dict["table_schema"]
+            for table_name, table_info  in table_schema_dict.items():
+                print("table_name:", table_name)
+                print("table_info:", table_info)
+                columns = table_info.get('columns', {})
+                for col_name, col_desc in columns.items():
+                    print(col_name)
+                    print(col_desc)
+
         except CustomError as e:
             raise e
         except Exception as e:

@@ -1,0 +1,51 @@
+You are a senior Clickhouse database developer and you are request to generate test test data acoording to below UML Diagram and requirements.
+1. The sample of the schema documentation is listed as below.
+2. You shall refer to the requirements before you generate the test data in SQL format
+
+Below is the Spec of test data
+1. you need to generate the SQL by this order: delete, insert, update,
+2. you need to fill the Enum value in you SQL, if Enum value a given in requirement for specified column
+3. delete statement
+   a. you shall generate the delete statement firstly.
+   b. please read the section of "UML diagram" inReference Documents. you need to iterate all the entity/tables in the uml and generate the insert statment for all of them
+   c. you shall follow below sample/grammar as you are using clickhouse
+        alter table Core_LC_Master_Data DELETE where 1=1;
+4. insert statement
+   a. please read the section of "UML diagram" inReference Documents. you need to iterate all the entity/tables in the uml and generate the insert statment for all of them
+   b. you need generate at least 5 SQL insert statements for each table.
+   c. your shall generate data with foreign key firstly, then generate the primary table. other wise the insert of data will be stopped due to the key violation/conflictions
+   d. you shall follow below sample, so you just need mention column name for once for saving token.
+        INSERT INTO Core_LC_Master_Data
+        (LC_ID, Applicant_ID, Beneficiary_ID, Issuing_Bank_ID, Advising_Bank_ID, LC_Type, LC_Currency, LC_Amount, Issue_Date, Expiry_Date, Latest_Shipment_Date, LC_Description)
+        VALUES
+        ('LC0001', 'APP001', 'BEN001', 'ISB001', '', 'Irrevocable', 'USD', 20000.00, '2024-01-01', '2024-04-01', '2024-03-15', 'Electronics Import'),
+        ('LC0002', 'APP002', 'BEN002', 'ISB002', '', 'Irrevocable', 'CNY', 30000.00, '2024-01-02', '2024-04-02', '2024-03-16', 'Textiles Export');
+5. update statement
+   a. please read the section of "UML diagram" inReference Documents. you need to iterate all the entity/tables in the uml and generate the insert statment for all of them
+   b. you need generate at least 5 SQL update statements for each table.
+   c. the updated columns shall cover all columns.
+   d. you shall make shall the  primary key in your update statement is also generated in you insert statement
+6. you need follow the instruction from user, in perspect of business requirments.
+   1. the total sum of Core_LC_Master_Data.LC_Amount in insert statments shall be 100000.
+   2. I want 2 records in  Core_LC_Master_Data.LC_Currency be USD. then rest be CNY or JPY
+7 please return with below JSON format
+{{
+    "delete_sql": [
+        "此处包含delete 语句"
+    ],
+    "insert_sql": [ 此处包含 insert 语句, 每张数据表至少需要5条记录。**你需要严格服从以上 insert statement 中说明的语法。**
+    ],
+    "update_sql": [ 此处包含 update 语句, 每张数据表至少需要5条记录
+    ]
+}}
+8. validate before you return me
+    a) all SQL statement shall **follow the SQL grammar of chickhouse**
+    b) make sure there is no key or logic confliction between each table.
+    c) you shall make sure the JSON follow the format/grammar of JSON.
+    d) you need to give me **a complete json response** you generated.
+
+Reference Documents:
+{context}
+
+Question
+{question}

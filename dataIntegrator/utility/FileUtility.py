@@ -69,6 +69,17 @@ class FileUtility:
             print(f"错误: 发生了一个未知错误: {e}")
         return ""
 
+    @staticmethod
+    def write_json_file(file_path, json_data):
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(json_data, file, ensure_ascii=False, indent=4)
+            print(f"JSON 数据成功写入文件 {file_path}。")
+        except FileNotFoundError:
+            print(f"错误: 文件路径 {file_path} 未找到。")
+        except Exception as e:
+            print(f"错误: 发生了一个未知错误: {e}")
+
 
 if __name__ == "__main__":
     filename = FileUtility.generate_filename_by_timestamp("LinearRegressionCiti","xlsx")

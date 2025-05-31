@@ -33,18 +33,21 @@ class CommonParameters():
 
     Default_AI_Engine = 'spark'
 
-    SPARKAI_URL_REQUEST_TIMEOUT = 120
-    SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
-    SPARKAI_DOMAIN = 'generalv3.5'
-    SPARK_APPID = "5f5c4f75"
-    SPARK_API_KEY = "7a3136e4cac2160adb122031351fe0a4"
-    SPARK_API_SECRET = "0672724ff7d71dc8fbbdcf98614aedb1"
-
-    MOCKED_AI_ANSWER = ""
+    # Configuration - 1
+    # SPARKAI_URL_REQUEST_TIMEOUT = 120
+    # SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
+    # SPARKAI_DOMAIN = 'generalv3.5'
+    # SPARK_APPID = "5f5c4f75"
+    # SPARK_API_KEY = "7a3136e4cac2160adb122031351fe0a4"
+    # SPARK_API_SECRET = "0672724ff7d71dc8fbbdcf98614aedb1"
+    # Configuration - 2
 
     #Keep the parameter when you are running PlotManager standalone (not within StreamLit)
     #IS_STREAMLIT_ON = False
     IS_STREAMLIT_ON = True
+
+    # IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
