@@ -11,7 +11,7 @@ import re
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-class RAG_UML_txt2uml(RAGAgent):
+class RAG_UML_uml2testdata(RAGAgent):
 
     def __init__(self, knowledge_base_file_path, prompt_file_path):
         self.knowledge_base_file_path = knowledge_base_file_path
@@ -19,7 +19,7 @@ class RAG_UML_txt2uml(RAGAgent):
 
     @classmethod
     def load_knowledge_base_from_json(self, file_path):
-        json_object = FileUtility.read_file(file_path)
+        json_object = FileUtility.read_json_file(file_path)
         return json_object
 
     @classmethod
@@ -27,8 +27,13 @@ class RAG_UML_txt2uml(RAGAgent):
         context = []
 
         # 用户需求说明
-        context.append("### 用户需求说明:")
-        context.append(knowledge_base)
+        context.append("### UML diagram:")
+        uml_diagram = knowledge_base["UML_Diagram"]
+        context.append(uml_diagram)
+
+        context.append("### User requirements:")
+        requirements = knowledge_base["requirements"]
+        context.append(requirements)
 
         return "\n".join(context)
 
@@ -50,10 +55,11 @@ class RAG_UML_txt2uml(RAGAgent):
         print(response)
         return response
 
+
     @classmethod
     def parse_response(cls, response):
         if CommonParameters.IF_ENABLE_MOCKED_AI:
-            cleaned_json = RAGMockedMessager.UML2schema_MOCKED_AI_ANSWER
+            cleaned_json = RAGMockedMessager.UML2testdata_MOCKED_AI_ANSWER
             return cleaned_json
 
         # 解析结果
@@ -65,13 +71,6 @@ class RAG_UML_txt2uml(RAGAgent):
 
     @classmethod
     def process_response(self, cleaned_json):
-
-        cleaned_json = re.sub(
-            r'(@startuml)(.*?)(@enduml)',
-            lambda m: m.group(1) + m.group(2).replace('\n', '\\n') + m.group(3),
-            cleaned_json,
-            flags=re.DOTALL
-        )
         try:
             response_dict = json.loads(cleaned_json)
         except CustomError as e:
@@ -91,8 +90,7 @@ class RAG_UML_txt2uml(RAGAgent):
         cleaned_json = self.parse_response(response)
         response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
-        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\create_table.json")
-
+        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\schema.json")
 
         return response_dict
 
@@ -109,18 +107,23 @@ class RAG_UML_txt2uml(RAGAgent):
 
     def display_result(self, response, result_dict):
         try:
-            print(result_dict["create_table_sql_statement"])
-            create_table_sql_statement_list = result_dict["create_table_sql_statement"]
-            for create_table_sql_statement_dict in create_table_sql_statement_list:
-                print(create_table_sql_statement_dict["table_name"])
-                print(create_table_sql_statement_dict["create_table_sql"])
 
-            print(result_dict["create_table_uml_statement"])
-            print(result_dict["explanation_in_Mandarin"])
-            print(result_dict["explanation_in_English"])
+            delete_sql_list = result_dict["delete_sql"]
+            for delete_sql in delete_sql_list:
+                print(delete_sql)
+
+            insert_sql_list = result_dict["insert_sql"]
+            for insert_sql in insert_sql_list:
+                print(insert_sql)
+
+            insert_sql_list = result_dict["update_sql"]
+            for insert_sql in insert_sql_list:
+                print(insert_sql)
+
         except CustomError as e:
             raise e
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
 
         return result_dict
+

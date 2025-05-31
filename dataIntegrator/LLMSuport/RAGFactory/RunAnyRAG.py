@@ -180,6 +180,24 @@ def rag_uml_txt2uml_inquiry():
     response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2uml", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
 
+def rag_uml_uml2schema_inquiry():
+    question = "请按照要求生成 Database UML和建表语句,并按照JSON格式返回"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2schema.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2schema_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_uml2schema", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
+def rag_uml_uml2testdata_inquiry():
+    question = "请按照要求生成 JSON 返回消息。**记得必须是完整的 JSON消息，不可中断。**"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2testdata.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2testdata_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_uml2testdata", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
 if __name__ == "__main__":
 
     ##############################
@@ -213,6 +231,8 @@ if __name__ == "__main__":
     # reason_chain_10000_inquiry()
 
     ##############################
-    # rag_uml_txt2uml_inquiry
+    # rag_uml
     ##############################
-    rag_uml_txt2uml_inquiry()
+    #rag_uml_txt2uml_inquiry()
+    #rag_uml_uml2schema_inquiry()
+    rag_uml_uml2testdata_inquiry()
