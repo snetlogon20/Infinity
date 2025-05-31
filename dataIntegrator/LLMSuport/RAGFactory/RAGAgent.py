@@ -2,8 +2,11 @@ from abc import ABC, abstractmethod
 
 from dataIntegrator import CommonLib
 from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
+from dataIntegrator.common.CustomError import CustomError
 from dataIntegrator.utility.FileUtility import FileUtility
 
+logger = CommonLib.logger
+commonLib = CommonLib()
 
 class RAGAgent(ABC):
     @abstractmethod
@@ -37,6 +40,17 @@ class RAGAgent(ABC):
         cleaned_json = json_str.replace("```json", "").replace("```", "").strip()
         print("cleaned_json:", cleaned_json)
         return cleaned_json
+
+    def write_json(self, response_dict: dict, joson_file_path):
+        try:
+            FileUtility.write_json_file(joson_file_path, response_dict)
+
+            return
+        except CustomError as e:
+            raise e
+        except Exception as e:
+            raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
+
 
     def run_single_question(self, agent_type, question):
 
