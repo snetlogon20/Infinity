@@ -3,6 +3,7 @@ from typing import Dict, Type
 
 from dataIntegrator.LLMSuport.RAGFactory.RAG_SQL_inquiry_stock_summary import RAG_SQL_inquiry_stock_summary
 from dataIntegrator.LLMSuport.RAGFactory.RAG_SQL_inquiry_stocks_code import RAG_SQL_inquiry_stocks_code
+from dataIntegrator.LLMSuport.RAGFactory.RAG_UML_txt2requirement import RAG_UML_txt2requirement
 from dataIntegrator.LLMSuport.RAGFactory.RAG_UML_txt2uml import RAG_UML_txt2uml
 from dataIntegrator.LLMSuport.RAGFactory.RAG_UML_uml2schema import RAG_UML_uml2schema
 from dataIntegrator.LLMSuport.RAGFactory.RAG_UML_uml2testdata import RAG_UML_uml2testdata
@@ -14,6 +15,7 @@ class RAGFactory:
         "RAG_SQL_inquiry_stock_summary": RAG_SQL_inquiry_stock_summary,
         "RAG_SQL_inquiry_stocks_code": RAG_SQL_inquiry_stocks_code,
         "RAG_general_inquiry": RAG_general_inquiry,
+        "RAG_UML_txt2requirement": RAG_UML_txt2requirement,
         "RAG_UML_txt2uml": RAG_UML_txt2uml,
         "RAG_UML_uml2schema": RAG_UML_uml2schema,
         "RAG_UML_uml2testdata": RAG_UML_uml2testdata,

@@ -1,0 +1,78 @@
+you are working for a US bank as a senior BA.
+you are request to draft a requirement for banking user in  English. show me your requirement in mark down format.
+
+## user's requirements
+I am working on a trade finance system, I want to create a set of business tables
+1. Core LC Master Data - including 20 columns
+2. Documentary Compliance - including 10 columns
+3. Transaction Tracking - including 10 columns
+4. SWIFT Integration  - including 10 columns
+5. Financial Accounting  - including 10 columns
+
+The layout of the requirement is listed as below, you need map user's requirement into below layout.
+## Abstract
+   You shall put the requirement abstraction here in 50 words
+## Section 1 The data model of LC business
+you need to split the data table into different data domains using snowflake models and give a brief on their business nature.
+    you need to list all the data in a list, including
+    1) number
+    2) table name: naming rule as following
+        a) you need to follow the grammar of Clickhouse
+        b) the shall be "datadomain" + "_" + "business name" + "_" + "mas"
+        c) you keep the table name in lowcase
+    3) table description
+    sample are listed as below
+
+    | No | Table Name       | table description             |
+    |--- |------------------|-------------------------------|
+    | 1  | Core_LC Master Data          | Description                   |
+    | 2  | Table 2          | Description                   |
+    | 3  | Table 3          | Description                   |
+
+## Section 2 The detail table information
+you need to iterate all tables listed above and list all  columns information in a following table including
+    Table Name:
+    1) number: the number shall restart from 1 for each table/data domain
+    2) short name,
+    3) long name,
+    4) description,
+    5) data type,
+    6) length,
+    7) mandatory or optional,
+    8) default value, please refer to the Section 2 default values
+    9) if the value is enum, then you need to list all the possible value
+    10) the status sequential of the  Core LC Master Data:
+                00 request->01 open->02 issue->03 advice->04 negotiated -> 05 redump ->06 closed
+                00 request->07 rejected
+                01 request->07 rejected
+                03 advice ->07 rejected
+                04 negotiated ->07 rejected
+                05 redumped ->07 rejected
+     11) Sample
+        **Table Name: Table Name
+        | No | Short Name       | Long Name                     | Description                                  | Data Type | Length | Mandatory | Default Value | Validation Rules               |
+        |----|------------------|-------------------------------|----------------------------------------------|-----------|--------|-----------|---------------|--------------------------------|
+        | 1  | TRANSACTION_ID   | Transaction ID                | Unique financial event ID                    | VARCHAR   | 20     | Yes       | Auto-generate | Unique                         |
+        | 2  | LC_REF           | LC Reference                  | Linked LC identifier                         | VARCHAR   | 20     | Yes       | ""            | Valid existing LC_REF          |
+        | 3  | EVENT_TYPE       | Transaction Type              | Nature of financial event                    | ENUM      | 20     | Yes       | "PAYMENT"     | PAYMENT/AMENDMENT/FEE/INTEREST |
+        | 4  | EVENT_DATE       | Event Date                    | Date transaction occurred                    | DATE      | -      | Yes       | CURRENT_DATE  | Valid past date                |
+        | 5  | AMOUNT           | Transaction Amount            | Monetary value of event                      | DECIMAL   | 18,2   | Yes       | 0.00          | !=0                            |
+
+## Section 3 default values of each column
+fill the default values on above columns information mentioned
+a. default value is mandate for each column
+b. mandatory or optional fields: if the default value is "", then this field property is optional,
+c. you need describe the default value for each column, regardless it's string or numeric
+d. you need to map each column with swift 700 message.
+ 1) if mapped, please advice the format
+ 2) if not mapped, then display "no a SWIFT mapped field"
+
+## Section 5 your doubts or inquiry,
+Please let me know if any doubts you have, so that user can provide additional information
+
+validate before you return me the requirement
+a) you shall generate the column information as what demanded from user
+b) I want **a complete requirement**. Don't be lazy and show me : (Continue similarly for all tables and columns) or use ... instead
+
+I want you generate the document in mark down format
+

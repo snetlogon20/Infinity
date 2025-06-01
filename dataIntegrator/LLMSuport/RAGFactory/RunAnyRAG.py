@@ -198,6 +198,15 @@ def rag_uml_uml2testdata_inquiry():
     response_dict = RAGFactory.run_rag_inquiry("RAG_UML_uml2testdata", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
 
+def rag_uml_txt2requirement_inquiry():
+    question = "按照要求生成需求文档"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2requirement.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2requirement_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2requirement", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
 if __name__ == "__main__":
 
     ##############################
@@ -233,6 +242,7 @@ if __name__ == "__main__":
     ##############################
     # rag_uml
     ##############################
+    rag_uml_txt2requirement_inquiry()
     #rag_uml_txt2uml_inquiry()
     #rag_uml_uml2schema_inquiry()
-    rag_uml_uml2testdata_inquiry()
+    #rag_uml_uml2testdata_inquiry()
