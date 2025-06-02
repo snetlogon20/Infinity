@@ -15,6 +15,7 @@ class CustomError(Exception):
             "000103": "Error in Linear regression",
             "000104": "Error in RAG service",
             "000105": "Error in Doc2Txt service",
+            "000106": "Error in JSON utility",
 
             "999999": "Unknown Error",
         }

@@ -5,6 +5,7 @@ from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
 from dataIntegrator.LLMSuport.RAGFactory.RAGAgent import RAGAgent
 from dataIntegrator.LLMSuport.RAGFactory.RAGMockedMessager import RAGMockedMessager
 from dataIntegrator.common.CustomError import CustomError
+from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.utility.FileUtility import FileUtility
 import re
 
@@ -80,6 +81,33 @@ class RAG_UML_uml2testdata(RAGAgent):
 
         return response_dict
 
+    def execute(self, result_dict: dict):
+
+        try:
+            clickhouseService = ClickhouseService()
+
+            delete_sql_list = result_dict["delete_sql"]
+            for delete_sql in delete_sql_list:
+                logger.info(rf"executing delete_sql: {delete_sql}")
+                clickhouseService.execute_sql(delete_sql)
+
+            insert_sql_list = result_dict["insert_sql"]
+            for insert_sql in insert_sql_list:
+                logger.info(rf"executing insert_sql: {insert_sql}")
+                clickhouseService.execute_sql(insert_sql)
+
+            update_sql_list = result_dict["update_sql"]
+            for update_sql in update_sql_list:
+                logger.info(rf"executing update_sql: {update_sql}")
+                clickhouseService.execute_sql(update_sql)
+
+            return
+
+        except CustomError as e:
+            raise e
+        except Exception as e:
+            raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
+
 
     def run_single_question(self, agent_type, question):
 
@@ -91,6 +119,8 @@ class RAG_UML_uml2testdata(RAGAgent):
         response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
         self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\schema.json")
+
+        self.execute(response_dict)
 
         return response_dict
 

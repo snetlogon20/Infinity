@@ -26,7 +26,7 @@ class RAG_UML_txt2uml_service(BaseRAGSQLInquiry):
 
         try:
             knowledge_base_file_path = rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\Letter of Credit Requirement_RAG.txt"
-            prompt_file_path = os.path.join(CommonParameters.rag_configuration_path, "RAG_UML_txt2uml_prompts.txt")
+            prompt_file_path = os.path.join(CommonParameters.rag_configuration_path, "RAG_UML_req2uml_prompts.txt")
 
             response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2uml", CommonParameters.Default_AI_Engine, question,
                                                        knowledge_base_file_path, prompt_file_path)

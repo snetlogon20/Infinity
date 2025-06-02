@@ -170,18 +170,18 @@ def reason_chain_10000_inquiry():
             question = question + "\n" + user_input
             print(rf"你已输入：{question}")
 
-def rag_uml_txt2uml_inquiry():
+def rag_uml_req2uml_inquiry():
     question = "请按照要求生成 Database UML和建表语句,并按照JSON格式返回"
 
-    #knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2uml.json")
-    knowledge_base_file_path = rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\Letter of Credit Requirement_RAG.txt"
-    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2uml_prompts.txt")
+    #knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_req2uml.json")
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_req2uml.md")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_req2uml_prompts.txt")
 
     response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2uml", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
 
 def rag_uml_uml2schema_inquiry():
-    question = "请按照要求生成 Database UML和建表语句,并按照JSON格式返回"
+    question = "请按照要求生成 schema documentation,并按照JSON格式返回"
 
     knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2schema.json")
     prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2schema_prompts.txt")
@@ -197,6 +197,26 @@ def rag_uml_uml2testdata_inquiry():
 
     response_dict = RAGFactory.run_rag_inquiry("RAG_UML_uml2testdata", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
+
+def rag_uml_txt2req_inquiry():
+    question = "按照要求生成需求文档"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2req.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_txt2req_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2requirement", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
+
+def rag_uml_schema2sql_inquiry():
+    question = "show me the Master data for Letters of Credit if it's currency code is EUR"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_schema2SQL.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_schema2SQL_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_schema2SQL", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
 
 if __name__ == "__main__":
 
@@ -233,6 +253,8 @@ if __name__ == "__main__":
     ##############################
     # rag_uml
     ##############################
-    #rag_uml_txt2uml_inquiry()
-    #rag_uml_uml2schema_inquiry()
+    # rag_uml_txt2req_inquiry()
+    rag_uml_req2uml_inquiry()
+    rag_uml_uml2schema_inquiry()
     rag_uml_uml2testdata_inquiry()
+    rag_uml_schema2sql_inquiry()

@@ -1,8 +1,8 @@
-You are a senior Clickhouse database developer and you are request to generate test test data acoording to below UML Diagram and requirements.
+You are a senior Clickhouse database developer and you are request to generate test data acoording to below UML Diagram and requirements.
 1. The sample of the schema documentation is listed as below.
 2. You shall refer to the requirements before you generate the test data in SQL format
 
-Below is the Spec of test data
+## Below is the Spec of test data
 1. you need to generate the SQL by this order: delete, insert, update,
 2. you need to fill the Enum value in you SQL, if Enum value a given in requirement for specified column
 3. delete statement
@@ -12,40 +12,46 @@ Below is the Spec of test data
         alter table Core_LC_Master_Data DELETE where 1=1;
 4. insert statement
    a. please read the section of "UML diagram" inReference Documents. you need to iterate all the entity/tables in the uml and generate the insert statment for all of them
-   b. you need generate at least 5 SQL insert statements for each table.
+   b. you need generate at least 2 SQL insert statements for each table.
    c. your shall generate data with foreign key firstly, then generate the primary table. other wise the insert of data will be stopped due to the key violation/conflictions
-   d. you shall follow below sample, so you just need mention column name for once for saving token.
-        INSERT INTO Core_LC_Master_Data
-        (LC_ID, Applicant_ID, Beneficiary_ID, Issuing_Bank_ID, Advising_Bank_ID, LC_Type, LC_Currency, LC_Amount, Issue_Date, Expiry_Date, Latest_Shipment_Date, LC_Description)
+   d. ** 生成SQL时，你必须使用如下 clickhouse批量插入（Bulk Insert）插入的语法。**
+        INSERT INTO [db.]table_name (col1, col2, col3, ...)
         VALUES
-        ('LC0001', 'APP001', 'BEN001', 'ISB001', '', 'Irrevocable', 'USD', 20000.00, '2024-01-01', '2024-04-01', '2024-03-15', 'Electronics Import'),
-        ('LC0002', 'APP002', 'BEN002', 'ISB002', '', 'Irrevocable', 'CNY', 30000.00, '2024-01-02', '2024-04-02', '2024-03-16', 'Textiles Export');
+            (val11, val12, val13, ...),  -- 第一行
+            (val21, val22, val23, ...),  -- 第二行
+            ...                          -- 更多行
 5. update statement
-   a. please read the section of "UML diagram" inReference Documents. you need to iterate all the entity/tables in the uml and generate the insert statment for all of them
-   b. you need generate at least 5 SQL update statements for each table.
-   c. the updated columns shall cover all columns.
-   d. you shall make shall the  primary key in your update statement is also generated in you insert statement
-6. you need follow the instruction from user, in perspect of business requirments.
-   1. the total sum of Core_LC_Master_Data.LC_Amount in insert statments shall be 100000.
-   2. I want 2 records in  Core_LC_Master_Data.LC_Currency be USD. then rest be CNY or JPY
-7 please return with below JSON format
+   a. you need to iterate all the entity/tables in the UML diagram and generate the update statement for all of them
+   b. you need generate at least 2 SQL update statements for each table.
+   c. 你必须拿出UML diagram 中 相应数据表的所有字段字段并进行更新。但primary key 的字段除外。
+6 please return with below JSON format
 {{
     "delete_sql": [
-        "此处包含delete 语句"
+        "此处包含delete 语句，需符合以上语法要求"
     ],
-    "insert_sql": [ 此处包含 insert 语句, 每张数据表至少需要5条记录。**你需要严格服从以上 insert statement 中说明的语法。**
+    "insert_sql": [
+        "INSERT INTO infinity_core_domain_lc_master_mas (lc_id, applicant_name, beneficiary_name, issuing_bank_code, lc_amount, currency_code, issue_date, expiry_date, status, goods_description) VALUES ('LC0001', 'Applicant A', 'Beneficiary A', 'ISB001', 20000.00, 'USD', '2024-01-01', '2024-04-01', '02', 'Electronics Import'), ('LC0002', 'Applicant A', 'Beneficiary A', 'ISB001', 20000.00, 'USD', '2024-01-01', '2024-04-01', '02', 'Electronics Import'), ('LC0003', 'Applicant A', 'Beneficiary A', 'ISB001', 20000.00, 'USD', '2024-01-01', '2024-04-01', '02', 'Electronics Import');",
+        "INSERT INTO infinity_compliance_domain_doc_compliance_mas (lc_id, doc_set_id, doc_type, submission_date, compliance_status) VALUES ('LC0001', 'DS001', 'B/L', '2024-01-06', 'APPROVED');",
+        "INSERT INTO infinity_transaction_domain_trans_tracking_mas (trans_id, lc_id, trans_type, trans_date, amount) VALUES ('T0001', 'LC0001', 'PAYMENT', '2024-01-11', 20000.00);",
+        "INSERT INTO infinity_integration_domain_swift_integration_mas (msg_id, msg_type, sender_bic, receiver_bic, lc_id) VALUES ('MSG002', 'MT730', 'SWIFTOWNBankC', 'SWIFTOWNBankD', 'LC0002');"
     ],
-    "update_sql": [ 此处包含 update 语句, 每张数据表至少需要5条记录
+    "update_sql": [ 此处包含 update 语句
     ]
 }}
-8. validate before you return me
-    a) all SQL statement shall **follow the SQL grammar of chickhouse**
+7. validate before you return me
+    a) **必须使用如下 clickhouse批量插入（Bulk Insert）插入的语法， 如果没有，则重新生成。**
     b) make sure there is no key or logic confliction between each table.
-    c) you shall make sure the JSON follow the format/grammar of JSON.
-    d) you need to give me **a complete json response** you generated.
+    c) 你必须检查每个 update 语句中的字段和 ** UML diagram 中 数据表的 字段 一致。否则会造成更新失败。** 如果有这种情况，则必须重新生成。
+        a. 比如： ALTER TABLE infinity_transaction_domain_trans_tracking_mas UPDATE trans_status = 'COMPLETED' WHERE trans_id = 'T0001';
+           这句语句中 trans_status 不在 UML 中。 所以就是错误的。 需要重新生成
+    d) you shall make sure the JSON follow the format/grammar of JSON.
+    e) you need to give me **a complete json response** you generated.
 
-Reference Documents:
+8. 错误案例
+   1.
+   以上这种
+## Reference Documents:
 {context}
 
-Question
+## Question
 {question}
