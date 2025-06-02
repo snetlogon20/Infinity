@@ -41,9 +41,9 @@ class RAGAgent(ABC):
         print("cleaned_json:", cleaned_json)
         return cleaned_json
 
-    def write_json(self, response_dict: dict, joson_file_path):
+    def write_json(self, response_dict: dict, json_file_path):
         try:
-            FileUtility.write_json_file(joson_file_path, response_dict)
+            FileUtility.write_json_file(json_file_path, response_dict)
 
             return
         except CustomError as e:
