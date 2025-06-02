@@ -207,6 +207,17 @@ def rag_uml_txt2req_inquiry():
     response_dict = RAGFactory.run_rag_inquiry("RAG_UML_txt2requirement", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
 
+
+def rag_uml_schema2sql_inquiry():
+    question = "show me the Master data for Letters of Credit if it's currency code is EUR"
+
+    knowledge_base_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_schema2SQL.json")
+    prompt_file_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_schema2SQL_prompts.txt")
+
+    response_dict = RAGFactory.run_rag_inquiry("RAG_UML_schema2SQL", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
+    print(response_dict)
+
+
 if __name__ == "__main__":
 
     ##############################
@@ -244,4 +255,5 @@ if __name__ == "__main__":
     #rag_uml_txt2req_inquiry()
     # rag_uml_req2uml_inquiry()
     # rag_uml_uml2schema_inquiry()
-    rag_uml_uml2testdata_inquiry()
+    #rag_uml_uml2testdata_inquiry()
+    rag_uml_schema2sql_inquiry()
