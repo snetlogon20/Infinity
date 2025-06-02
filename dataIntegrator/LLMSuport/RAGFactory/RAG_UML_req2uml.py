@@ -1,17 +1,19 @@
 import json
+import os
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
 from dataIntegrator.LLMSuport.RAGFactory.RAGAgent import RAGAgent
 from dataIntegrator.LLMSuport.RAGFactory.RAGMockedMessager import RAGMockedMessager
 from dataIntegrator.common.CustomError import CustomError
+from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.utility.FileUtility import FileUtility
 import re
 
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-class RAG_UML_txt2uml(RAGAgent):
+class RAG_UML_req2uml(RAGAgent):
 
     def __init__(self, knowledge_base_file_path, prompt_file_path):
         self.knowledge_base_file_path = knowledge_base_file_path
@@ -20,6 +22,7 @@ class RAG_UML_txt2uml(RAGAgent):
     @classmethod
     def load_knowledge_base_from_json(self, file_path):
         json_object = FileUtility.read_file(file_path)
+        #json_object = FileUtility.read_json_file(file_path)
         return json_object
 
     @classmethod
@@ -28,7 +31,9 @@ class RAG_UML_txt2uml(RAGAgent):
 
         # 用户需求说明
         context.append("### 用户需求说明:")
-        context.append(knowledge_base)
+        #user_requirement = knowledge_base["context"]
+        user_requirement = knowledge_base
+        context.append(user_requirement)
 
         return "\n".join(context)
 
@@ -53,7 +58,7 @@ class RAG_UML_txt2uml(RAGAgent):
     @classmethod
     def parse_response(cls, response):
         if CommonParameters.IF_ENABLE_MOCKED_AI:
-            cleaned_json = RAGMockedMessager.UML2schema_MOCKED_AI_ANSWER
+            cleaned_json = RAGMockedMessager.txt2uml_MOCKED_AI_ANSWER
             return cleaned_json
 
         # 解析结果
@@ -91,10 +96,64 @@ class RAG_UML_txt2uml(RAGAgent):
         cleaned_json = self.parse_response(response)
         response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
-        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\create_table.json")
 
+        response_dict["requirements"] = context
+        json_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2schema.json")
+        self.write_json(response_dict, json_path)
+
+        json_path = os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_uml2testdata.json")
+        self.write_json(response_dict, json_path)
+
+        self.execute(response_dict)
 
         return response_dict
+
+    # Overwrite the method here, as there is re-structure the dict
+    def write_json(self, response_dict: dict, json_file_path):
+        try:
+            json_dict = {
+                "UML_Diagram": response_dict["create_table_uml_statement"],
+                "requirements": response_dict["requirements"]
+            }
+            FileUtility.write_json_file(json_file_path, json_dict)
+
+            return
+        except CustomError as e:
+            raise e
+        except Exception as e:
+            raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
+
+    def execute(self, response_dict: dict):
+
+        try:
+
+            clickhouseService = ClickhouseService()
+
+            drop_table_sql_statement_list = response_dict["drop_table_sql_statement"]
+            for drop_table_sql_statement_dict in drop_table_sql_statement_list:
+                table_name = drop_table_sql_statement_dict["table_name"]
+                drop_table_sql = drop_table_sql_statement_dict["drop_table_sql"]
+
+                logger.info(rf"executing drop_table_sql_statement: table name{table_name} drop_table_sql {drop_table_sql}")
+
+                clickhouseService.execute_sql(drop_table_sql)
+
+            create_table_sql_statement_list = response_dict["create_table_sql_statement"]
+            for create_table_sql_statement_dict in create_table_sql_statement_list:
+                table_name = create_table_sql_statement_dict["table_name"]
+                create_table_sql = create_table_sql_statement_dict["create_table_sql"]
+
+                logger.info(rf"executing create_table_sql_statement: table name{table_name} create_table_sql {create_table_sql}")
+
+                clickhouseService.execute_sql(create_table_sql)
+
+            return
+
+        except CustomError as e:
+            raise e
+        except Exception as e:
+            raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
+
 
     def run_prompt_questions(self):
         while True:
@@ -109,15 +168,17 @@ class RAG_UML_txt2uml(RAGAgent):
 
     def display_result(self, response, result_dict):
         try:
-            print(result_dict["create_table_sql_statement"])
+            drop_table_sql_statement_list = result_dict["drop_table_sql_statement"]
+            for drop_table_sql_statement_dict in drop_table_sql_statement_list:
+                print(drop_table_sql_statement_dict["table_name"])
+                print(drop_table_sql_statement_dict["drop_table_sql"])
+
             create_table_sql_statement_list = result_dict["create_table_sql_statement"]
             for create_table_sql_statement_dict in create_table_sql_statement_list:
                 print(create_table_sql_statement_dict["table_name"])
                 print(create_table_sql_statement_dict["create_table_sql"])
 
             print(result_dict["create_table_uml_statement"])
-            print(result_dict["explanation_in_Mandarin"])
-            print(result_dict["explanation_in_English"])
         except CustomError as e:
             raise e
         except Exception as e:

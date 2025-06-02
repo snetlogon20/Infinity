@@ -1,4 +1,5 @@
 import json
+import os
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
@@ -92,7 +93,7 @@ class RAG_UML_uml2schema(RAGAgent):
         cleaned_json = self.parse_response(response)
         response_dict = self.process_response(cleaned_json)
         self.display_result(response, response_dict)
-        self.write_json(response_dict, rf"D:\workspace_python\infinity\dataIntegrator\test\RegulatoryRAG2UML\schema.json")
+        self.write_json(response_dict, os.path.join(CommonParameters.rag_configuration_path,"RAG_UML_schema2SQL.json"))
 
         return response_dict
 

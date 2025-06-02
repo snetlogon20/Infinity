@@ -3,31 +3,31 @@ you are request to draft a requirement for banking user in  English. show me you
 
 ## user's requirements
 I am working on a trade finance system, I want to create a set of business tables
-1. Core LC Master Data - including 20 columns
-2. Documentary Compliance - including 10 columns
-3. Transaction Tracking - including 10 columns
-4. SWIFT Integration  - including 10 columns
-5. Financial Accounting  - including 10 columns
+1. Core LC Master Data - including 10 columns
+2. Documentary Compliance - including 5 columns
+3. Transaction Tracking - including 5 columns
+4. SWIFT Integration  - including 5 columns
+5. Financial Accounting  - including 5 columns
 
 The layout of the requirement is listed as below, you need map user's requirement into below layout.
 ## Abstract
-   You shall put the requirement abstraction here in 50 words
+   You shall put the requirement abstraction here in 25 words
 ## Section 1 The data model of LC business
 you need to split the data table into different data domains using snowflake models and give a brief on their business nature.
     you need to list all the data in a list, including
     1) number
     2) table name: naming rule as following
         a) you need to follow the grammar of Clickhouse
-        b) the shall be "datadomain" + "_" + "business name" + "_" + "mas"
+        b) the shall be "infinity_" + ""datadomain" + "_" + "business name" + "_" + "mas"
         c) you keep the table name in lowcase
     3) table description
-    sample are listed as below
+    sample are listed as below, you shall remove all the whitespace(" ") in your table
 
-    | No | Table Name       | table description             |
+    | No | Table Name | table description |
     |--- |------------------|-------------------------------|
-    | 1  | Core_LC Master Data          | Description                   |
-    | 2  | Table 2          | Description                   |
-    | 3  | Table 3          | Description                   |
+    | 1| Core_LC Master Data| Description |
+    | 2| Table 2| Description |
+    | 3| Table 3| Description |
 
 ## Section 2 The detail table information
 you need to iterate all tables listed above and list all  columns information in a following table including
@@ -50,13 +50,13 @@ you need to iterate all tables listed above and list all  columns information in
                 05 redumped ->07 rejected
      11) Sample
         **Table Name: Table Name
-        | No | Short Name       | Long Name                     | Description                                  | Data Type | Length | Mandatory | Default Value | Validation Rules               |
-        |----|------------------|-------------------------------|----------------------------------------------|-----------|--------|-----------|---------------|--------------------------------|
-        | 1  | TRANSACTION_ID   | Transaction ID                | Unique financial event ID                    | VARCHAR   | 20     | Yes       | Auto-generate | Unique                         |
-        | 2  | LC_REF           | LC Reference                  | Linked LC identifier                         | VARCHAR   | 20     | Yes       | ""            | Valid existing LC_REF          |
-        | 3  | EVENT_TYPE       | Transaction Type              | Nature of financial event                    | ENUM      | 20     | Yes       | "PAYMENT"     | PAYMENT/AMENDMENT/FEE/INTEREST |
-        | 4  | EVENT_DATE       | Event Date                    | Date transaction occurred                    | DATE      | -      | Yes       | CURRENT_DATE  | Valid past date                |
-        | 5  | AMOUNT           | Transaction Amount            | Monetary value of event                      | DECIMAL   | 18,2   | Yes       | 0.00          | !=0                            |
+        |No|ShortName|LongName|Description|DataType|Length|Mandatory|DefaultValue|
+        |----|------------------|-------------------------------|----------------------------------------------|-----------|--------|-----------|---------------|
+        |1|TRANSACTION_ID|TransactionID|UniquefinancialeventID|VARCHAR|20|Yes|Auto-generate|
+        |2|LC_REF|LCReference|LinkedLCidentifier|VARCHAR|20|Yes|""|
+        |3|EVENT_TYPE|TransactionType|Natureoffinancialevent|ENUM|20|Yes|"PAYMENT"|
+        |4|EVENT_DATE|EventDate|Datetransactionoccurred|DATE|-|Yes|CURRENT_DATE|
+        |5|AMOUNT|TransactionAmount|Monetaryvalueofevent|DECIMAL|18,2|Yes|0.00|
 
 ## Section 3 default values of each column
 fill the default values on above columns information mentioned
@@ -71,8 +71,14 @@ d. you need to map each column with swift 700 message.
 Please let me know if any doubts you have, so that user can provide additional information
 
 validate before you return me the requirement
-a) you shall generate the column information as what demanded from user
-b) I want **a complete requirement**. Don't be lazy and show me : (Continue similarly for all tables and columns) or use ... instead
+a) you shall generate all the column information as what demanded from user
+b) please remove white space(" ") in your tables to minimus the feedback to me, just as below sample
+        |No|ShortName|LongName|Description|DataType|Length|Mandatory|DefaultValue|
+        |----|------------------|-------------------------------|----------------------------------------------|-----------|--------|-----------|---------------|
+        |1|TRANSACTION_ID|TransactionID|UniquefinancialeventID|VARCHAR|20|Yes|Auto-generate
+b) I want **a complete requirement**. so just keep  your statement simply and short
 
-I want you generate the document in mark down format
+I want you generate the requirement document in mark down format
 
+# 后果声明
+**你必须返回完整的需求内容， 不可以有任何省略的输出**
