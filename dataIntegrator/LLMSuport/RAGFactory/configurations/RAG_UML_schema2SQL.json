@@ -1,85 +1,62 @@
 {
     "table_definitions": [
         {
-            "table_name": "infinity_core_domain_lc_master_mas",
-            "table_definition": "Master data for Letters of Credit, including lifecycle and financial details.",
-            "primary_key": "lc_id",
-            "table_alias": "infinity_core_domain_lc_master_mas"
+            "table_name": "Core_LC_Master_Data",
+            "table_definition": "核心信用证主数据，Core LC Master Data",
+            "primary_key": "LC_ID",
+            "table_alias": "Core_LC_Master_Data"
         },
         {
-            "table_name": "infinity_compliance_domain_doc_compliance_mas",
-            "table_definition": "Data related to documentary compliance verification for LCs.",
-            "primary_key": "lc_id, doc_set_id",
-            "table_alias": "infinity_compliance_domain_doc_compliance_mas"
+            "table_name": "Documentary_Compliance",
+            "table_definition": "单证合规性，Documentary Compliance",
+            "primary_key": "Document_ID",
+            "table_alias": "Documentary_Compliance"
         },
         {
-            "table_name": "infinity_transaction_domain_trans_tracking_mas",
-            "table_definition": "Tracks the lifecycle of trade transactions.",
-            "primary_key": "trans_id",
-            "table_alias": "infinity_transaction_domain_trans_tracking_mas"
-        },
-        {
-            "table_name": "infinity_integration_domain_swift_integration_mas",
-            "table_definition": "Stores data for SWIFT message integration in trade finance.",
-            "primary_key": "msg_id",
-            "table_alias": "infinity_integration_domain_swift_integration_mas"
-        },
-        {
-            "table_name": "infinity_accounting_domain_fin_accounting_mas",
-            "table_definition": "Records financial accounting entries for trade transactions.",
-            "primary_key": "acc_entry_id",
-            "table_alias": "infinity_accounting_domain_fin_accounting_mas"
+            "table_name": "Transaction_Tracking",
+            "table_definition": "交易跟踪，Transaction Tracking",
+            "primary_key": "Transaction_ID",
+            "table_alias": "Transaction_Tracking"
         }
     ],
     "table_schema": {
-        "infinity_core_domain_lc_master_mas": {
+        "Core_LC_Master_Data": {
             "columns": {
-                "lc_id": "Unique identifier for a Letter of Credit (VARCHAR), column alias as: lc_id",
-                "applicant_name": "Name of the LC applicant (VARCHAR), column alias as: applicant_name",
-                "beneficiary_name": "Name of the LC beneficiary (VARCHAR), column alias as: beneficiary_name",
-                "issuing_bank_code": "SWIFT/BIC code of the issuing bank (VARCHAR), column alias as: issuing_bank_code",
-                "lc_amount": "Principal amount of the LC (DECIMAL), column alias as: lc_amount",
-                "currency_code": "ISO 4217 currency code for the LC (VARCHAR), column alias as: currency_code",
-                "issue_date": "Date when the LC is issued (DATE), column alias as: issue_date",
-                "expiry_date": "Date when the LC expires (DATE), column alias as: expiry_date",
-                "status": "Lifecycle status of the LC (ENUM), column alias as: status",
-                "goods_description": "Description of goods or services covered by the LC (VARCHAR), column alias as: goods_description"
+                "LC_ID": "信用证编号，Letter of Credit Identification（字符串类型）, column alias as:LC_ID",
+                "Applicant_ID": "申请人编号，Applicant Identification（字符串类型）, column alias as:Applicant_ID",
+                "Beneficiary_ID": "受益人编号，Beneficiary Identification（字符串类型）, column alias as:Beneficiary_ID",
+                "Issuing_Bank_ID": "开证行编号，Issuing Bank Identification（字符串类型）, column alias as:Issuing_Bank_ID",
+                "Advising_Bank_ID": "通知行编号，Advising Bank Identification（字符串类型）, column alias as:Advising_Bank_ID",
+                "LC_Type": "信用证类型，Letter of Credit Type（字符串类型）, column alias as:LC_Type",
+                "LC_Currency": "信用证货币，Letter of Credit Currency（字符串类型）, column alias as:LC_Currency",
+                "LC_Amount": "信用证金额，Letter of Credit Amount（十进制类型）, column alias as:LC_Amount",
+                "Issue_Date": "开证日期，LC Issue Date（日期类型）, column alias as:Issue_Date",
+                "Expiry_Date": "到期日期，LC Expiry Date（日期类型）, column alias as:Expiry_Date",
+                "Latest_Shipment_Date": "最迟装运日期，Latest Shipment Date（日期类型）, column alias as:Latest_Shipment_Date",
+                "LC_Description": "信用证描述，Letter of Credit Description（字符串类型）, column alias as:LC_Description"
             }
         },
-        "infinity_compliance_domain_doc_compliance_mas": {
+        "Documentary_Compliance": {
             "columns": {
-                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
-                "doc_set_id": "Unique identifier for a set of documents (VARCHAR), column alias as: doc_set_id",
-                "doc_type": "Type of submitted document (ENUM), column alias as: doc_type",
-                "submission_date": "Date when documents are submitted (DATE), column alias as: submission_date",
-                "compliance_status": "Result of document compliance check (ENUM), column alias as: compliance_status"
+                "Document_ID": "单证编号，Document Identification（字符串类型）, column alias as:Document_ID",
+                "LC_ID_Ref": "信用证编号引用，Letter of Credit Identification Reference（字符串类型）, column alias as:LC_ID_Ref",
+                "Document_Type": "单证类型，Document Type（字符串类型）, column alias as:Document_Type",
+                "Document_Status": "单证状态，Document Status（字符串类型）, column alias as:Document_Status",
+                "Submission_Date": "提交日期，Document Submission Date（日期类型）, column alias as:Submission_Date",
+                "Review_Date": "审核日期，Document Review Date（日期类型）, column alias as:Review_Date",
+                "Discrepancy_Details": "差异详情，Discrepancy Details（字符串类型）, column alias as:Discrepancy_Details",
+                "Document_Reference_Number": "单证参考编号，Document Reference Number（字符串类型）, column alias as:Document_Reference_Number"
             }
         },
-        "infinity_transaction_domain_trans_tracking_mas": {
+        "Transaction_Tracking": {
             "columns": {
-                "trans_id": "Unique transaction identifier (VARCHAR), column alias as: trans_id",
-                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
-                "trans_type": "Type of transaction (ENUM), column alias as: trans_type",
-                "trans_date": "Date when the transaction occurs (DATE), column alias as: trans_date",
-                "amount": "Monetary value of the transaction (DECIMAL), column alias as: amount"
-            }
-        },
-        "infinity_integration_domain_swift_integration_mas": {
-            "columns": {
-                "msg_id": "Unique SWIFT message identifier (VARCHAR), column alias as: msg_id",
-                "msg_type": "Type of SWIFT message (ENUM), column alias as: msg_type",
-                "sender_bic": "SWIFT/BIC of the message sender (VARCHAR), column alias as: sender_bic",
-                "receiver_bic": "SWIFT/BIC of the message receiver (VARCHAR), column alias as: receiver_bic",
-                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id"
-            }
-        },
-        "infinity_accounting_domain_fin_accounting_mas": {
-            "columns": {
-                "acc_entry_id": "Unique accounting entry identifier (VARCHAR), column alias as: acc_entry_id",
-                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
-                "entry_date": "Date of the accounting entry (DATE), column alias as: entry_date",
-                "debit_amount": "Debit amount of the accounting entry (DECIMAL), column alias as: debit_amount",
-                "credit_amount": "Credit amount of the accounting entry (DECIMAL), column alias as: credit_amount"
+                "Transaction_ID": "交易编号，Transaction Identification（字符串类型）, column alias as:Transaction_ID",
+                "LC_ID_Ref": "信用证编号引用，Letter of Credit Identification Reference（字符串类型）, column alias as:LC_ID_Ref",
+                "Transaction_Date": "交易日期，Transaction Date（日期类型）, column alias as:Transaction_Date",
+                "Transaction_Type": "交易类型，Transaction Type（字符串类型）, column alias as:Transaction_Type",
+                "Party_Involved": "参与方，Party Involved（字符串类型）, column alias as:Party_Involved",
+                "Transaction_Status": "交易状态，Transaction Status（字符串类型）, column alias as:Transaction_Status",
+                "Previous_Transaction_ID": "前一交易编号，Previous Transaction Identification（字符串类型）, column alias as:Previous_Transaction_ID"
             }
         }
     }
