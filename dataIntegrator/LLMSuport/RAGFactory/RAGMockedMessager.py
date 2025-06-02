@@ -548,3 +548,59 @@ class RAGMockedMessager():
     ]
     }"""
 
+    # UML2testdata
+    schema2SQL_MOCKED_AI_ANSWER = """{
+    "sql": "SELECT 
+        infinity_core_domain_lc_master_mas.lc_id AS infinity_core_domain_lc_master_mas__lc_id,
+        infinity_core_domain_lc_master_mas.applicant_name AS infinity_core_domain_lc_master_mas__applicant_name,
+        infinity_core_domain_lc_master_mas.beneficiary_name AS infinity_core_domain_lc_master_mas__beneficiary_name,
+        infinity_core_domain_lc_master_mas.issuing_bank_code AS infinity_core_domain_lc_master_mas__issuing_bank_code,
+        infinity_core_domain_lc_master_mas.lc_amount AS infinity_core_domain_lc_master_mas__lc_amount,
+        infinity_core_domain_lc_master_mas.currency_code AS infinity_core_domain_lc_master_mas__currency_code,
+        infinity_core_domain_lc_master_mas.issue_date AS infinity_core_domain_lc_master_mas__issue_date,
+        infinity_core_domain_lc_master_mas.expiry_date AS infinity_core_domain_lc_master_mas__expiry_date,
+        infinity_core_domain_lc_master_mas.status AS infinity_core_domain_lc_master_mas__status,
+        infinity_core_domain_lc_master_mas.goods_description AS infinity_core_domain_lc_master_mas__goods_description
+    FROM 
+        infinity_core_domain_lc_master_mas
+    WHERE 
+        infinity_core_domain_lc_master_mas.currency_code = 'EUR';",
+    "explanation_in_Mandarin": "查询信用证主数据中货币代码为EUR的记录，返回所有相关字段。",
+    "explanation_in_English": "Query the master data of Letters of Credit where the currency code is EUR, returning all relevant fields.",
+    "isPlotRequired": "no",
+    "plotRequirement": {
+        "plotType": "lineChart",
+        "PlotX": "",
+        "PlotY": "",
+        "PlotTitle": "",
+        "xlabel": "",
+        "ylabel": ""
+    },
+    "isLinearRegressionRequired": "no",
+    "linearRequirement": {
+        "plotType": "lineChart",
+        "xColumns": "",
+        "yColumn": "",
+        "PlotXColumn": "",
+        "PlotTitle": "",
+        "xlabel": "",
+        "ylabel": "",
+        "if_run_test": "false",
+        "X_given_test_source_path": ""
+    },
+    "isMonteCarloRequired": "no",
+    "MonteCarloRequirement": {
+        "market":"", 
+        "stock":"",
+        "start_date": "",
+        "end_date":"",
+        "init_value": "",
+        "analysis_column": "",
+        "t": 0.01,
+        "times": 10,
+        "series": 1000,
+        "alpha": 0.05,
+        "distribution_type": "lognormal"
+    },
+    "feedback": ""
+}"""

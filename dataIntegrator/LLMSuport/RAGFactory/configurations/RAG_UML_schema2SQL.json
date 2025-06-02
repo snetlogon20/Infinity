@@ -1,0 +1,86 @@
+{
+    "table_definitions": [
+        {
+            "table_name": "infinity_core_domain_lc_master_mas",
+            "table_definition": "Master data for Letters of Credit, including lifecycle and financial details.",
+            "primary_key": "lc_id",
+            "table_alias": "infinity_core_domain_lc_master_mas"
+        },
+        {
+            "table_name": "infinity_compliance_domain_doc_compliance_mas",
+            "table_definition": "Data related to documentary compliance verification for LCs.",
+            "primary_key": "lc_id, doc_set_id",
+            "table_alias": "infinity_compliance_domain_doc_compliance_mas"
+        },
+        {
+            "table_name": "infinity_transaction_domain_trans_tracking_mas",
+            "table_definition": "Tracks the lifecycle of trade transactions.",
+            "primary_key": "trans_id",
+            "table_alias": "infinity_transaction_domain_trans_tracking_mas"
+        },
+        {
+            "table_name": "infinity_integration_domain_swift_integration_mas",
+            "table_definition": "Stores data for SWIFT message integration in trade finance.",
+            "primary_key": "msg_id",
+            "table_alias": "infinity_integration_domain_swift_integration_mas"
+        },
+        {
+            "table_name": "infinity_accounting_domain_fin_accounting_mas",
+            "table_definition": "Records financial accounting entries for trade transactions.",
+            "primary_key": "acc_entry_id",
+            "table_alias": "infinity_accounting_domain_fin_accounting_mas"
+        }
+    ],
+    "table_schema": {
+        "infinity_core_domain_lc_master_mas": {
+            "columns": {
+                "lc_id": "Unique identifier for a Letter of Credit (VARCHAR), column alias as: lc_id",
+                "applicant_name": "Name of the LC applicant (VARCHAR), column alias as: applicant_name",
+                "beneficiary_name": "Name of the LC beneficiary (VARCHAR), column alias as: beneficiary_name",
+                "issuing_bank_code": "SWIFT/BIC code of the issuing bank (VARCHAR), column alias as: issuing_bank_code",
+                "lc_amount": "Principal amount of the LC (DECIMAL), column alias as: lc_amount",
+                "currency_code": "ISO 4217 currency code for the LC (VARCHAR), column alias as: currency_code",
+                "issue_date": "Date when the LC is issued (DATE), column alias as: issue_date",
+                "expiry_date": "Date when the LC expires (DATE), column alias as: expiry_date",
+                "status": "Lifecycle status of the LC (ENUM), column alias as: status",
+                "goods_description": "Description of goods or services covered by the LC (VARCHAR), column alias as: goods_description"
+            }
+        },
+        "infinity_compliance_domain_doc_compliance_mas": {
+            "columns": {
+                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
+                "doc_set_id": "Unique identifier for a set of documents (VARCHAR), column alias as: doc_set_id",
+                "doc_type": "Type of submitted document (ENUM), column alias as: doc_type",
+                "submission_date": "Date when documents are submitted (DATE), column alias as: submission_date",
+                "compliance_status": "Result of document compliance check (ENUM), column alias as: compliance_status"
+            }
+        },
+        "infinity_transaction_domain_trans_tracking_mas": {
+            "columns": {
+                "trans_id": "Unique transaction identifier (VARCHAR), column alias as: trans_id",
+                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
+                "trans_type": "Type of transaction (ENUM), column alias as: trans_type",
+                "trans_date": "Date when the transaction occurs (DATE), column alias as: trans_date",
+                "amount": "Monetary value of the transaction (DECIMAL), column alias as: amount"
+            }
+        },
+        "infinity_integration_domain_swift_integration_mas": {
+            "columns": {
+                "msg_id": "Unique SWIFT message identifier (VARCHAR), column alias as: msg_id",
+                "msg_type": "Type of SWIFT message (ENUM), column alias as: msg_type",
+                "sender_bic": "SWIFT/BIC of the message sender (VARCHAR), column alias as: sender_bic",
+                "receiver_bic": "SWIFT/BIC of the message receiver (VARCHAR), column alias as: receiver_bic",
+                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id"
+            }
+        },
+        "infinity_accounting_domain_fin_accounting_mas": {
+            "columns": {
+                "acc_entry_id": "Unique accounting entry identifier (VARCHAR), column alias as: acc_entry_id",
+                "lc_id": "Linked LC identifier (VARCHAR), column alias as: lc_id",
+                "entry_date": "Date of the accounting entry (DATE), column alias as: entry_date",
+                "debit_amount": "Debit amount of the accounting entry (DECIMAL), column alias as: debit_amount",
+                "credit_amount": "Credit amount of the accounting entry (DECIMAL), column alias as: credit_amount"
+            }
+        }
+    }
+}
