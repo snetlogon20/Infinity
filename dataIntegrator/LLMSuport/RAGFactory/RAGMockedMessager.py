@@ -533,20 +533,25 @@ class RAGMockedMessager():
         "ALTER TABLE infinity_accounting_domain_fin_accounting_mas DELETE WHERE 1=1;"
     ],
     "insert_sql": [
-        "INSERT INTO infinity_core_domain_lc_master_mas (lc_id, applicant_name, beneficiary_name, issuing_bank_code, lc_amount, currency_code, issue_date, expiry_date, status, goods_description) VALUES ('LC0001', 'Applicant A', 'Beneficiary A', 'SWIFTOWNBankA', 20000.00, 'USD', '2024-01-01', '2024-04-01', '02', 'Electronics Import'), ('LC0002', 'Applicant B', 'Beneficiary B', 'SWIFTOWNBankB', 30000.00, 'CNY', '2024-01-02', '2024-04-02', '02', 'Textiles Export');",
-        "INSERT INTO infinity_compliance_domain_doc_compliance_mas (lc_id, doc_set_id, doc_type, submission_date, compliance_status) VALUES ('LC0001', 'DS001', 'B/L', '2024-01-06', 'APPROVED'), ('LC0002', 'DS002', 'INV', '2024-01-07', 'PENDING');",
-        "INSERT INTO infinity_transaction_domain_trans_tracking_mas (trans_id, lc_id, trans_type, trans_date, amount) VALUES ('T0001', 'LC0001', 'PAYMENT', '2024-01-11', 20000.00), ('T0002', 'LC0002', 'AMENDMENT', '2024-01-12', 30000.00);",
-        "INSERT INTO infinity_integration_domain_swift_integration_mas (msg_id, msg_type, sender_bic, receiver_bic, lc_id) VALUES ('MSG001', 'MT700', 'SWIFTOWNBankA', 'SWIFTOWNBankD', 'LC0001'), ('MSG002', 'MT730', 'SWIFTOWNBankB', 'SWIFTOWNBankE', 'LC0002');",
-        "INSERT INTO infinity_accounting_domain_fin_accounting_mas (acc_entry_id, lc_id, entry_date, debit_amount, credit_amount) VALUES ('AE0001', 'LC0001', '2024-01-15', 20000.00, 0.00), ('AE0002', 'LC0002', '2024-01-16', 30000.00, 0.00);"
+        "INSERT INTO infinity_core_domain_lc_master_mas (lc_id, applicant_name, beneficiary_name, issuing_bank_code, lc_amount, currency_code, issue_date, expiry_date, status, goods_description) VALUES ('LC0001', 'Applicant A Corp', 'Beneficiary A Ltd', 'BANKUS33', 50000.00, 'USD', '2024-06-01', '2024-09-01', '00', 'Industrial Machinery'), ('LC0002', 'Applicant B GmbH', 'Beneficiary B S.A.', 'DEUTDEFF', 75000.00, 'EUR', '2024-06-02', '2024-09-15', '01', 'Medical Equipment');",
+        "INSERT INTO infinity_compliance_domain_doc_compliance_mas (lc_id, doc_set_id, doc_type, submission_date, compliance_status) VALUES ('LC0001', 'DS001', 'B/L', '2024-06-10', 'SUBMITTED'), ('LC0002', 'DS002', 'INV', '2024-06-11', 'REVIEWED');",
+        "INSERT INTO infinity_transaction_domain_trans_tracking_mas (trans_id, lc_id, trans_type, trans_date, amount) VALUES ('TXN001', 'LC0001', 'PAYMENT', '2024-06-15', 50000.00), ('TXN002', 'LC0002', 'AMENDMENT', '2024-06-16', 1000.00);",
+        "INSERT INTO infinity_integration_domain_swift_integration_mas (msg_id, msg_type, sender_bic, receiver_bic, lc_id) VALUES ('SWIFT001', 'MT700', 'BANKUS33XXX', 'DEUTDEFFXXX', 'LC0001'), ('SWIFT002', 'MT701', 'DEUTDEFFXXX', 'BANKUS33XXX', 'LC0002');",
+        "INSERT INTO infinity_accounting_domain_fin_accounting_mas (acc_entry_id, lc_id, entry_date, debit_amount, credit_amount) VALUES ('ACC001', 'LC0001', '2024-06-20', 50000.00, 0.00), ('ACC002', 'LC0002', '2024-06-21', 0.00, 75000.00);"
     ],
     "update_sql": [
-        "ALTER TABLE infinity_core_domain_lc_master_mas UPDATE lc_id = 'LC0001' SET applicant_name = 'Updated Applicant A', beneficiary_name = 'Updated Beneficiary A', issuing_bank_code = 'NEWBANKCODE', lc_amount = 25000.00, currency_code = 'EUR', issue_date = '2024-01-03', expiry_date = '2024-04-03', status = '03', goods_description = 'Updated Electronics Import' WHERE lc_id = 'LC0001';",
-        "ALTER TABLE infinity_compliance_domain_doc_compliance_mas UPDATE lc_id = 'LC0001' SET doc_set_id = 'DS003', doc_type = 'CERT', submission_date = '2024-01-10', compliance_status = 'APPROVED' WHERE lc_id = 'LC0001';",
-        "ALTER TABLE infinity_transaction_domain_trans_tracking_mas UPDATE trans_id = 'T0001' SET lc_id = 'LC0002', trans_type = 'FEE', trans_date = '2024-01-13', amount = 500.00 WHERE trans_id = 'T0001';",
-        "ALTER TABLE infinity_integration_domain_swift_integration_mas UPDATE msg_id = 'MSG001' SET msg_type = 'MT740', sender_bic = 'NEWBANKCODE', receiver_bic = 'SWIFTOWNBankF', lc_id = 'LC0003' WHERE msg_id = 'MSG001';",
-        "ALTER TABLE infinity_accounting_domain_fin_accounting_mas UPDATE acc_entry_id = 'AE0001' SET lc_id = 'LC0002', entry_date = '2024-01-18', debit_amount = 25000.00, credit_amount = 500.00 WHERE acc_entry_id = 'AE0001';"
+        "ALTER TABLE infinity_core_domain_lc_master_mas UPDATE applicant_name = 'Updated Applicant A Inc', beneficiary_name = 'Updated Beneficiary A Group', issuing_bank_code = 'CITIUS33', lc_amount = 55000.00, currency_code = 'GBP', issue_date = '2024-06-03', expiry_date = '2024-09-10', status = '02', goods_description = 'Updated Machinery Parts' WHERE lc_id = 'LC0001';",
+        "ALTER TABLE infinity_core_domain_lc_master_mas UPDATE applicant_name = 'Updated Applicant B AG', beneficiary_name = 'Updated Beneficiary B International', issuing_bank_code = 'COMMDEFF', lc_amount = 80000.00, currency_code = 'CHF', issue_date = '2024-06-04', expiry_date = '2024-09-20', status = '03', goods_description = 'Updated Medical Devices' WHERE lc_id = 'LC0002';",
+        "ALTER TABLE infinity_compliance_domain_doc_compliance_mas UPDATE doc_type = 'PACKING_LIST', submission_date = '2024-06-12', compliance_status = 'APPROVED' WHERE lc_id = 'LC0001' AND doc_set_id = 'DS001';",
+        "ALTER TABLE infinity_compliance_domain_doc_compliance_mas UPDATE doc_type = 'CERT_OF_ORIGIN', submission_date = '2024-06-13', compliance_status = 'REJECTED' WHERE lc_id = 'LC0002' AND doc_set_id = 'DS002';",
+        "ALTER TABLE infinity_transaction_domain_trans_tracking_mas UPDATE trans_type = 'FEE', trans_date = '2024-06-17', amount = 150.00 WHERE trans_id = 'TXN001';",
+        "ALTER TABLE infinity_transaction_domain_trans_tracking_mas UPDATE trans_type = 'ADJUSTMENT', trans_date = '2024-06-18', amount = -500.00 WHERE trans_id = 'TXN002';",
+        "ALTER TABLE infinity_integration_domain_swift_integration_mas UPDATE msg_type = 'MT730', sender_bic = 'UBSWCHZHXXX', receiver_bic = 'HSBCHKHHXXX' WHERE msg_id = 'SWIFT001';",
+        "ALTER TABLE infinity_integration_domain_swift_integration_mas UPDATE msg_type = 'MT732', sender_bic = 'BNPAFRPPXXX', receiver_bic = 'SCBLUS33XXX' WHERE msg_id = 'SWIFT002';",
+        "ALTER TABLE infinity_accounting_domain_fin_accounting_mas UPDATE entry_date = '2024-06-22', debit_amount = 10000.00, credit_amount = 0.00 WHERE acc_entry_id = 'ACC001';",
+        "ALTER TABLE infinity_accounting_domain_fin_accounting_mas UPDATE entry_date = '2024-06-23', debit_amount = 0.00, credit_amount = 5000.00 WHERE acc_entry_id = 'ACC002';"
     ]
-    }"""
+}"""
 
     # UML2testdata
     schema2SQL_MOCKED_AI_ANSWER = """{
