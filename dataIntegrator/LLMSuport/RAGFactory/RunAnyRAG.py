@@ -255,6 +255,6 @@ if __name__ == "__main__":
     ##############################
     # rag_uml_txt2req_inquiry()
     rag_uml_req2uml_inquiry()
-    rag_uml_uml2schema_inquiry()
-    rag_uml_uml2testdata_inquiry()
+    # rag_uml_uml2schema_inquiry()
+    # rag_uml_uml2testdata_inquiry()
     rag_uml_schema2sql_inquiry()
