@@ -1,0 +1,104 @@
+@startuml
+
+class RAGFactory {
+  +Dict[str, Type[RAGAgent]] _registry
+  +new_agent(agent_type: str, knowledge_base_file_path: str, prompt_file_path: str): RAGAgent
+  +run_rag_inquiry(rag_model: str, agent_type: str, question: str, knowledge_base_file_path: str, prompt_file_path: str)
+  +run_rag_inquiry(agent_name: str, agent_type: str, question: str, knowledge_base_file_path: str, prompt_file_path: str): dict
+}
+
+class RAGAgent {
+  +run_single_question(agent_type: str, prompt: str): str
+  +load_knowledge_base_from_json(file_path: str): dict
+  +load_and_generate_prompts(prompt_file_path: str, context: str, question: str): str
+  +call_ai_agent(agent_type: str, prompt: str, question: str)
+}
+
+class RAG_SQL_inquiry_stock_summary {
+  +knowledge_base_file_path: str
+  +prompt_file_path: str
+  +__init__(knowledge_base_file_path: str, prompt_file_path: str)
+  +run_single_question(agent_type: str, question: str): dict
+  +run_prompt_questions()
+  +display_result(response: dict, result_dict: dict)
+}
+
+class RAG_SQL_inquiry_stocks_code {
+  +knowledge_base_file_path: str
+  +prompt_file_path: str
+  +__init__(knowledge_base_file_path: str, prompt_file_path: str)
+  +run_single_question(agent_type: str, question: str): dict
+  +run_prompt_questions()
+  +display_result(response: dict, result_dict: dict)
+}
+
+class RAG_SQL_inquiry_stock_summary_service {
+  +RAG_SQL_inquiry_stock_summary_service_fetch(agent_type: str, question: str): dict
+}
+
+class FlaskService {
+  -app: Flask
+  -response_dict: dict
+  +__init__(): None
+  +register_routes(): None
+  +RAG_SQL_inquiry_stock_summary(): Response
+  +RAG_SQL_inquiry_portfolio_volatility(): Response
+  +run(): None
+}
+
+class RAG_SQL_inquiry_portfolio_volatility_service {
+  +RAG_SQL_inquiry_portfolio_volatility_fetch(agent_type: str, question: str, response_dict: dict): (dict, str)
+}
+
+class PortfolioVolatilityCalculator {
+  -weight_a: float
+  -weight_b: float
+  -portfolio_data: DataFrame
+  +test_portfolio_volatility_with_any_pair(response_dict: dict): dict
+}
+
+package "dataIntegrator.LLMSuport.AiAgents" {
+    class SparkAI {
+        +inquiry(prompt: str): str
+    }
+
+    class AIAgent {
+        +inquiry(prompt: str): str
+    }
+
+    class main {
+        +main()
+    }
+
+    class __init__ {
+        +__init__()
+    }
+
+    class AIAgentFactory {
+        +new_agent(agent_type: str): AIAgent
+        +call_agent(agent_type: str, prompt: str): str
+    }
+
+    class DeepSeek {
+        +inquiry(prompt: str): str
+    }
+
+    AIAgent <|-- SparkAI
+    AIAgent <|-- DeepSeek
+    AIAgentFactory --> SparkAI : creates
+    AIAgentFactory --> DeepSeek : creates
+    main --> AIAgentFactory : calls
+}
+
+RAGFactory --> RAGAgent : uses
+RAGFactory --> RAG_SQL_inquiry_stock_summary : creates
+RAGFactory --> RAG_SQL_inquiry_stocks_code : creates
+RAG_SQL_inquiry_stock_summary --> RAGAgent : extends
+RAG_SQL_inquiry_stocks_code --> RAGAgent : extends
+RAG_SQL_inquiry_stock_summary_service --> RAGFactory: uses >
+FlaskService --> RAG_SQL_inquiry_stock_summary_service: uses >
+FlaskService --> RAG_SQL_inquiry_portfolio_volatility_service: uses >
+RAG_SQL_inquiry_portfolio_volatility_service --> RAGFactory: uses >
+RAG_SQL_inquiry_portfolio_volatility_service --> PortfolioVolatilityCalculator: uses >
+
+@enduml

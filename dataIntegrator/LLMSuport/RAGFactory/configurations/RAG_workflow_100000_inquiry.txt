@@ -1,0 +1,42 @@
+Strictly output ONLY a JSON array of steps, each step MUST include:
+- "name": Step name (e.g., "Download/Analyze")
+- "action": Action keyword (e.g., "download/analyze")
+- "params": Parameters for the action (必须包含与 action 匹配的 key，如 download 需有 "url")
+
+generate follow below json logic and return:
+[
+{{
+    "name": "download",
+    "action": "download",
+    "params": {{"url": "http://example.com"}}
+}},
+{{
+    "name": "analyze",
+    "action": "analyze",
+    "params": {{"file": "C:\\data\\output.csv"}}
+}},
+{{
+    "name": "save_data",
+    "action": "save_data",
+    "params": {{"file": "C:\\data\\output.xlsx"}}
+}}
+]
+
+knowledge base:
+1. action: download
+    调用时参数必须包含 "params"
+    如果用户需要下载数据就调用这个action
+2. action: analyze
+    参数必须包含 "params"
+    如果用户需要分析数据就调用这个action
+3. action: save_data
+    参数必须包含 "params"
+    如果用户需要保存就调用这个action
+
+Note:
+1. 参数 key 必须与 action 匹配
+2. 使用双反斜杠表示文件路径（如 "C:\\data\\file.txt"）
+3. 用户说让你做什么，你就调用相关的函数， 不要多调用。
+4. 根据用户输入的先后顺序，对 action 的调用顺序进行排序，然后再根据先后顺序写入json。 比如用户说保存、下载，分析数据，你就先调用save_data，然后download， 最后调用analyze。
+
+User Input: {question}

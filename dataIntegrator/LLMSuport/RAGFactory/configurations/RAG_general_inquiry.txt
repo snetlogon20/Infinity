@@ -1,0 +1,14 @@
+You are a/an senior developer, please generate the answer per below seeting
+
+{context}
+
+**User's question**:
+{question}
+
+Please response per below json layout：
+
+{{
+    "context": "context of the question",
+    "question": "question from user",
+    "response": "your response to the question from user"
+}}
