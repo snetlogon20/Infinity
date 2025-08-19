@@ -30,12 +30,12 @@ def RAG_SQL_inquiry_stock_summary():
     #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的所有信息，比较同期中国股票中 “国脉科技”的收益率 和同期上海黄金交易所日行情中的所有信息。 作图时把美股的当日收益率, 国脉科技的收益率、黄金收益率和同业拆放利率的各类利率当作Y 轴"
     #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的交易量，交易金额，然后再比较同期中国股票中 “国脉科技”的交易量*500倍，交易金额*500倍。 作图"
     #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的交易量，交易金额，然后再比较同期中国股票中 “国脉科技”的交易量*500倍，交易金额*500倍。 用散点图"
-    #question = "帮我在美国股票信息中找出花旗2024-5-02到2025-5-5的月收益率，然后再比较同期苹果、摩根大通的平均收益率， 然后再比较 同期上海银行间同业拆放利率中的隔夜利息， 和同期上海黄金交易所日行情中的合约代码为Au99.99的收益率。用折线图"
+    question = "帮我在美国股票信息中找出花旗2024-5-02到2025-5-5的月收益率，然后再比较同期苹果、摩根大通的平均收益率， 然后再比较 同期上海银行间同业拆放利率中的隔夜利息， 和同期上海黄金交易所日行情中的合约代码为Au99.99的收益率。用折线图"
     #question = "帮我在美国股票信息中找出花旗2024-10-02到2024-10-31的交易量，交易金额，然后再比较同期摩根大通的交易量，交易金额。 用折线图"
     #question = "帮我在美国股票信息中找出花旗2024-12-02到2024-12-31的pct_change，然后再比较 同期上海银行间同业拆放利率中的overnight的收益率，比较同期中国股票中 “国脉科技”的收益率。不作图，但是 需要线性回归分析：花旗pct_change是ycolumn, 其余是xColumns"
     #question = "帮我在美国股票信息中找出花旗2024-06-02到2024-12-31的pct_change、收盘价，然后再比较 同期上海银行间同业拆放利率中的overnight的收益率，比较同期中国股票中 “国脉科技”的收益率、价格, 再比较 美国国债收益率曲线 中的 1月期、3月期、 3年期收益率和10年期收益率, 再比较外汇市场日行情行情中人民币对美元的买入收盘价。去除为0的数据。作图，然后需要线性回归分析：花旗pct_change是ycolumn, 其余是xColumns"
     #question = "帮我在美国股票信息中找出花旗2024-06-02到2024-12-31的pct_change、收盘价，然后再比较 同期上海银行间同业拆放利率中的overnight的收益率，比较同期中国股票中 “国脉科技”的收益率、价格, 再比较 美国国债收益率曲线 中的 1月期、3月期、 3年期收益率和10年期收益率, 再比较外汇市场日行情行情中人民币对美元的买入收盘价。去除为0的数据 , 按照交易日期排序。作图，然后需要线性回归分析：花旗pct_change是ycolumn, 其余是xColumns"
-    question = "Find all the fields for AAPL in the us stock market between December2024.31.2024 and December 31, 2024. I need this to do a Monte carlo analysis. stock code: AAPL, date taken from October 1, 2022, to November 19, 2024.The initial field is close point, and the analysis field is pct change."
+    #question = "Find all the fields for AAPL in the us stock market between December2024.31.2024 and December 31, 2024. I need this to do a Monte carlo analysis. stock code: AAPL, date taken from October 1, 2022, to November 19, 2024.The initial field is close point, and the analysis field is pct change."
 
     response_dict = RAGFactory.run_rag_inquiry("RAG_SQL_inquiry_stock_summary", CommonParameters.Default_AI_Engine, question, knowledge_base_file_path, prompt_file_path)
     print(response_dict)
@@ -221,9 +221,18 @@ def rag_uml_schema2sql_inquiry():
 if __name__ == "__main__":
 
     ##############################
+    # rag_uml
+    ##############################
+    # rag_uml_txt2req_inquiry()
+    # rag_uml_req2uml_inquiry()
+    # rag_uml_uml2schema_inquiry()
+    # rag_uml_uml2testdata_inquiry()
+    # rag_uml_schema2sql_inquiry()
+
+    ##############################
     # RAG_SQL_inquiry_stock_summary
     ##############################
-    # RAG_SQL_inquiry_stock_summary()
+    RAG_SQL_inquiry_stock_summary()
     #
     # ##############################
     # # RAG_SQL_inquiry_stocks_code
@@ -249,12 +258,3 @@ if __name__ == "__main__":
     # reason_chain_10000_inquiry
     ##############################
     # reason_chain_10000_inquiry()
-
-    ##############################
-    # rag_uml
-    ##############################
-    # rag_uml_txt2req_inquiry()
-    rag_uml_req2uml_inquiry()
-    rag_uml_uml2schema_inquiry()
-    rag_uml_uml2testdata_inquiry()
-    rag_uml_schema2sql_inquiry()
