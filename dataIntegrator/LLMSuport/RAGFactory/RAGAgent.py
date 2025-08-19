@@ -51,6 +51,9 @@ class RAGAgent(ABC):
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000104",custom_error_message=rf"Error when executing RAG service", e=e)
 
+    def execute(self, result_dict: dict):
+        pass
+
 
     def run_single_question(self, agent_type, question):
 

@@ -94,11 +94,10 @@
     h) 'series':用户指定需要模拟的假设次数，是个整数，默认为1000i)'alpha':用户指定的置信度，默认是0.05，j)'distribution_type':'用户指定的分布，可以选择的有normal(正态分布)/l0gnormal(对数正态分布)/historical(历史分布g)下面的JSON是格式模板，我需要你根据上面的要求填写到以下模板中
     i) 'alpha':用户指定的置信度，默认是0.05，
     j) 'distribution_type':'用户指定的分布，可以选择的有normal(正态分布)/lognormal(对数正态分布)/historical(历史分布)', 默认是lognormal分布'
-    g)下面的JSON是格式模板，我需要你根据上面的要求填写到以下模板中
 
-12. 返回JSON格式:
+12. 返回JSON格式,严格遵守以下JSON格式中的要求，不得擅自更改。:
 {{
-    "sql": "生成的SQL",
+    "sql": "此处规范放入你生成的SQL语句",
     "explanation_in_Mandarin": "解释查询目的和逻辑",
     "explanation_in_English": "Explain the target and logic of the inquiry in English",
     "isPlotRequired": "是否要求产生图表，yes/no",
@@ -124,17 +123,17 @@
     }},
     "isMonteCarloRequired":"是否要求进行蒙特卡罗分析，yes/no，默认no",
     "MonteCarloRequirement":{{
-        'market':'US', 'stock':'C',
-        'start_date': '需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询开始日期，'end_date':'需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询结束日期'
-        'init_value': '需要根据]SON["sq1"]中的字段全名，结合用户问题，填写用户指定的初始值的字段
-        'analysis_column': '需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定需要分析的字段',
-        't': 0.01，
-        'times': 10,
-        'series': 1000,
-        'alpha': 0.05.
-        'distribution_type': 'lognormal' # normal/lognormal/historical
+        "market":"US", "stock":"C",
+        "start_date": "需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询开始日期，'end_date':'需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定的査询结束日期"
+        "init_value": "需要根据]SON["sq1"]中的字段全名，结合用户问题，填写用户指定的初始值的字段"
+        "analysis_column": "需要根据JSON["sq1"]中的字段全名，结合用户问题，填写用户指定需要分析的字段",
+        "t": 0.01，
+        "times": 10,
+        "series": 1000,
+        "alpha": 0.05.
+        "distribution_type": "lognormal" # normal/lognormal/historical
     }},
-    "feedback","在过程中产生的疑问，或者需要用户补充的信息"
+    "feedback": "在过程中产生的疑问，或者需要用户补充的信息"
 }}
 
 13 # 后果声明

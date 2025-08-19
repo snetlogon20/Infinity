@@ -137,23 +137,9 @@ if __name__ == "__main__":
                 service.request_for_rag_inquiry(user_input)
                 st.session_state.button_clicked = False
     if choice == "Any-Requirement":
-        # 添加文本输入框和按钮
-        user_input = st.text_area("**Tell me/你的问题:**", height=100, placeholder="Please input question like: 请按照要求生成 Database UML和建表语句,并按照JSON格式返回")
-        # 在 Streamlit 中嵌入 HTML 代码
+        anyRequirement = AnyRequirement()
+        anyRequirement.main()
 
-        if 'button_clicked' not in st.session_state:
-            st.session_state.button_clicked = False
-
-        if st.button("Go/生成"):
-            st.session_state.button_clicked = True
-
-        if st.session_state.button_clicked:
-            if user_input is None or len(user_input) == 0:
-                print("question is null")
-            else:
-                service = AnyRequirement()
-                service.request_for_rag_inquiry(user_input)
-                st.session_state.button_clicked = False
     if choice == "CHAT-BOT":
 
         if 'button_clicked' not in st.session_state:

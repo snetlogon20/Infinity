@@ -436,8 +436,8 @@ class TuShareServiceManager():
         try:
             logger.info("callTuShareService started")
 
-            start_date = "20240101"
-            end_date = "20241231"
+            start_date = "20250101"
+            end_date = "20250806"
             start_quarter = "2024Q1"
             end_quarter = "2025Q1"
 
@@ -454,7 +454,7 @@ class TuShareServiceManager():
                 # "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
                 # "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
                 # "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
-                "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
+                # "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
                 # "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 # "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date}
             }
@@ -469,9 +469,9 @@ class TuShareServiceManager():
                 except Exception as e:
                     logger.error(f"调用 {method_name} 失败: {e}")
 
-            # have issue here
-            # param_dict = {"ts_code": "C", "start_date": start_date, "end_date": end_date}
-            # self.callTuShareUSStockDailyService(param_dict) #5 times daily
+            ##### have issue here, just doubt it's the compatibility issue between py312 and tushrae
+            param_dict = {"ts_code": "C", "start_date": start_date, "end_date": end_date}
+            self.callTuShareUSStockDailyService(param_dict) #5 times daily
 
             logger.info("callTuShareService completed successfully")
 
