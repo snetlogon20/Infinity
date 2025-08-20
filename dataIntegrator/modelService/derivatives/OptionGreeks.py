@@ -1,7 +1,10 @@
 import numpy as np
 from scipy.stats import norm
 from abc import ABC, abstractmethod
+from dataIntegrator import CommonLib
 
+logger = CommonLib.logger
+commonLib = CommonLib()
 
 class OptionGreeks(ABC):
     """希腊字母计算抽象基类"""
@@ -134,9 +137,24 @@ def calculate_all_greeks(S, K, T, r, sigma, option_type='call'):
 
     return greeks
 
+
+def print_greeks_information(greeks):
+    logger.info("Option Greeks:")
+
+    for key, value in greeks.items():
+        if key == 'parameters':
+            print(f"Option Type: {value["option_type"]}")
+
+    for key, value in greeks.items():
+        if key != 'parameters':
+            print(f"{key.capitalize():<6}: {value:.6f}")
+    print("\n")
+
 # 使用示例
 if __name__ == "__main__":
-    # 测试数据
+    ##############################
+    # 1. 基础测试测试案例
+    ##############################
     params = {
         'S': 100,  # 标的现价
         'K': 100,  # 行权价
@@ -147,18 +165,16 @@ if __name__ == "__main__":
 
     # 计算看涨期权
     call_greeks = calculate_all_greeks(**params, option_type='call')
-    print("Call Option Greeks:")
-    for key, value in call_greeks.items():
-        if key != 'parameters':
-            print(f"{key.capitalize():<6}: {value:.6f}")
+    print_greeks_information(call_greeks)
 
     # 计算看跌期权
     put_greeks = calculate_all_greeks(**params, option_type='put')
-    print("\nPut Option Greeks:")
-    for key, value in put_greeks.items():
-        if key != 'parameters':
-            print(f"{key.capitalize():<6}: {value:.6f}")
+    print_greeks_information(put_greeks)
 
     # 查看完整返回结构
     print("\n完整返回结构示例:")
     print(call_greeks)
+
+    ##############################
+    # 1. 基础测试测试案例
+    ##############################
