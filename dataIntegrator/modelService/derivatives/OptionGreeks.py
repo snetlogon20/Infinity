@@ -7,7 +7,6 @@ import math
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-
 class OptionGreeks(ABC):
     """希腊字母计算抽象基类"""
 
@@ -166,7 +165,6 @@ def print_greeks_information(greeks):
     print(rf"Rho_yield: {round(greeks['rho_yield'], 6)}")
     print(rf"Theta: {round(greeks['theta'], 6)}")
     print("\n")
-
 
 
 # 使用示例
