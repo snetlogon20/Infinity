@@ -42,7 +42,7 @@
 2. ClickHouse
 
 #### 使用说明
-详见 https://gitee.com/snetlogon20/infinity/blob/master/dataIntegrator/notebook/readme/Infinity%20Grid(CN).pdf
+   - 详见 https://gitee.com/snetlogon20/infinity/blob/master/dataIntegrator/notebook/readme/Infinity%20Grid(CN).pdf
 
 
 #### 参与贡献
