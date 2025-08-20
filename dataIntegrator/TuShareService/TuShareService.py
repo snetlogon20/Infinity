@@ -7,7 +7,6 @@ from dataIntegrator import CommonLib
 
 logger = CommonLib.logger
 
-#class TuShareService(CommonLib.CommonLib):
 class TuShareService(CommonLib):
 
 
