@@ -9,7 +9,7 @@
 - **功能三**：提供可视化数据展现
 - **功能四**：在数据聚合并计算关键金融指标的基础上，提供大预言分析及金融顾问建议服务。
 
-**2 Infinity Grid**
+**2. Infinity Grid**
 作为DataIntegrator中的一个模块，Infinity Grid是一个开源的大语言模型Agent，主要功能是对金融量化工具提供大语言模型的支持。Infinity 可以作为一个插件对传统金融行业提供了对包括了对固定收益、股票、 衍生品等各类金融模型的量化计算。
 
 - **功能一**：人类语言翻译为SQL查询并完成量化分析
@@ -19,18 +19,18 @@
 #### 软件架构
 软件架构说明
 1. data Service 抽取数据服务
-   2. modelService 金融模型服务，包括
-   a. 债券分析
-   b. 衍生品分析
-   c. 各类分布模型
-   d. 远期
-   e. 期权
-   f. 蒙特卡洛模拟
-   g. 各类统计基础模型
+2. modelService 金融模型服务，包括
+   - a. 债券分析
+   - b. 衍生品分析
+   - c. 各类分布模型
+   - d. 远期
+   - e. 期权
+   - f. 蒙特卡洛模拟
+   - g. 各类统计基础模型
 3. LLMSupport 大语言模型服务
-   a. AI 模型工厂
-   b. RAG 服务
-   c. Chroma 向量服务
+   - a. AI 模型工厂
+   - b. RAG 服务
+   - c. Chroma 向量服务
 4. plotService 绘图服务
 5. StreamLit 可视化服务
 6. TuShareService Tushare 金融数据获取服务
