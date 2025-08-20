@@ -2,26 +2,30 @@ import numpy as np
 from scipy.stats import norm
 from abc import ABC, abstractmethod
 from dataIntegrator import CommonLib
+import math
 
 logger = CommonLib.logger
 commonLib = CommonLib()
 
+
 class OptionGreeks(ABC):
     """希腊字母计算抽象基类"""
 
-    def __init__(self, S, K, T, r, sigma, option_type='call'):
+    def __init__(self, S, K, T, r, y, sigma, option_type='call'):
         """
         S: 标的资产现价
         K: 行权价
         T: 到期时间（年）
         r: 无风险利率
+        y: 股息率
         sigma: 波动率
         option_type: 'call' 或 'put'
         """
         self.S = float(S)
         self.K = float(K)
         self.T = float(T)
-        self.r = float(r)
+        self.r = float(r)  # 无风险利率
+        self.y = float(y)  # 股息率
         self.sigma = float(sigma)
         self.option_type = option_type.lower()
 
@@ -34,7 +38,8 @@ class OptionGreeks(ABC):
             raise ValueError("S, K, T, sigma 必须为正数")
 
     def _d1_d2(self):
-        d1 = (np.log(self.S / self.K) + (self.r + 0.5 * self.sigma ** 2) * self.T) / (self.sigma * np.sqrt(self.T))
+        d1 = (np.log(self.S / self.K) + (self.r - self.y + 0.5 * self.sigma ** 2) * self.T) / (
+                    self.sigma * np.sqrt(self.T))
         d2 = d1 - self.sigma * np.sqrt(self.T)
         return d1, d2
 
@@ -49,10 +54,13 @@ class Delta(OptionGreeks):
     def calculate(self):
         d1, _ = self._d1_d2()
         if self.option_type == 'call':
-            return norm.cdf(d1)
+            normalDistribution_d1 = norm.cdf(d1)
+            delta = math.exp(-1 * self.y * self.T) * normalDistribution_d1  # 仅用y调整
+            return delta
         else:
-            return norm.cdf(d1) - 1
-
+            normalDistribution_d1 = norm.cdf(d1) - 1
+            delta = math.exp(-1 * self.y * self.T) * normalDistribution_d1  # 仅用y调整
+            return delta
 
 class Gamma(OptionGreeks):
     """Gamma计算（call/put相同）"""
@@ -67,14 +75,16 @@ class Theta(OptionGreeks):
 
     def calculate(self):
         d1, d2 = self._d1_d2()
-        term1 = - (self.S * norm.pdf(d1) * self.sigma) / (2 * np.sqrt(self.T))
+        term1 = -(self.S * norm.pdf(d1) * self.sigma) / (2 * np.sqrt(self.T))
 
         if self.option_type == 'call':
-            term2 = -self.r * self.K * np.exp(-self.r * self.T) * norm.cdf(d2)
-            return (term1 + term2) / 365  # 转换为每日theta
+            term2 = -self.r * self.K * np.exp(-(self.r - self.y) * self.T) * norm.cdf(d2)
+            term3 = self.y * self.S * np.exp(-self.y * self.T) * norm.cdf(d1)
+            return (term1 + term2 + term3) / 365  # 转换为每日theta
         else:
-            term2 = self.r * self.K * np.exp(-self.r * self.T) * norm.cdf(-d2)
-            return (term1 + term2) / 365
+            term2 = self.r * self.K * np.exp(-(self.r - self.y) * self.T) * norm.cdf(-d2)
+            term3 = -self.y * self.S * np.exp(-self.y * self.T) * norm.cdf(-d1)
+            return (term1 + term2 + term3) / 365
 
 
 class Vega(OptionGreeks):
@@ -86,95 +96,96 @@ class Vega(OptionGreeks):
 
 
 class Rho(OptionGreeks):
-    """Rho计算"""
+    """Rho（利率敏感度）计算"""
 
     def calculate(self):
         _, d2 = self._d1_d2()
         if self.option_type == 'call':
-            return self.K * self.T * np.exp(-self.r * self.T) * norm.cdf(d2) * 0.01  # 利率变化1%的影响
+            return self.K * self.T * np.exp(-(self.r - self.y) * self.T) * norm.cdf(d2) * 0.01
         else:
-            return -self.K * self.T * np.exp(-self.r * self.T) * norm.cdf(-d2) * 0.01
+            return -self.K * self.T * np.exp(-(self.r - self.y) * self.T) * norm.cdf(-d2) * 0.01
 
 
-def calculate_all_greeks(S, K, T, r, sigma, option_type='call'):
+class RhoYield(OptionGreeks):
+    """RhoYield（股息率敏感度）计算"""
+
+    def calculate(self):
+        d1, _ = self._d1_d2()
+        if self.option_type == 'call':
+            return -self.S * self.T * np.exp(-self.y * self.T) * norm.cdf(d1) * 0.01
+        else:
+            return self.S * self.T * np.exp(-self.y * self.T) * norm.cdf(-d1) * 0.01
+
+
+def calculate_all_greeks(S, K, T, r, y, sigma, option_type='call'):
     """
-    计算所有期权希腊值并返回字典
+    计算所有期权希腊值并返回字典（包含RhoYield）
     参数:
         S: 标的资产现价
         K: 行权价
         T: 到期时间（年）
         r: 无风险利率
+        y: 股息率
         sigma: 波动率
         option_type: 'call' 或 'put' (默认'call')
     返回:
         dict: 包含所有希腊值的字典
     """
-    # 参数校验
     option_type = option_type.lower()
     if option_type not in ['call', 'put']:
         raise ValueError("option_type 必须是 'call' 或 'put'")
 
-    # 计算所有希腊值
     greeks = {
-        'delta': Delta(S, K, T, r, sigma, option_type).calculate(),
-        'gamma': Gamma(S, K, T, r, sigma).calculate(),  # gamma对call/put相同
-        'theta': Theta(S, K, T, r, sigma, option_type).calculate(),
-        'vega': Vega(S, K, T, r, sigma).calculate(),  # vega对call/put相同
-        'rho': Rho(S, K, T, r, sigma, option_type).calculate()
-    }
-
-    # 添加计算参数信息
-    greeks.update({
+        'delta': Delta(S, K, T, r, y, sigma, option_type).calculate(),
+        'gamma': Gamma(S, K, T, r, y, sigma).calculate(),
+        'theta': Theta(S, K, T, r, y, sigma, option_type).calculate(),
+        'vega': Vega(S, K, T, r, y, sigma).calculate(),
+        'rho': Rho(S, K, T, r, y, sigma, option_type).calculate(),
+        'rho_yield': RhoYield(S, K, T, r, y, sigma, option_type).calculate(),
         'parameters': {
-            'S': S,
-            'K': K,
-            'T': T,
-            'r': r,
-            'sigma': sigma,
+            'S': S, 'K': K, 'T': T,
+            'r': r, 'y': y, 'sigma': sigma,
             'option_type': option_type
         }
-    })
-
+    }
     return greeks
 
 
 def print_greeks_information(greeks):
+    """格式化输出希腊值"""
     logger.info("Option Greeks:")
 
     for key, value in greeks.items():
         if key == 'parameters':
-            print(f"Option Type: {value["option_type"]}")
+            print(f"Option Type: {value['option_type']}")
 
-    for key, value in greeks.items():
-        if key != 'parameters':
-            print(f"{key.capitalize():<6}: {value:.6f}")
+    print(rf"Delta: {round(greeks['delta'], 6)}")
+    print(rf"Gamma: {round(greeks['gamma'], 6)}")
+    print(rf"Vega: {round(greeks['vega'], 6)}")
+    print(rf"Rho: {round(greeks['rho'], 6)}")
+    print(rf"Rho_yield: {round(greeks['rho_yield'], 6)}")
+    print(rf"Theta: {round(greeks['theta'], 6)}")
     print("\n")
+
+
 
 # 使用示例
 if __name__ == "__main__":
-    ##############################
-    # 1. 基础测试测试案例
-    ##############################
+    # 测试案例1（长期期权）
     params = {
-        'S': 100,  # 标的现价
-        'K': 100,  # 行权价
-        'T': 1,  # 1年到期
-        'r': 0.05,  # 5%无风险利率
-        'sigma': 0.2  # 20%波动率
+        'S': 100, 'K': 100, 'T': 1,
+        'r': 0.05, 'y': 0.03, 'sigma': 0.2
     }
-
-    # 计算看涨期权
     call_greeks = calculate_all_greeks(**params, option_type='call')
     print_greeks_information(call_greeks)
 
-    # 计算看跌期权
     put_greeks = calculate_all_greeks(**params, option_type='put')
     print_greeks_information(put_greeks)
 
-    # 查看完整返回结构
-    print("\n完整返回结构示例:")
-    print(call_greeks)
-
-    ##############################
-    # 1. 基础测试测试案例
-    ##############################
+    # 测试案例2（短期期权，P346 Table 14.1参数）
+    short_term_params = {
+        'S': 100, 'K': 100, 'T': 0.25,
+        'r': 0.05, 'y': 0.03, 'sigma': 0.2
+    }
+    short_call = calculate_all_greeks(**short_term_params, option_type='call')
+    print_greeks_information(short_call)
