@@ -184,14 +184,68 @@ def testCase2():
 
     return result
 
+def testCase3():
+    short_term_params_list = [
+        {
+            'S': 100,
+            'K': 90,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        },
+        {
+            'S': 100,
+            'K': 100,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        },
+        {
+            'S': 100,
+            'K': 110,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        },
+    ]
+
+    for short_term_params in short_term_params_list:
+
+        greeks = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
+        OptionGreeks.print_greeks_information(greeks)
+
+        test_data = {
+            'spot_price': short_term_params['S'],  # 标的资产价格($)
+            'volatility': short_term_params['sigma'],  # 波动率(20%)
+            'interest_rate': short_term_params['r'],  # 无风险利率(5%)
+            'dividend_yield': short_term_params['y'],  # 股息率(3%)
+            'time_to_maturity': short_term_params['T'],  # 到期时间(3个月)
+            'delta': greeks['delta'],  # 使用计算出的delta Δ
+            'gamma': greeks['gamma'],  # 使用计算出的gamma Γ
+            'vega': greeks['vega'],  # 使用计算出的vega Λ
+            'rho': greeks['rho'],  # 使用计算出的rho ρ
+            'theta': greeks['theta'],  # 使用计算出的theta Θ
+            'phi': greeks['rho_yield'],  # 使用rho_yield作为 Φ
+            'confidence_level': 95  # 置信水平(95%)
+        }
+
+        optionGreeksWorstLoss = OptionGreeksWorstLoss()
+        result = optionGreeksWorstLoss.calculate_worst_loss(test_data)
+        optionGreeksWorstLoss.print_result(result)
+
+    return result
+
 # 测试代码
 if __name__ == "__main__":
 
     # Test Case1 - 示例数据 (基于P346, 表14.1 K=100列的数据)，给定固定数据，测试计算最坏损失
-    result = testCase1()
+    #result = testCase1()
 
     # Test Case2 -  示例数据 (基于P346, 表14.1 K=100列的数据）但是资产价格，先通过 call OptionGreeks 自动计算，后计算最坏损失
     #result = testCase2()
 
     # Test Case3 -  进阶 (基于P346, 表14.1) 给定不同的行权价格，计算最坏损失
-    #result = testCase2()
+    result = testCase3()

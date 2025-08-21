@@ -3,6 +3,8 @@ from scipy.stats import norm
 from abc import ABC, abstractmethod
 from dataIntegrator import CommonLib
 import math
+import pandas as pd
+import matplotlib.pyplot as plt
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -166,30 +168,72 @@ class RhoYield(OptionGreeks):
 
 # 使用示例
 if __name__ == "__main__":
-    # 测试案例1（长期期权）
-    params = {
-        'S': 100,
-        'K': 100,
-        'T': 1,
-        'r': 0.05,
-        'y': 0.03,
-        'sigma': 0.2
-    }
+    # # 测试案例1（长期期权）
+    # params = {
+    #     'S': 100,
+    #     'K': 100,
+    #     'T': 1,
+    #     'r': 0.05,
+    #     'y': 0.03,
+    #     'sigma': 0.2
+    # }
+    #
+    # call_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+    # OptionGreeks.print_greeks_information(call_greeks)
+    #
+    # put_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='put')
+    # OptionGreeks.print_greeks_information(put_greeks)
+    #
+    # # 测试案例2（短期期权，P346 Table 14.1参数）
+    # short_term_params = {
+    #     'S': 100,
+    #     'K': 100,
+    #     'T': 0.25,
+    #     'r': 0.05,
+    #     'y': 0.03,
+    #     'sigma': 0.2
+    # }
+    # short_call = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
+    # OptionGreeks.print_greeks_information(short_call)
 
-    call_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
-    OptionGreeks.print_greeks_information(call_greeks)
+    # 测试案例3（短期期权，P346 Table 14.1参数）便利所有可能行权价格  90-100-110
+    params_list = [
+        {
+            'S': 100,
+            'K': K,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        }
+        for K in range(90, 111, 1)  # 从90到110（包含110），步长为1
+    ]
 
-    put_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='put')
-    OptionGreeks.print_greeks_information(put_greeks)
+    greeks_list = []
+    for params in params_list:
+        greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+        OptionGreeks.print_greeks_information(greeks)
 
-    # 测试案例2（短期期权，P346 Table 14.1参数）
-    short_term_params = {
-        'S': 100,
-        'K': 100,
-        'T': 0.25,
-        'r': 0.05,
-        'y': 0.03,
-        'sigma': 0.2
-    }
-    short_call = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
-    OptionGreeks.print_greeks_information(short_call)
+        flat_greeks = {
+            'delta': greeks['delta'],
+            'gamma': greeks['gamma'],
+            'vega': greeks['vega'],
+            'rho': greeks['rho'],
+            'rho_yield': greeks['rho_yield'],
+            'theta': greeks['theta'],
+
+            'S': greeks['parameters']['S'],
+            'K': greeks['parameters']['K'],
+            'T': greeks['parameters']['T'],
+            'r': greeks['parameters']['r'],
+            'y': greeks['parameters']['y'],
+            'sigma': greeks['parameters']['sigma'],
+            'option_type': greeks['parameters']['option_type']
+        }
+
+        greeks_list.append(flat_greeks)
+
+    df = pd.DataFrame(greeks_list)
+    df.to_excel(rf"E:\tmp\aaaaa.xlsx")
+
+    print(df)
