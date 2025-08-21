@@ -1,5 +1,5 @@
-from dataIntegrator.modelService.derivatives.RateManager import RateManager
-import numpy as np
+from dataIntegrator.modelService.derivatives.rates.RateManager import RateManager
+
 
 class ForwardManager:
     def __init__(self, params):
