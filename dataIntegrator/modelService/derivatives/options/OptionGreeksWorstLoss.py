@@ -28,6 +28,8 @@ class OptionGreeksWorstLoss:
         theta = greeks_data.get('theta', 0)  # Θ
         phi = greeks_data.get('phi', 0)  # Φ(资产收益率敏感度)
 
+        daily_sigma = greeks_data.get('daily_sigma', 0)  # 波动率的日波动率
+
         #############################
         # 希腊字母值 (来自表14.1 K=100列)
         #############################
@@ -39,7 +41,7 @@ class OptionGreeksWorstLoss:
         worst_gamma_S = worst_dS**2 # -$2.08 * -$2.08 = 4.33
 
         # 3. 波动率(σ)的最坏变动(1.5% daily vol)
-        worst_dsigma = z_score * 0.015  # -2.5%(百分比)
+        worst_dsigma = z_score * daily_sigma  # -2.5%(百分比)
 
         # 4. 利率(r)的最坏变动(1% annual vol)
         worst_dr = z_score * 0.01 / math.sqrt(252)  # -0.10%(百分比)
@@ -175,7 +177,8 @@ def testCase2():
         'rho': greeks['rho'],  # 使用计算出的rho ρ
         'theta': greeks['theta'],  # 使用计算出的theta Θ
         'phi': greeks['rho_yield'],  # 使用rho_yield作为 Φ
-        'confidence_level': 95  # 置信水平(95%)
+        'confidence_level': 95,  # 置信水平(95%)
+        'daily_sigma': 0.015  # 单日波动率(0.015%)
     }
 
     optionGreeksWorstLoss = OptionGreeksWorstLoss()
@@ -229,7 +232,8 @@ def testCase3():
             'rho': greeks['rho'],  # 使用计算出的rho ρ
             'theta': greeks['theta'],  # 使用计算出的theta Θ
             'phi': greeks['rho_yield'],  # 使用rho_yield作为 Φ
-            'confidence_level': 95  # 置信水平(95%)
+            'confidence_level': 95,  # 置信水平(95%)
+            'daily_segma': 0.015  # 单日波动率(0.015%)
         }
 
         optionGreeksWorstLoss = OptionGreeksWorstLoss()
@@ -245,7 +249,7 @@ if __name__ == "__main__":
     #result = testCase1()
 
     # Test Case2 -  示例数据 (基于P346, 表14.1 K=100列的数据）但是资产价格，先通过 call OptionGreeks 自动计算，后计算最坏损失
-    #result = testCase2()
+    result = testCase2()
 
     # Test Case3 -  进阶 (基于P346, 表14.1) 给定不同的行权价格，计算最坏损失
-    result = testCase3()
+    # result = testCase3()
