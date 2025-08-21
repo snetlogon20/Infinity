@@ -46,6 +46,54 @@ class OptionGreeks(ABC):
     def calculate(self):
         pass
 
+    def calculate_all_greeks(S, K, T, r, y, sigma, option_type='call'):
+        """
+        计算所有期权希腊值并返回字典（包含RhoYield）
+        参数:
+            S: 标的资产现价
+            K: 行权价
+            T: 到期时间（年）
+            r: 无风险利率
+            y: 股息率
+            sigma: 波动率
+            option_type: 'call' 或 'put' (默认'call')
+        返回:
+            dict: 包含所有希腊值的字典
+        """
+        option_type = option_type.lower()
+        if option_type not in ['call', 'put']:
+            raise ValueError("option_type 必须是 'call' 或 'put'")
+
+        greeks = {
+            'delta': Delta(S, K, T, r, y, sigma, option_type).calculate(),
+            'gamma': Gamma(S, K, T, r, y, sigma).calculate(),
+            'theta': Theta(S, K, T, r, y, sigma, option_type).calculate(),
+            'vega': Vega(S, K, T, r, y, sigma).calculate(),
+            'rho': Rho(S, K, T, r, y, sigma, option_type).calculate(),
+            'rho_yield': RhoYield(S, K, T, r, y, sigma, option_type).calculate(),
+            'parameters': {
+                'S': S, 'K': K, 'T': T,
+                'r': r, 'y': y, 'sigma': sigma,
+                'option_type': option_type
+            }
+        }
+        return greeks
+
+    def print_greeks_information(greeks):
+        """格式化输出希腊值"""
+        logger.info("Option Greeks:")
+
+        for key, value in greeks.items():
+            if key == 'parameters':
+                print(f"Option Type: {value['option_type']}")
+
+        print(rf"Delta: {round(greeks['delta'], 6)}")
+        print(rf"Gamma: {round(greeks['gamma'], 6)}")
+        print(rf"Vega: {round(greeks['vega'], 6)}")
+        print(rf"Rho: {round(greeks['rho'], 6)}")
+        print(rf"Rho_yield: {round(greeks['rho_yield'], 6)}")
+        print(rf"Theta: {round(greeks['theta'], 6)}")
+        print("\n")
 
 class Delta(OptionGreeks):
     """Delta计算"""
@@ -116,74 +164,32 @@ class RhoYield(OptionGreeks):
             return self.S * self.T * np.exp(-self.y * self.T) * norm.cdf(-d1) * 0.01
 
 
-def calculate_all_greeks(S, K, T, r, y, sigma, option_type='call'):
-    """
-    计算所有期权希腊值并返回字典（包含RhoYield）
-    参数:
-        S: 标的资产现价
-        K: 行权价
-        T: 到期时间（年）
-        r: 无风险利率
-        y: 股息率
-        sigma: 波动率
-        option_type: 'call' 或 'put' (默认'call')
-    返回:
-        dict: 包含所有希腊值的字典
-    """
-    option_type = option_type.lower()
-    if option_type not in ['call', 'put']:
-        raise ValueError("option_type 必须是 'call' 或 'put'")
-
-    greeks = {
-        'delta': Delta(S, K, T, r, y, sigma, option_type).calculate(),
-        'gamma': Gamma(S, K, T, r, y, sigma).calculate(),
-        'theta': Theta(S, K, T, r, y, sigma, option_type).calculate(),
-        'vega': Vega(S, K, T, r, y, sigma).calculate(),
-        'rho': Rho(S, K, T, r, y, sigma, option_type).calculate(),
-        'rho_yield': RhoYield(S, K, T, r, y, sigma, option_type).calculate(),
-        'parameters': {
-            'S': S, 'K': K, 'T': T,
-            'r': r, 'y': y, 'sigma': sigma,
-            'option_type': option_type
-        }
-    }
-    return greeks
-
-
-def print_greeks_information(greeks):
-    """格式化输出希腊值"""
-    logger.info("Option Greeks:")
-
-    for key, value in greeks.items():
-        if key == 'parameters':
-            print(f"Option Type: {value['option_type']}")
-
-    print(rf"Delta: {round(greeks['delta'], 6)}")
-    print(rf"Gamma: {round(greeks['gamma'], 6)}")
-    print(rf"Vega: {round(greeks['vega'], 6)}")
-    print(rf"Rho: {round(greeks['rho'], 6)}")
-    print(rf"Rho_yield: {round(greeks['rho_yield'], 6)}")
-    print(rf"Theta: {round(greeks['theta'], 6)}")
-    print("\n")
-
-
 # 使用示例
 if __name__ == "__main__":
     # 测试案例1（长期期权）
     params = {
-        'S': 100, 'K': 100, 'T': 1,
-        'r': 0.05, 'y': 0.03, 'sigma': 0.2
+        'S': 100,
+        'K': 100,
+        'T': 1,
+        'r': 0.05,
+        'y': 0.03,
+        'sigma': 0.2
     }
-    call_greeks = calculate_all_greeks(**params, option_type='call')
-    print_greeks_information(call_greeks)
 
-    put_greeks = calculate_all_greeks(**params, option_type='put')
-    print_greeks_information(put_greeks)
+    call_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+    OptionGreeks.print_greeks_information(call_greeks)
+
+    put_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='put')
+    OptionGreeks.print_greeks_information(put_greeks)
 
     # 测试案例2（短期期权，P346 Table 14.1参数）
     short_term_params = {
-        'S': 100, 'K': 100, 'T': 0.25,
-        'r': 0.05, 'y': 0.03, 'sigma': 0.2
+        'S': 100,
+        'K': 100,
+        'T': 0.25,
+        'r': 0.05,
+        'y': 0.03,
+        'sigma': 0.2
     }
-    short_call = calculate_all_greeks(**short_term_params, option_type='call')
-    print_greeks_information(short_call)
+    short_call = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
+    OptionGreeks.print_greeks_information(short_call)
