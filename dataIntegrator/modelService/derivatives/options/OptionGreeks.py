@@ -166,49 +166,100 @@ class RhoYield(OptionGreeks):
             return self.S * self.T * np.exp(-self.y * self.T) * norm.cdf(-d1) * 0.01
 
 
-# 使用示例
-if __name__ == "__main__":
-    # # 测试案例1（长期期权）
-    # params = {
-    #     'S': 100,
-    #     'K': 100,
-    #     'T': 1,
-    #     'r': 0.05,
-    #     'y': 0.03,
-    #     'sigma': 0.2
-    # }
-    #
-    # call_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
-    # OptionGreeks.print_greeks_information(call_greeks)
-    #
-    # put_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='put')
-    # OptionGreeks.print_greeks_information(put_greeks)
-    #
-    # # 测试案例2（短期期权，P346 Table 14.1参数）
-    # short_term_params = {
-    #     'S': 100,
-    #     'K': 100,
-    #     'T': 0.25,
-    #     'r': 0.05,
-    #     'y': 0.03,
-    #     'sigma': 0.2
-    # }
-    # short_call = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
-    # OptionGreeks.print_greeks_information(short_call)
+def plot_greeks(greeks_df, plot_options):
+    plot_axis = plot_options.get("plot_axis","K")
+    plot_axis_label = plot_options.get("Strike Price","Strike Price")
 
-    # 测试案例3（短期期权，P346 Table 14.1参数）便利所有可能行权价格  90-100-110
-    params_list = [
-        {
-            'S': 100,
-            'K': K,
-            'T': 0.25,
-            'r': 0.05,
-            'y': 0.03,
-            'sigma': 0.2
-        }
-        for K in range(90, 111, 1)  # 从90到110（包含110），步长为1
-    ]
+    # 使用 pyplot 绘制折线图，将六个图放在一个画布上
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
+    # 为整个画布添加标题
+    fig.suptitle(plot_options.get("plot_title",""), fontsize=16, fontweight='bold')
+
+    # 将axes展平为一维数组，便于访问
+    ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
+
+    # 第1个子图：Delta
+    ax1.plot(greeks_df[plot_axis], greeks_df['delta'], marker='o')
+    ax1.set_title('Delta Value')
+    ax1.set_xlabel(plot_axis_label)
+    ax1.set_ylabel('Delta Values')
+    ax1.grid(True)
+    ax1.tick_params(axis='x', rotation=45)
+
+    # 第2个子图：Gamma
+    ax2.plot(greeks_df[plot_axis], greeks_df['gamma'], marker='o')
+    ax2.set_title('Gamma Value')
+    ax2.set_xlabel(plot_axis_label)
+    ax2.set_ylabel('Gamma Values')
+    ax2.grid(True)
+    ax2.tick_params(axis='x', rotation=45)
+
+    # 第3个子图：Vega
+    ax3.plot(greeks_df[plot_axis], greeks_df['vega'], marker='o')
+    ax3.set_title('Vega Value')
+    ax3.set_xlabel(plot_axis_label)
+    ax3.set_ylabel('Vega Values')
+    ax3.grid(True)
+    ax3.tick_params(axis='x', rotation=45)
+
+    # 第4个子图：rho_rate
+    ax4.plot(greeks_df[plot_axis], greeks_df['rho'], marker='o')
+    ax4.set_title('Rho(rate) Value')
+    ax4.set_xlabel(plot_axis_label)
+    ax4.set_ylabel('Rho(rate) Values')
+    ax4.grid(True)
+    ax4.tick_params(axis='x', rotation=45)
+
+    # 第5个子图：rho_yield
+    ax5.plot(greeks_df[plot_axis], greeks_df['rho_yield'], marker='o')
+    ax5.set_title('Rho(yield) Value')
+    ax5.set_xlabel(plot_axis_label)
+    ax5.set_ylabel('Rho(yield) Values')
+    ax5.grid(True)
+    ax5.tick_params(axis='x', rotation=45)
+
+    # 第6个子图：theta
+    ax6.plot(greeks_df[plot_axis], greeks_df['theta'], marker='o')
+    ax6.set_title('Theta Value')
+    ax6.set_xlabel(plot_axis_label)
+    ax6.set_ylabel('Theta Values')
+    ax6.grid(True)
+    ax6.tick_params(axis='x', rotation=45)
+
+    # 调整布局
+    plt.tight_layout()
+    plt.show()
+
+
+def test_case1():
+    params = {
+        'S': 100,
+        'K': 100,
+        'T': 1,
+        'r': 0.05,
+        'y': 0.03,
+        'sigma': 0.2
+    }
+    call_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+    OptionGreeks.print_greeks_information(call_greeks)
+    put_greeks = OptionGreeks.calculate_all_greeks(**params, option_type='put')
+    OptionGreeks.print_greeks_information(put_greeks)
+
+
+def test_case2():
+    short_term_params = {
+        'S': 100,
+        'K': 100,
+        'T': 0.25,
+        'r': 0.05,
+        'y': 0.03,
+        'sigma': 0.2
+    }
+    short_call = OptionGreeks.calculate_all_greeks(**short_term_params, option_type='call')
+    OptionGreeks.print_greeks_information(short_call)
+
+def test_case3(params_list):
     greeks_list = []
     for params in params_list:
         greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
@@ -232,8 +283,104 @@ if __name__ == "__main__":
         }
 
         greeks_list.append(flat_greeks)
+    greeks_df = pd.DataFrame(greeks_list)
+    greeks_df.to_excel(rf"D:\workspace_python\infinity\dataIntegrator\data\outbound\GreeksAnalysis.xlsx")
 
-    df = pd.DataFrame(greeks_list)
-    df.to_excel(rf"E:\tmp\aaaaa.xlsx")
+    plot_options =  {
+        'plot_axis': 'K',
+        'plot_axis_label': 'Strike Price',
+        'plot_title': 'Option Greeks Analysis - Strike Price'
+    }
+    plot_greeks(greeks_df, plot_options)
 
-    print(df)
+
+def test_case4(params_list):
+    greeks_list = []
+    for params in params_list:
+        greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+        OptionGreeks.print_greeks_information(greeks)
+
+        flat_greeks = {
+            'delta': greeks['delta'],
+            'gamma': greeks['gamma'],
+            'vega': greeks['vega'],
+            'rho': greeks['rho'],
+            'rho_yield': greeks['rho_yield'],
+            'theta': greeks['theta'],
+
+            'S': greeks['parameters']['S'],
+            'K': greeks['parameters']['K'],
+            'T': greeks['parameters']['T'],
+            'r': greeks['parameters']['r'],
+            'y': greeks['parameters']['y'],
+            'sigma': greeks['parameters']['sigma'],
+            'option_type': greeks['parameters']['option_type']
+        }
+
+        greeks_list.append(flat_greeks)
+    greeks_df = pd.DataFrame(greeks_list)
+    greeks_df.to_excel(rf"D:\workspace_python\infinity\dataIntegrator\data\outbound\GreeksAnalysis.xlsx")
+
+    plot_options =  {
+        'plot_axis': 'S',
+        'plot_axis_label': 'Spot Price',
+        'plot_title': 'Option Greeks Analysis - Spot Price'
+    }
+    plot_greeks(greeks_df, plot_options)
+
+
+# 使用示例
+if __name__ == "__main__":
+    # 测试案例1（长期期权）
+    # params = {
+    #     'S': 100,
+    #     'K': 100,
+    #     'T': 1,
+    #     'r': 0.05,
+    #     'y': 0.03,
+    #     'sigma': 0.2
+    # }
+    #test_case1()
+
+    # 测试案例2（短期期权，P346 Table 14.1参数）
+    # short_term_params = {
+    #     'S': 100,
+    #     'K': 100,
+    #     'T': 0.25,
+    #     'r': 0.05,
+    #     'y': 0.03,
+    #     'sigma': 0.2
+    # }
+    #test_case2()
+
+    # 测试案例3（短期期权，P346 Table 14.1参数）
+    # 遍历所有可能行权价格  90-100-110
+    params_list = [
+        {
+            'S': 100,
+            'K': K,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        }
+        for K in range(70, 131, 1)  # 从90到110（包含110），步长为1
+    ]
+    #test_case3(params_list)
+
+
+    # 测试案例4（短期期权，P346 Table 14.1参数）
+    # 遍历所有可能Spot价格  90-100-110
+    params_list = [
+        {
+            'S': S,
+            'K': 100,
+            'T': 0.25,
+            'r': 0.05,
+            'y': 0.03,
+            'sigma': 0.2
+        }
+        for S in range(70, 131, 1)  # 从90到110（包含110），步长为1
+    ]
+    #test_case4(params_list)
+
