@@ -85,6 +85,8 @@ class OptionGreeks(ABC):
         """格式化输出希腊值"""
         logger.info("Option Greeks:")
 
+        print("期权风险分析基础信息")
+        print("========================================")
         for key, value in greeks.items():
             if key == 'parameters':
                 print(f"Option Type: {value['option_type']}")
@@ -265,22 +267,7 @@ def test_case3(params_list):
         greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
         OptionGreeks.print_greeks_information(greeks)
 
-        flat_greeks = {
-            'delta': greeks['delta'],
-            'gamma': greeks['gamma'],
-            'vega': greeks['vega'],
-            'rho': greeks['rho'],
-            'rho_yield': greeks['rho_yield'],
-            'theta': greeks['theta'],
-
-            'S': greeks['parameters']['S'],
-            'K': greeks['parameters']['K'],
-            'T': greeks['parameters']['T'],
-            'r': greeks['parameters']['r'],
-            'y': greeks['parameters']['y'],
-            'sigma': greeks['parameters']['sigma'],
-            'option_type': greeks['parameters']['option_type']
-        }
+        flat_greeks = convert_greeks_to_flat_greeks(greeks)
 
         greeks_list.append(flat_greeks)
     greeks_df = pd.DataFrame(greeks_list)
@@ -300,22 +287,7 @@ def test_case4(params_list):
         greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
         OptionGreeks.print_greeks_information(greeks)
 
-        flat_greeks = {
-            'delta': greeks['delta'],
-            'gamma': greeks['gamma'],
-            'vega': greeks['vega'],
-            'rho': greeks['rho'],
-            'rho_yield': greeks['rho_yield'],
-            'theta': greeks['theta'],
-
-            'S': greeks['parameters']['S'],
-            'K': greeks['parameters']['K'],
-            'T': greeks['parameters']['T'],
-            'r': greeks['parameters']['r'],
-            'y': greeks['parameters']['y'],
-            'sigma': greeks['parameters']['sigma'],
-            'option_type': greeks['parameters']['option_type']
-        }
+        flat_greeks = convert_greeks_to_flat_greeks(greeks)
 
         greeks_list.append(flat_greeks)
     greeks_df = pd.DataFrame(greeks_list)
@@ -327,6 +299,63 @@ def test_case4(params_list):
         'plot_title': 'Option Greeks Analysis - Spot Price'
     }
     plot_greeks(greeks_df, plot_options)
+
+def test_case5(params_list):
+    greeks_list = []
+    for params in params_list:
+        greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+        OptionGreeks.print_greeks_information(greeks)
+
+        flat_greeks = convert_greeks_to_flat_greeks(greeks)
+
+        greeks_list.append(flat_greeks)
+    greeks_df = pd.DataFrame(greeks_list)
+    greeks_df.to_excel(rf"D:\workspace_python\infinity\dataIntegrator\data\outbound\GreeksAnalysis.xlsx")
+
+    plot_options =  {
+        'plot_axis': 'r',
+        'plot_axis_label': 'rate',
+        'plot_title': 'Option Greeks Analysis - rate'
+    }
+    plot_greeks(greeks_df, plot_options)
+
+def test_case6(params_list):
+    greeks_list = []
+    for params in params_list:
+        greeks = OptionGreeks.calculate_all_greeks(**params, option_type='call')
+        OptionGreeks.print_greeks_information(greeks)
+
+        flat_greeks = convert_greeks_to_flat_greeks(greeks)
+
+        greeks_list.append(flat_greeks)
+    greeks_df = pd.DataFrame(greeks_list)
+    greeks_df.to_excel(rf"D:\workspace_python\infinity\dataIntegrator\data\outbound\GreeksAnalysis.xlsx")
+
+    plot_options =  {
+        'plot_axis': 'T',
+        'plot_axis_label': 'tenor',
+        'plot_title': 'Option Greeks Analysis - tenor'
+    }
+    plot_greeks(greeks_df, plot_options)
+
+def convert_greeks_to_flat_greeks(greeks):
+    flat_greeks = {
+        'delta': greeks['delta'],
+        'gamma': greeks['gamma'],
+        'vega': greeks['vega'],
+        'rho': greeks['rho'],
+        'rho_yield': greeks['rho_yield'],
+        'theta': greeks['theta'],
+
+        'S': greeks['parameters']['S'],
+        'K': greeks['parameters']['K'],
+        'T': greeks['parameters']['T'],
+        'r': greeks['parameters']['r'],
+        'y': greeks['parameters']['y'],
+        'sigma': greeks['parameters']['sigma'],
+        'option_type': greeks['parameters']['option_type']
+    }
+    return flat_greeks
 
 
 # 使用示例
@@ -383,4 +412,35 @@ if __name__ == "__main__":
         for S in range(70, 131, 1)  # 从90到110（包含110），步长为1
     ]
     #test_case4(params_list)
+
+
+    # 测试案例5（短期期权，P346 Table 14.1参数）
+    # 遍历所有可能 rate 价格  0.03 - 0.07
+    params_list = [
+        {
+            'S': 100,
+            'K': 100,
+            'T': 0.25,
+            'r': r / 1000,  # 转换回小数形式
+            'y': 0.03,
+            'sigma': 0.2
+        }
+        for r in range(30, 75, 5)  # 从30到75（对应0.03到0.075），步长为5
+    ]
+    #test_case5(params_list)
+
+    # 测试案例6（短期期权，P346 Table 14.1参数）
+    # 遍历所有可能 tenor 价格  0.03 - 0.07
+    params_list = [
+        {
+            'S': 100,
+            'K': 100,
+            'T': T/100,
+            'r': 0.05,  # 转换回小数形式
+            'y': 0.03,
+            'sigma': 0.2
+        }
+        for T in range(1, 100, 5)  # 从30到75（对应0.03到0.075），步长为5
+    ]
+    test_case6(params_list)
 
