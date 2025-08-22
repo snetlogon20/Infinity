@@ -85,6 +85,8 @@ class OptionGreeks(ABC):
         """格式化输出希腊值"""
         logger.info("Option Greeks:")
 
+        print("期权风险分析基础信息")
+        print("========================================")
         for key, value in greeks.items():
             if key == 'parameters':
                 print(f"Option Type: {value['option_type']}")
