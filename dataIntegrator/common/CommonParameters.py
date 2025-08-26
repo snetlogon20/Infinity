@@ -1,5 +1,8 @@
 import os
 
+from dataIntegrator.common.MyTokens import MyTokens
+
+
 class CommonParameters():
 
     application_name = "infinity_grid"
@@ -16,10 +19,11 @@ class CommonParameters():
     logPath = os.path.join(dataPath,'log')
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
 
-    tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
-    #tuShareToken = "2876ea85cb005fb5fa17c809a98174f2d5aae8b1f830110a5ead6211"  # 咸鱼
+    # tuShareToken = "00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003"  #Samuel
+    tuShareToken = "2876ea85cb005fb5fa17c809a98174f2d5aae8b1f830110a5ead6211"  # 咸鱼
+    # tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.165'
+    clickhouseHostName='192.168.98.170'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
