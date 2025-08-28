@@ -7,6 +7,8 @@ import arviz as az
 from datetime import datetime, timedelta
 import multiprocessing as mp
 
+from dataIntegrator import CommonParameters
+
 # 设置matplotlib支持中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
@@ -16,7 +18,8 @@ warnings.filterwarnings('ignore')
 
 def main():
     # 设置 Tushare token
-    ts.set_token('00fcaf64c13f1a8e58011bb7b07d2016f9c632e7711162c0b95c2003')
+    token = CommonParameters.tuShareToken
+    ts.set_token(token)
     pro = ts.pro_api()
 
     # 选择股票代码（例如：贵州茅台 - 600519.SH）
