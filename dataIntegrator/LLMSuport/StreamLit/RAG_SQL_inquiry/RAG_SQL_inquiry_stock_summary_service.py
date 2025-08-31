@@ -9,7 +9,7 @@ from io import BytesIO
 import base64
 
 from dataIntegrator.common.CustomError import CustomError
-from dataIntegrator.modelService.MonteCarlo.MonteCarlo import MonteCarlo
+from dataIntegrator.modelService.MonteCarlo.MonteCarloRandom import MonteCarloRandom
 from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
 from dataIntegrator.plotService.PlotManager import PlotManager
 from dataIntegrator.utility.SQLUtility import SQLUtility
@@ -52,7 +52,7 @@ class RAG_SQL_inquiry_stock_summary_service(BaseRAGSQLInquiry):
             if response_dict["isMonteCarloRequired"] == "yes":
                 dataFrame = response_dict["results"]
                 simulat_params = response_dict["MonteCarloRequirement"]
-                monteCarlo = MonteCarlo()
+                monteCarlo = MonteCarloRandom()
                 all_line_df = monteCarlo.simulation_multi_series(dataFrame, simulat_params)
 
             return response_dict

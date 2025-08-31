@@ -11,21 +11,6 @@ class CommonLib():
     #def __init__(self, LogLib):
     def __init__(self):
         pass
-        # try:
-        #     self.logger.info("CommonLib __init__ started")
-        #
-        #     self.logger.info("CommonLib __init__ completed")
-        # except Exception as e:
-        #     print('Exception', e)
-        #
-        #     print('==============================================')
-        #     print("%s.%s:" % (CommonLogLib, "__init__"))
-        #     print('Exception: ', e)
-        #     info = traceback.format_exc()
-        #     print(info)
-        #     print('==============================================')
-        #
-        # raise e
 
     @classmethod
     def raise_custom_error(self, error_code, custom_error_message, e=None, log_error=True):
@@ -57,3 +42,9 @@ class CommonLib():
         self.logger.error(info)
         self.logger.error('==============================================')
 
+    @staticmethod
+    def setPandasPrintOptions():
+        import pandas as pd
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.width', 1000)  # 根据你的屏幕宽度调整

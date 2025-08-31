@@ -1,6 +1,11 @@
+import math
+
 import scipy.stats as stats
 import pandas as pd
 import matplotlib.pyplot as plt
+
+from dataIntegrator import CommonLib
+
 
 class BinomialDistribution:
     def __init__(self, n, p):
@@ -37,6 +42,15 @@ class BinomialDistribution:
         float: CDF value at k.
         """
         return stats.binom.cdf(k, self.n, self.p)
+
+    def cdf_manual(self, T, p, x):
+        T = T
+        p = p
+        x = x
+        possibility = ((math.factorial(T) / (math.factorial(x) * math.factorial(T - x))) *
+                       (p ** x) *
+                       (1 - p) ** (T - x))
+        return possibility
 
     def mean(self):
         """
@@ -156,8 +170,74 @@ def test_binomial_distribution_cdf():
     plt.show()
 
 
+def caculate_distribution_for_number_of_exceptions():
+    # P361
+    # 单一值测试
+    T = 250
+    p = 0.01
+    x = 0
+    possibility = ((math.factorial(250) / (math.factorial(x) * math.factorial(T - x))) *
+                   (p ** x) *
+                   (1 - p) ** (250 - x))
+    print(f"{possibility:.30f}")
+
+    # 其实等同于调用 binomial_dist.cdf
+    p = 0.01  # 已知每次成功概率
+    n = 250  # 总实验次数
+    x=range(0,11,1)
+    binomial_dist = BinomialDistribution(n, p)
+    p = binomial_dist.cdf(x)
+    df = pd.DataFrame({'x': x, 'PMF': p})
+    print(df)
+
+    p = 0.01  # 已知每次成功概率
+    n = 250  # 总实验次数
+    x=1
+    p = binomial_dist.cdf_manual(n, p, x)
+    print("--------------", p)
+
+
+    # 循环值测试
+    T = 250
+    p = 0.01
+    x = 0
+    number_of_exceptions = 11
+    for x in range(0, number_of_exceptions):
+        possibility = ((math.factorial(250) / (math.factorial(x) * math.factorial(T - x))) *
+                       (p ** x) *
+                       (1 - p) ** (250 - x))
+        print(rf"expected_number:{x} observation:{p},possibility:{possibility:.6f} ")
+    # 返回dataFrame
+    T = 250
+    p = 0.01
+    x = 0
+    number_of_exceptions = 11
+    data_dict = {}
+    data_dict_list = []
+    cumulative_probability = 0
+    type1_error_rate = 1
+    for x in range(0, number_of_exceptions):
+        possibility = ((math.factorial(T) / (math.factorial(x) * math.factorial(T - x))) *
+                       (p ** x) *
+                       (1 - p) ** (T - x))
+        cumulative_probability = cumulative_probability + possibility
+
+        if x > 0:
+            type1_error_rate = 1 - last_cumulative_probability
+        last_cumulative_probability = cumulative_probability
+
+        data_dict = {'expected_number': x, 'percent': x / T, 'observation': p,
+                     'possibility': possibility, 'cumulative_probability': cumulative_probability,
+                     'type1_error_rate': type1_error_rate}
+        data_dict_list.append(data_dict)
+    df = pd.DataFrame(data_dict_list)
+    CommonLib().setPandasPrintOptions()
+    print(df)
+
+
 if __name__ == "__main__":
     pd.set_option('display.float_format', '{:.6f}'.format)
 
-    test_binomial_distribution_pmf()
-    test_binomial_distribution_cdf()
+    # test_binomial_distribution_pmf()
+    # test_binomial_distribution_cdf()
+    caculate_distribution_for_number_of_exceptions()
