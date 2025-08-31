@@ -1,7 +1,6 @@
 from operator import itemgetter
 
 import pandas as pd
-from parso.python.tree import Class
 
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.financialAnalysis.TrackingError import TrackingError

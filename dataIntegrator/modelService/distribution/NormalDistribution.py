@@ -24,13 +24,13 @@ class NormalDistribution:
         return (1 / (self.std_dev * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((x - self.mean) / self.std_dev) ** 2)
 
     def cdf(self, x, mean=0, std_dev=1):
-        """计算正态分布的累积分布函数"""
+        """计算正态分布的累积分布函数(Cumulative Distribution Function): Percentage -> Z"""
         self.mean = mean
         self.std_dev = std_dev
         return norm.cdf(x, loc=mean, scale=std_dev)
 
     def ppf(self, q, mean=0, std_dev=1):
-        """计算正态分布的分位数（逆CDF）"""
+        """计算正态分布的分位数（Percent Point Function, 逆CDF）: Percentage -> Z"""
         self.mean = mean
         self.std_dev = std_dev
         return norm.ppf(q, loc=self.mean, scale=self.std_dev)
@@ -208,7 +208,7 @@ class NormalDistribution:
 
         return result_boolean, p_value, result
 
-def test_normal_distribution():
+def test_normal_distribution_original():
     normDistribution = NormalDistribution(0, 1)
 
     """初始化测试数据"""
@@ -396,6 +396,7 @@ def test_normal_distribution():
     normalDistribution.if_normal_distribution_bera_with_JB(data, significance_level=0.05)
 
 if __name__ == "__main__":
+    test_normal_distribution_original()
     test_normal_distribution()
     test_hypothesisAnalysis()
     test_parameter_estimation()
