@@ -139,8 +139,42 @@ def main():
 
 
     # 绘制诊断图
-    az.plot_trace(trace)
-    plt.suptitle(f'{ticker} MCMC参数后验分布', fontsize=16)
+    # az.plot_trace(trace)
+    # plt.figure(figsize=(14, 8))  # 增加图形宽度
+    # plt.suptitle(f'{ticker} MCMC参数后验分布', fontsize=12)
+    # plt.title('Information Ratio by Stock Pairs', fontsize=12)
+    # plt.xlabel('Stock Pairs', fontsize=12)
+    # plt.ylabel('Information Ratio', fontsize=12)
+    # plt.xticks(rotation=45, ha='right')  # ha='right' 使标签右对齐，避免重叠
+    # plt.tight_layout()
+    # plt.show()
+    # 绘制诊断图 - 修正这部分代码
+    print("\n绘制MCMC诊断图...")
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    # 迹图 (Trace plots)
+    axes[0, 0].plot(trace.posterior['mu'].values.flatten(), alpha=0.7)
+    axes[0, 0].set_title('Mu Trace Plot')
+    axes[0, 0].set_xlabel('Iteration')
+    axes[0, 0].set_ylabel('Mu Value')
+
+    axes[0, 1].plot(trace.posterior['sigma'].values.flatten(), alpha=0.7, color='orange')
+    axes[0, 1].set_title('Sigma Trace Plot')
+    axes[0, 1].set_xlabel('Iteration')
+    axes[0, 1].set_ylabel('Sigma Value')
+
+    # 后验分布直方图
+    axes[1, 0].hist(trace.posterior['mu'].values.flatten(), bins=30, alpha=0.7, edgecolor='black')
+    axes[1, 0].set_title('Mu Posterior Distribution')
+    axes[1, 0].set_xlabel('Mu Value')
+    axes[1, 0].set_ylabel('Frequency')
+
+    axes[1, 1].hist(trace.posterior['sigma'].values.flatten(), bins=30, alpha=0.7, color='orange', edgecolor='black')
+    axes[1, 1].set_title('Sigma Posterior Distribution')
+    axes[1, 1].set_xlabel('Sigma Value')
+    axes[1, 1].set_ylabel('Frequency')
+
+    plt.suptitle(f'{ticker} MCMC参数后验分布诊断', fontsize=16)
     plt.tight_layout()
     plt.show()
 

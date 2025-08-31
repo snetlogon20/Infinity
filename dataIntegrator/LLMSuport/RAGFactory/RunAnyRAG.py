@@ -2,7 +2,7 @@ from dataIntegrator.LLMSuport.RAGFactory.RAGFactory import RAGFactory
 from dataIntegrator.common.CommonParameters import CommonParameters
 import os
 
-from dataIntegrator.modelService.MonteCarlo.MonteCarlo import MonteCarlo
+from dataIntegrator.modelService.MonteCarlo.MonteCarloRandom import MonteCarloRandom
 from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
 from dataIntegrator.plotService.PlotManager import PlotManager
 from dataIntegrator.utility.FileUtility import FileUtility
@@ -51,7 +51,7 @@ def RAG_SQL_inquiry_stock_summary():
     if response_dict["isMonteCarloRequired"]=="yes" :
         dataFrame =response_dict["results"]
         simulat_params =response_dict["MonteCarloRequirement"]
-        monteCarlo = MonteCarlo()
+        monteCarlo = MonteCarloRandom()
         all_line_df = monteCarlo.simulation_multi_series(dataFrame, simulat_params)
 
 def RAG_SQL_inquiry_stocks_code():

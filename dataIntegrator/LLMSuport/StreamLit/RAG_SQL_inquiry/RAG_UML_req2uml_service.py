@@ -11,7 +11,7 @@ from io import BytesIO
 import base64
 
 from dataIntegrator.common.CustomError import CustomError
-from dataIntegrator.modelService.MonteCarlo.MonteCarlo import MonteCarlo
+from dataIntegrator.modelService.MonteCarlo.MonteCarloRandom import MonteCarlo
 from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
 from dataIntegrator.plotService.PlotManager import PlotManager
 from dataIntegrator.utility.SQLUtility import SQLUtility

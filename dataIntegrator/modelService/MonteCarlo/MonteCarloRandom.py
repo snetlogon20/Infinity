@@ -10,7 +10,7 @@ from dataIntegrator.plotService.LinePlotManager import LinePlotManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
 
-class MonteCarlo:
+class MonteCarloRandom:
     def __init__(self):
         pass
 
@@ -470,7 +470,7 @@ if __name__ == "__main__":
     for simulat_params in simulat_params_list:
         dataFrame = get_dataset(simulat_params['market'], simulat_params['stock'], simulat_params['start_date'],
                                 simulat_params['end_date'])
-        monteCarlo = MonteCarlo()
+        monteCarlo = MonteCarloRandom()
         all_line_df = monteCarlo.simulation_multi_series(dataFrame, simulat_params)
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
