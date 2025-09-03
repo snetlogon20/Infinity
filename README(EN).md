@@ -5,7 +5,7 @@
 **1. Data Integrator**  
 A financial data analytics platform with built-in data extraction, quantitative financial analysis, machine learning, data visualization, and LLM capabilities.  
 - **Feature 1**: Automatically fetch latest financial market data  
-- **Feature 2**: Provide various quantitative modules and numerical analysis  
+- **Feature 2**: Provide various quantitative modules for financial engineering and financial risk management.  
 - **Feature 3**: Offer data visualization capabilities  
 - **Feature 4**: Deliver predictive analytics and financial advisory services based on aggregated data and key financial indicators  
 
