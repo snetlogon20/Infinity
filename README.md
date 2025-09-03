@@ -1,11 +1,11 @@
-# dataIntegrator - snetlogon20
+# DataIntegrator - snetlogon20
 
 #### 介绍
 
 **1. Data Integrater** 
 是一个金融数据分析平台。内置数据抽取平台，量化金融分析、机器学习、数据可视化及LLM 模型。
 - **功能一**：自动获取最新金融市场数据
-- **功能二**：提供各类量化模块及数量分析
+- **功能二**：为金融工程(Financial Engineering)和金融风险管理(FRM - Financial Risk Management)提供各类量化模块及数量分析
 - **功能三**：提供可视化数据展现
 - **功能四**：在数据聚合并计算关键金融指标的基础上，提供大语言分析及金融顾问建议服务。
 
