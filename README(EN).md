@@ -1,4 +1,4 @@
-# dataIntegrator - snetlogon20
+# DataIntegrator - snetlogon20
 
 #### Introduction
 
