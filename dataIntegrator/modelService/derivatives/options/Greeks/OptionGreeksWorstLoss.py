@@ -1,7 +1,7 @@
 import math
 from scipy.stats import norm
 import pandas as pd
-from dataIntegrator.modelService.derivatives.options.OptionGreeks import OptionGreeks
+from dataIntegrator.modelService.derivatives.options.Greeks.OptionGreeks import OptionGreeks
 import matplotlib.pyplot as plt
 
 class OptionGreeksWorstLoss:
