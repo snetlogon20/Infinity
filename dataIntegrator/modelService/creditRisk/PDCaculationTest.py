@@ -18,8 +18,28 @@ def test_caculate_pd_by_yield_lgd():
     pi = PDCaculation().caculate_pd_with_yield(LGD, r, y, tenor)
     print(pi)
 
+def test_caculate_EDF_with_Merton_model():
+    # Page 517 21.2.4 Example
+
+    # 使用自定义参数计算
+    print("\n使用自定义参数计算:")
+    pdCaculation = PDCaculation()
+
+    results = pdCaculation.caculate_EDF_with_Merton_model(
+        Asset_V=100,
+        sigma=0.2,
+        T=1,
+        risk_free_rate=0.1,
+        Bond_Face_Value_K=99.46,
+        S=13.59,
+        Leverage_Rate=0.9
+    )
+    for key, value in results.items():
+        print(f"{key}: {value}")
 
 if __name__ == '__main__':
 
-    test_caculate_pd_by_yield_lgd()
+    #test_caculate_pd_by_yield_lgd()
+
+    test_caculate_EDF_with_Merton_model()
 
