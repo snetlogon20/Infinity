@@ -183,6 +183,9 @@ class VARCalculator:
     #     return results
 
     def plot_var_distribution(self, method: str = 'historical', horizon: int = 1):
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
+
         """
         可视化收益率分布与VaR[1](@ref)
 
