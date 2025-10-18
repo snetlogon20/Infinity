@@ -224,6 +224,38 @@ def test_calculate_probability_by_zHigh_zLow():
 
     return probability, z_value
 
+def test_calculate_probability_by_rate_range():
+    # 假设美联储利率为5.5%, 假设步长为0.25%, 分别结算range(5.5%-3.0%)的概率
+
+    z_high = 6.528/100  # 6.528%
+    z_low = 3/100  # 6%
+    step = 0.25/100
+    sigma = 0.8/100  # 0.8%
+
+    z_low_sequence = np.arange(z_high, z_low - step, -step)  # 注意调整终止值
+    for z_low in z_low_sequence:
+        print("*" * 50)
+        print(f"z_high = {z_high}%")
+        print(f"z_low = {z_low}%")
+        print(f"sigma = {sigma}%")
+        print()
+
+        # 计算概率
+        normalDistribution = NormalDistribution(0, 1)
+        probability, z_value = normalDistribution.calculate_probability_by_zHigh_zLow(z_high, z_low, sigma)
+
+        print("计算结果:")
+        print(f"z值 = ({z_high}% - {z_low}%) / {sigma}% = {z_value:.6f}")
+        print(f"概率 P(Z ≤ -{z_value:.6f}) = {probability:.6f}")
+        print(f"概率值: {probability:.4f} ({probability * 100:.2f}%)")
+
+        # 附加解释
+        print("\n结果解释:")
+        print(f"计算得到的z值为: {z_value:.6f}")
+        print(f"这意味着我们要求计算 P(Z ≤ -{z_value:.6f}) 的概率")
+        print(f"在标准正态分布中，这个概率为: {probability:.6f}/{probability/100}%")
+
+
 
 
 if __name__ == "__main__":
@@ -234,3 +266,4 @@ if __name__ == "__main__":
     test_back_test()
 
     test_calculate_probability_by_zHigh_zLow()
+    test_calculate_probability_by_rate_range()
