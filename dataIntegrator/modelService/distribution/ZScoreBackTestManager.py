@@ -1,6 +1,3 @@
-import math
-from scipy.stats import norm
-
 from dataIntegrator.modelService.distribution.ZScoreEstimation import ZScoreEstimation
 
 
@@ -23,12 +20,12 @@ class ZScoreBackTestManager():
         # 假设检验决策
         if z_observed > z_critical:
             conclusion="拒绝原假设"
-            conclusion_reseason="原假设 p=0.01 可能低估了风险，异常值比例显著高于预期。"
+            conclusion_reseason=rf"原假设 p={p} 可能低估了风险，异常值比例显著高于预期。"
         else:
             conclusion="无法拒绝原假设（Z ≤ Z_critical）"
-            conclusion_reseason ="异常值数量在统计上可接受，原假设 p=0.01 可能成立。"
-        print("结论: 拒绝原假设（Z > Z_critical）")
-        print("原假设 p=0.01 可能低估了风险，异常值比例显著高于预期。")
+            conclusion_reseason =rf"异常值数量在统计上可接受，原假设 p={p} 可能成立。"
+        print(conclusion)
+        print(conclusion_reseason)
 
         # 附加分析：将观察到的 Z 值转换为显著性水平（p-value）
         alpha_observed = estimator.convert_z2alpha(z_observed)
