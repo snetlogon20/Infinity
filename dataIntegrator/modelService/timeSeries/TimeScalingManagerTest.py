@@ -98,5 +98,5 @@ if __name__ == "__main__":
     test2_calculate_scaled_sigma()
     test3_1_calculate_EWMA_eta()
     test3_2_calculate_EWMA_eta_with_log_value()
-    #test3_calculate_EWMA_rolling_eta()
+    test3_calculate_EWMA_rolling_eta()
 
