@@ -115,7 +115,8 @@ class TimeScalingManager:
             r_t_minus_1 = returns[i]
 
             # 根据EWMA公式更新条件方差: b_t = (1-λ)*r_{t-1}^2 + λ*b_{t-1}
-            b_t = (1 - lambda_param) * (r_t_minus_1 ** 2) + lambda_param * b_t_minus_1
+            #b_t = (1 - lambda_param) * (r_t_minus_1 ** 2) + lambda_param * b_t_minus_1
+            b_t = self.calculate_EWMA_eta(ewma_lambda=lambda_param, expected_return = r_t_minus_1, eta_t_minus_1=b_t_minus_1)
 
             # 保存结果
             result['time'].append(times[i])
