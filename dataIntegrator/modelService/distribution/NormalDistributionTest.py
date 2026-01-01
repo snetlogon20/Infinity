@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
 from dataIntegrator.modelService.distribution.NormalDistribution import NormalDistribution
 from dataIntegrator.modelService.statistics.MathmaticManger import MathmaticManager
@@ -226,6 +227,7 @@ def test_calculate_probability_by_zHigh_zLow():
 
 def test_calculate_probability_by_rate_range():
     # 假设美联储利率为5.5%, 假设步长为0.25%, 分别结算range(5.5%-3.0%)的概率
+    # 仿照 p41 中的场景
 
     z_high = 6.528/100  # 6.528%
     z_low = 3/100  # 6%
@@ -233,6 +235,10 @@ def test_calculate_probability_by_rate_range():
     sigma = 0.8/100  # 0.8%
 
     z_low_sequence = np.arange(z_high, z_low - step, -step)  # 注意调整终止值
+
+    X = []
+    Y = []
+
     for z_low in z_low_sequence:
         print("*" * 50)
         print(f"z_high = {z_high}%")
@@ -255,8 +261,21 @@ def test_calculate_probability_by_rate_range():
         print(f"这意味着我们要求计算 P(Z ≤ -{z_value:.6f}) 的概率")
         print(f"在标准正态分布中，这个概率为: {probability:.6f}/{probability/100}%")
 
+        X.append(z_low)
+        Y.append(probability)
 
+    X_desc = sorted(X, reverse=True)
+    Y_desc = sorted(Y, reverse=True)
 
+    # 作图
+    plt.figure(figsize=(10, 6))
+    plt.scatter(X_desc, Y_desc, color='blue', marker='o')
+    plt.xlabel('z_low values')
+    plt.ylabel('Probability')
+    plt.title('Scatter Plot of Probability vs z_low')
+    plt.grid(True)
+    plt.gca().invert_xaxis()  # 反转X轴，使数字从大到小排列
+    plt.show()
 
 if __name__ == "__main__":
     test_normal_distribution_original()
