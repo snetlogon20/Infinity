@@ -436,13 +436,13 @@ class TuShareServiceManager():
         try:
             logger.info("callTuShareService started")
 
-            start_date = "20250101"
-            end_date = "20250806"
+            start_date = "20255101"
+            end_date = "20251231"
             start_quarter = "2024Q1"
             end_quarter = "2025Q1"
 
             param_method_dict = {
-                "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
+                # "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
                 # "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
                 # "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
                 # "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
@@ -455,7 +455,7 @@ class TuShareServiceManager():
                 # "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
                 # "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
                 # "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
-                # "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
+                "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 # "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date}
             }
 

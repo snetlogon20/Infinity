@@ -1,7 +1,7 @@
 import pandas
 from clickhouse_driver import Client as ClickhouseClient
 import akshare as ak
-from pandas import DataFrame
+import sys
 from dataIntegrator.common.CommonParameters import CommonParameters
 from dataIntegrator import CommonLib
 from dataIntegrator.common.FileType import FileType
@@ -10,16 +10,14 @@ logger = CommonLib.logger
 
 class AkShareService(CommonLib):
     jsonString = ""
-    token = CommonParameters.tuShareToken
     clickhouseClient = ClickhouseClient(host=CommonParameters.clickhouseHostName,database=CommonParameters.clickhouseHostDatabase)
 
 
     def __init__(self):
         logger.info("__init__ started")
 
-    @classmethod
-    def getToken(self):
-        return self.token
+        self.ak = ak
+
 
     @classmethod
     def prepareDataFrame(self, ts_code, start_date, end_date):
@@ -93,9 +91,28 @@ class AkShareService(CommonLib):
         return dataFrame
 
     @classmethod
-    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000"):
-        logger.info("saveDateToDisk started")
+    def deleteAkDateFromClickHouse(self, del_sql: str):
+        logger.info("deleteAkDateFromClickHouse started")
+
+        try:
+            self.clickhouseClient.execute(del_sql)
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+        logger.info("deleteAkDateFromClickHouse completed")
+
+        return
 
     @classmethod
-    def saveDateToClickHouse(self):
-        logger.info("saveDateToClickHouse started...")
+    def saveAkDateToClickHouse(self,insert_sql_statement, dataframe: pandas.core.frame.DataFrame):
+        logger.info("saveDataToClickHouse started")
+
+        try:
+            data = dataframe.to_dict('records')
+            self.clickhouseClient.execute(insert_sql_statement, data)
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+        logger.info("saveDataToClickHouse completed")
+
+        return
