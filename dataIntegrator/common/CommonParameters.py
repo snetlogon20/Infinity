@@ -1,5 +1,5 @@
 import os
-
+import datetime
 from dataIntegrator.common.MyTokens import MyTokens
 
 
@@ -7,6 +7,7 @@ class CommonParameters():
 
     application_name = "infinity_grid"
     default_time_zone = 'Asia/Shanghai'
+    today = datetime.date.today().strftime('%Y%m%d')
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
     rag_configuration_path = os.path.join(basePath, 'LLMSuport', 'RAGFactory', 'configurations')
@@ -21,7 +22,7 @@ class CommonParameters():
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.170'
+    clickhouseHostName='192.168.98.172'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {

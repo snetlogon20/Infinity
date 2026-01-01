@@ -120,3 +120,4 @@ plantuml==0.3.0
 prefect==3.3.4
 pymc==5.25.1
 py_vollib==1.0.1
+akshare==1.18.3
