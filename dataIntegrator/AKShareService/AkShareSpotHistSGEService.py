@@ -11,8 +11,8 @@ class AkShareSpotHistSGEService(AkShareService):
         logger.info("prepareData started")
 
         try:
-            self.dataFrame = self.ak.spot_hist_sge(symbol='Au99.99')
-            self.dataFrame.columns = [
+            dataFrame = self.ak.spot_hist_sge(symbol='Au99.99')
+            dataFrame.columns = [
                 'date',
                 'open',
                 'close',
@@ -24,7 +24,7 @@ class AkShareSpotHistSGEService(AkShareService):
             raise e
 
         logger.info("prepareData completed")
-        return self.dataFrame
+        return dataFrame
 
     @classmethod
     def saveDateToClickHouse(self, dataFrame):
