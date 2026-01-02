@@ -35,6 +35,12 @@ class AkShareSpotHistSGEService(AkShareService):
             if 'date' in dataFrame.columns:
                 dataFrame['date'] = dataFrame['date'].astype(str)
 
+            # 按日期排序确保计算正确
+            dataFrame = dataFrame.sort_values('date').reset_index(drop=True)
+
+            # 计算涨跌幅：(当前收盘价 - 前一日收盘价) / 前一日收盘价
+            dataFrame['pct_change'] = dataFrame['close'].pct_change() * 100
+
             insert_sql = "INSERT INTO indexsysdb.df_akshare_spot_hist_sge VALUES"
             self.saveAkDateToClickHouse(insert_sql, dataFrame)
         except Exception as e:
