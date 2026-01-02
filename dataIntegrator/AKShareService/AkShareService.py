@@ -24,6 +24,10 @@ class AkShareService(CommonLib):
         logger.info("prepareData started")
 
     @classmethod
+    def transformDataFrame(self, dataFrame: pandas.core.frame.DataFrame):
+        logger.info("transformDataFrame started")
+
+    @classmethod
     def convertDataFrame2JSON(self, dataFrame: pandas.core.frame.DataFrame, orient='table'):
         logger.info("prepareData started")
 
