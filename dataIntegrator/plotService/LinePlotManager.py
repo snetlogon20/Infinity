@@ -62,7 +62,9 @@ class LinePlotManager(PlotManagerSuper):
             ax.set_xticks(data_frame[PlotX])
             ax.grid(True)
 
-            ax.legend(loc='best')
+            # 只有当有标签时才显示图例
+            if ax.get_legend_handles_labels()[0]:
+                ax.legend(loc='best')
 
             # 显示图表
             if CommonParameters.IS_STREAMLIT_ON:

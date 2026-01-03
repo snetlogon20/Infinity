@@ -1,13 +1,10 @@
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.TuShareService.TuShareService import TuShareService
 from clickhouse_driver import Client as ClickhouseClient
-import sys
 import pandas as pd
 
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-#class ClickhouseService(TuShareService):
 class ClickhouseService:
 
     clickhouseClient = ClickhouseClient(
@@ -60,43 +57,100 @@ class ClickhouseService:
             )
         logger.info("SQL execution completed")
 
-if __name__ == "__main__":
-    # Example DataFrames
-    # queryStatement = """select cn_money_supply.m1  as ml
-    #                         from indexsysdb.df_sys_calendar calendar
-    #                         left join df_tushare_shibor_daily shibor_daily
-    #                         on calendar.trade_date  = shibor_daily.trade_date
-    #                         left join indexsysdb.cn_money_supply cn_money_supply
-    #                         on SUBSTRING(calendar.trade_date,1,6) = cn_money_supply.trade_date
-    #                         left join indexsysdb.df_tushare_cn_gdp cn_gdp
-    #                         on calendar.trade_year || 'Q' || calendar.quarter    = cn_gdp.quarter
-    #                         where CAST(calendar.trade_year AS BIGINT)  >= '2018'
-    #                         order by calendar.trade_date"""
-    # columns = ['ml']
-    # clickhouseService = ClickhouseService()
-    # result = clickhouseService.getDataFrame(queryStatement, columns)
-    # print(result)
+
+    @classmethod
+    def save_dataframe_to_clickhouse(cls, dataframe, table_name, database='indexsysdb'):
+        """
+        将带有列名的 DataFrame 保存到 ClickHouse
+
+        Args:
+            dataframe: 要保存的 DataFrame
+            table_name: 目标表名
+            database: 数据库名，默认为 'indexsysdb'
+
+        Returns:
+            bool: 保存成功返回 True，失败抛出异常
+        """
+        logger.info(f"Saving DataFrame to ClickHouse table: {database}.{table_name}")
+
+        try:
+            # 检查表是否存在
+            check_table_sql = f"""
+            SELECT name 
+            FROM system.tables 
+            WHERE database = '{database}' AND name = '{table_name}'
+            """
+            table_exists = cls.clickhouseClient.execute(check_table_sql)
+
+            if not table_exists:
+                # 表不存在，创建表
+                create_table_sql = cls._generate_create_table_sql(dataframe, table_name, database)
+                cls.execute_sql(create_table_sql)
+                logger.info(f"Created new table: {database}.{table_name}")
+            else:
+                logger.info(f"Table already exists: {database}.{table_name}")
+
+            # 准备插入数据
+            # 将 DataFrame 转换为元组列表
+            values = [tuple(row) for row in dataframe.values]
+
+            # 构建插入 SQL
+            columns_str = ', '.join(dataframe.columns)
+            placeholders = ', '.join(['%s'] * len(dataframe.columns))
+            insert_sql = f"INSERT INTO {database}.{table_name} ({columns_str}) VALUES"
+
+            # 执行批量插入
+            cls.clickhouseClient.execute(insert_sql, values)
+
+            logger.info(f"Successfully saved {len(dataframe)} rows to {database}.{table_name}")
+            return True
+
+        except Exception as e:
+            raise commonLib.raise_custom_error(
+                error_code="000103",
+                custom_error_message=f"Failed to save DataFrame to ClickHouse table: {database}.{table_name}",
+                e=e
+            )
 
 
-    queryStatement = """SELECT AVG(pct_change) AS average_return
-    FROM indexsysdb.df_tushare_us_stock_daily
-    WHERE ts_code = 'C' AND
-    trade_date >= '20241215' AND
-    trade_date <= '20241216'"""
-    clickhouseService = ClickhouseService()
-    result = clickhouseService.getDataFrameWithoutColumnsName(queryStatement)
-    print(result)
+    @classmethod
+    def _generate_create_table_sql(cls, dataframe, table_name, database):
+        """
+        根据 DataFrame 结构生成 CREATE TABLE 语句
 
-    # create_table_sql = """
-    # CREATE TABLE IF NOT EXISTS test_table (
-    #     id UInt32,
-    #     name String
-    # ) ENGINE = Memory
-    # """
-    # clickhouseService = ClickhouseService()
-    # clickhouseService.execute_sql(create_table_sql)
+        Args:
+            dataframe: 源 DataFrame
+            table_name: 表名
+            database: 数据库名
 
-    # # 示例：删除表
-    # clickhouseService = ClickhouseService()
-    # drop_table_sql = "DROP TABLE IF EXISTS test_table"
-    # clickhouseService.execute_sql(drop_table_sql)
+        Returns:
+            str: CREATE TABLE 语句
+        """
+        columns_definitions = []
+
+        for col_name in dataframe.columns:
+            col_dtype = dataframe[col_name].dtype
+
+            # 根据 pandas 数据类型映射到 ClickHouse 类型
+            if 'int' in str(col_dtype):
+                ch_type = 'Int64'
+            elif 'float' in str(col_dtype):
+                ch_type = 'Float64'
+            elif 'datetime' in str(col_dtype) or 'date' in str(col_dtype).lower():
+                ch_type = 'Date'  # 或者 'DateTime' 根据需要
+            else:
+                ch_type = 'String'
+
+            columns_definitions.append(f"{col_name} {ch_type}")
+
+        columns_str = ',\n    '.join(columns_definitions)
+
+        create_sql = f"""
+        CREATE TABLE {database}.{table_name} (
+            {columns_str}
+        )
+        ENGINE = MergeTree()
+        ORDER BY tuple()
+        """
+
+        return create_sql

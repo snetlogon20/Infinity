@@ -1,3 +1,5 @@
+import pandas
+
 from dataIntegrator import CommonLib
 from dataIntegrator.AKShareService.AkShareService import AkShareService
 import sys
@@ -27,8 +29,8 @@ class AkShareSpotHistSGEService(AkShareService):
         return dataFrame
 
     @classmethod
-    def saveDateToClickHouse(self, dataFrame):
-        logger.info("saveDateToClickHouse started")
+    def transformDataFrame(self, dataFrame: pandas.core.frame.DataFrame):
+        logger.info("transformData started")
 
         try:
             # 数据预处理：转换日期列
@@ -41,6 +43,18 @@ class AkShareSpotHistSGEService(AkShareService):
             # 计算涨跌幅：(当前收盘价 - 前一日收盘价) / 前一日收盘价
             dataFrame['pct_change'] = dataFrame['close'].pct_change() * 100
 
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+
+        logger.info("transformData completed")
+        return dataFrame
+
+    @classmethod
+    def saveDateToClickHouse(self, dataFrame):
+        logger.info("saveDateToClickHouse started")
+
+        try:
             insert_sql = "INSERT INTO indexsysdb.df_akshare_spot_hist_sge VALUES"
             self.saveAkDateToClickHouse(insert_sql, dataFrame)
         except Exception as e:
