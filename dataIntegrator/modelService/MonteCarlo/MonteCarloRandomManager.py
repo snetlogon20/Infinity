@@ -1,5 +1,4 @@
 import pandas
-from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandom import MonteCarloRandom
 
 

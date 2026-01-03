@@ -1,9 +1,7 @@
-import pandas
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
-from dataIntegrator.modelService.MonteCarlo.MonteCarloRandom import MonteCarloRandom
+import pandas as pd
 
-
-class InquiryManager:
+class FreeInquiryManager:
 
     @classmethod
     def get_tushare_stock_dataset(cls, market, stock, start_date, end_date):
@@ -55,6 +53,19 @@ class InquiryManager:
         clickhouseService = ClickhouseService()
         dataFrame = clickhouseService.getDataFrameWithoutColumnsName(sql)
 
+        # 尝试将数值列转换为数值类型
+        if market == "US":
+            numeric_columns = ['close_point', 'open_point', 'high_point', 'low_point',
+                               'pre_close', 'change_point', 'pct_change', 'vol', 'amount',
+                               'vwap', 'turnover_ratio', 'total_mv', 'pe', 'pb']
+        elif market == "CN":
+            numeric_columns = ['open', 'high', 'low', 'close', 'pre_close',
+                               'change', 'pct_chg', 'vol', 'amount']
+
+        for col in numeric_columns:
+            if col in dataFrame.columns:
+                dataFrame[col] = pd.to_numeric(dataFrame[col], errors='coerce')
+
         if market == "US":
             ax_line = dataFrame.plot.line(x='trade_date', y='close_point')
             ax_scatter = dataFrame.plot.scatter(x='trade_date', y='pct_change')
@@ -86,11 +97,11 @@ class InquiryManager:
         clickhouseService = ClickhouseService()
         dataFrame = clickhouseService.getDataFrameWithoutColumnsName(sql)
 
-        ax_line = dataFrame.plot.line(x='date', y='close')
-        ax_scatter = dataFrame.plot.scatter(x='date', y='close')
-
-        ax_line.set_title(rf'Stock Close Point: {market}-{stock} Between:{start_date} ~ {end_date}')
-        ax_scatter.set_title(rf'Stock Change Volatility: {market}-{stock} Between:{start_date} ~ {end_date}')
+        # ax_line = dataFrame.plot.line(x='date', y='close')
+        # ax_scatter = dataFrame.plot.scatter(x='date', y='close')
+        #
+        # ax_line.set_title(rf'Stock Close Point: {market}-{stock} Between:{start_date} ~ {end_date}')
+        # ax_scatter.set_title(rf'Stock Change Volatility: {market}-{stock} Between:{start_date} ~ {end_date}')
 
         return dataFrame
 
@@ -98,21 +109,15 @@ class InquiryManager:
     def get_akshare_treasury_yield_dataset(cls, market, stock, start_date, end_date):
 
         sql = rf"""
-                SELECT trade_date, m1 
-                FROM indexsysdb.df_tushare_us_treasury_yield_cruve
-                where trade_date>='20230809'
+                SELECT trade_date, tenor_1y 
+                FROM indexsysdb.df_tushare_shibor_lpr_daily
+                --where trade_date>='20230809'
                 """
 
         clickhouseService = ClickhouseService()
         dataFrame = clickhouseService.getDataFrameWithoutColumnsName(sql)
 
         # 计算涨跌幅：(当前收盘价 - 前一日收盘价) / 前一日收盘价
-        dataFrame['pct_change'] = dataFrame['m1'].pct_change() * 100
-
-        ax_line = dataFrame.plot.line(x='trade_date', y='m1')
-        ax_scatter = dataFrame.plot.scatter(x='trade_date', y='pct_change')
-
-        ax_line.set_title(rf'Stock Close Point: {market}-{stock} Between:{start_date} ~ {end_date}')
-        ax_scatter.set_title(rf'Stock Change Volatility: {market}-{stock} Between:{start_date} ~ {end_date}')
+        dataFrame['pct_change'] = dataFrame['tenor_1y'].pct_change() * 100
 
         return dataFrame

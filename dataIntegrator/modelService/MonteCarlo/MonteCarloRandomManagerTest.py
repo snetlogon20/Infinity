@@ -1,4 +1,4 @@
-from dataIntegrator.inquiryService.InquiryManager import InquiryManager
+from dataIntegrator.analysisService.FreeInquiryManager import InquiryManager
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomManager import MonteCarloRandomManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
