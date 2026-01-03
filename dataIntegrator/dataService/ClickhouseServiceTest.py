@@ -73,7 +73,7 @@ class ClickhouseServiceTest:
 
         # 保存到 ClickHouse
         clickhouse_service = ClickhouseService()
-        result = clickhouse_service.save_dataframe_to_clickhouse(df, 'my_table')
+        result = clickhouse_service.save_dataframe_to_clickhouse(df, 'test_my_table')
         print(f"DataFrame saved successfully: {result}")
         return result
 
