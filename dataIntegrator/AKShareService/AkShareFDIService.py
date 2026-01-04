@@ -1,3 +1,5 @@
+import pandas
+
 from dataIntegrator import CommonLib
 from dataIntegrator.AKShareService.AkShareService import AkShareService
 import sys
@@ -10,9 +12,20 @@ class AkShareFDIService(AkShareService):
         logger.info("prepareData started")
 
         try:
-            # 使用 akshare 获取 FDI 数据 - 根据接口示例，使用正确的API
-            import akshare as ak
-            dataFrame = ak.macro_china_fdi()
+            dataFrame = self.ak.macro_china_fdi()
+
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+
+        logger.info("prepareData completed")
+        return dataFrame
+
+    @classmethod
+    def transformDataFrame(self, dataFrame: pandas.core.frame.DataFrame):
+        logger.info("transformData started")
+
+        try:
 
             # 重命名列以匹配英文字段名
             # 原始列名: ['月份', '当月', '当月-同比增长', '当月-环比增长', '累计', '累计-同比增长']
@@ -57,12 +70,11 @@ class AkShareFDIService(AkShareService):
 
             # 将整个DataFrame中的NaN值转换为0
             dataFrame = dataFrame.fillna(0)
-
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-        logger.info("prepareData completed")
+        logger.info("transformData completed")
         return dataFrame
 
     def saveDateToClickHouse(self, dataFrame):
