@@ -71,6 +71,7 @@ def test_draw_plot_with_SQL_data():
         result['df_sys_calendar__trade_date'] = range(len(result))
     result = result.corr()
 
+
     # 创建测试参数字典
     param_dict = {
         "isPlotRequired": "yes",
