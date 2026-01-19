@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 import streamlit as st
 from dataIntegrator import CommonLib, CommonParameters
@@ -6,6 +8,7 @@ from dataIntegrator.plotService.PlotManagerSuper import PlotManagerSuper
 
 logger = CommonLib.logger
 commonLib = CommonLib()
+
 
 class LinePlotManager(PlotManagerSuper):
 
@@ -51,13 +54,13 @@ class LinePlotManager(PlotManagerSuper):
             for item in split_PlotY_list:
                 PlotY_str = item.strip()
                 #ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o', label=PlotY_str)
-                ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o')
+                ax.plot(data_frame[PlotX], data_frame[PlotY_str], marker='o',label=PlotY_str)
 
             # 设置图表标题和坐标轴标签
             logger.info(rf"设置图表标题和坐标轴标签")
             ax.set_title(PlotTitle)
             ax.set_xlabel(xlabel)
-            plt.xticks(rotation=45)
+            plt.xticks(rotation=90)
             ax.set_ylabel(ylabel)
             ax.set_xticks(data_frame[PlotX])
             ax.grid(True)
@@ -75,5 +78,3 @@ class LinePlotManager(PlotManagerSuper):
                 plt.show()
         except Exception as e:
             raise commonLib.raise_custom_error(error_code="000102",custom_error_message=rf"Draw plot failed", e=e)
-
-

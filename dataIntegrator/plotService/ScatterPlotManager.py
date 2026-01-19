@@ -52,7 +52,8 @@ class ScatterPlotManager(PlotManagerSuper):
             split_PlotY_list = PlotY.split(',')
             for item in split_PlotY_list:
                 PlotY_str = item.strip()
-                ax.scatter(data_frame[PlotX], data_frame[PlotY_str], label=PlotY_str)  # 绘制散点图
+                #ax.scatter(data_frame[PlotX], data_frame[PlotY_str], label=PlotY_str)  # 绘制散点图
+                ax.scatter(data_frame[PlotX], data_frame[PlotY_str], marker='o',label=PlotY_str)
 
             # 设置图表标题和坐标轴标签
             logger.info(rf"设置图表标题和坐标轴标签")

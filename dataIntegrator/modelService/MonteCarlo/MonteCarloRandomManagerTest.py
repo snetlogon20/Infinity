@@ -1,4 +1,4 @@
-from dataIntegrator.analysisService.FreeInquiryManager import InquiryManager
+from dataIntegrator.analysisService.InquiryManager import InquiryManager
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomManager import MonteCarloRandomManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
@@ -315,5 +315,4 @@ if __name__ == "__main__":
     # monteCarloTest.test_multi_stock_multi_series_lognormal_distribution()
 
     # monteCarloTest.test_multi_series_lognormal_distribution_sge()
-
     monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()

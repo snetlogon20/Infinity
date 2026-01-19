@@ -22,7 +22,7 @@ class CommonParameters():
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.172'
+    clickhouseHostName='192.168.98.173'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {

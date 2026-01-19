@@ -129,3 +129,11 @@ class InquiryManager:
         dataFrame['pct_change'] = dataFrame['m1'].pct_change() * 100
 
         return dataFrame
+
+    @classmethod
+    def get_sql_dataset(cls, sql):
+
+        clickhouseService = ClickhouseService()
+        dataFrame = clickhouseService.getDataFrameWithoutColumnsName(sql)
+
+        return dataFrame

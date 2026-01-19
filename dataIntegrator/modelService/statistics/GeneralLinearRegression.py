@@ -158,10 +158,11 @@ class GeneralLinearRegression:
 
         param_dict["result"] = param_dict_in.get("results", "None")
 
-        param_dict["plotType"] = param_dict_in.get('linearRequirement', {}).get("plotType", "lineChart")
-        param_dict["xColumns"] = param_dict_in.get('linearRequirement', {}).get("xColumns", "None")
-        param_dict["yColumn"] = param_dict_in.get('linearRequirement', {}).get("yColumn", "None")
-        param_dict["PlotXColumn"] = param_dict_in.get('linearRequirement', {}).get("PlotXColumn", "None")
+        param_dict["plotType"] = param_dict_in.get("plotType", "lineChart")
+        param_dict["xColumns"] = param_dict_in.get("xColumns", "None")
+        param_dict["yColumn"] = param_dict_in.get("yColumn", "None")
+
+        param_dict["PlotXColumn"] = param_dict_in.get("PlotXColumn", "None")
         param_dict["PlotTitle"] = param_dict_in.get('linearRequirement', {}).get("PlotTitle", "None")
         param_dict["xlabel"] = param_dict_in.get('linearRequirement', {}).get("xlabel", "None")
         param_dict["ylabel"] = param_dict_in.get('linearRequirement', {}).get("ylabel", "None")
@@ -202,61 +203,33 @@ class GeneralLinearRegression:
         linePlotManager.draw_plot(param_dict)
 
 
-def load_param_dict():
-
-    response_dict = {}
-
-    sql = """SELECT 
-        df_sys_calendar.trade_date AS df_sys_calendar__trade_date,
-        df_tushare_us_stock_daily.pct_change AS df_tushare_us_stock_daily__pct_change,
-        df_tushare_shibor_daily.tenor_on AS df_tushare_shibor_daily__tenor_on,
-        df_tushare_stock_daily.pct_chg AS df_tushare_stock_daily__pct_chg
-    FROM
-        df_sys_calendar
-    LEFT JOIN df_tushare_us_stock_daily 
-        ON df_sys_calendar.trade_date = df_tushare_us_stock_daily.trade_date 
-        AND df_tushare_us_stock_daily.ts_code = 'C'
-    LEFT JOIN df_tushare_shibor_daily 
-        ON df_sys_calendar.trade_date = df_tushare_shibor_daily.trade_date
-    LEFT JOIN df_tushare_stock_daily 
-        ON df_sys_calendar.trade_date = df_tushare_stock_daily.trade_date 
-        AND df_tushare_stock_daily.ts_code = '002093.SZ'
-    WHERE 
-        df_sys_calendar.trade_date BETWEEN '20241202' AND '20241231'
+def test_perform_linear_regression_single_feature():
     """
+    测试单个特征的线性回归
+    """
+    # 创建测试数据
+    X_data = np.random.rand(50, 1)
+    y_data = 2 * X_data.ravel() + np.random.normal(0, 0.1, 50)
 
-    clickhouseService = ClickhouseService()
-    result = clickhouseService.getDataFrameWithoutColumnsName(sql)
+    df = pd.DataFrame(X_data, columns=['feature1'])
+    df['target'] = y_data
 
-    xColumns = [
-        "df_tushare_shibor_daily__tenor_on",
-        "df_tushare_stock_daily__pct_chg",
-    ]
+    param_dict = {
+        'xColumns': "'feature1'",
+        'yColumn': 'target',
+        'result': df,
+        'if_run_test': 'false',
+        'X_given_test_source_path': None
+    }
 
-    yColumn = "df_tushare_us_stock_daily__pct_change"
+    response_dict = GeneralLinearRegression.perform_linear_regression(param_dict)
 
-    response_dict["sql"] = sql
-    response_dict["result"] = result
-    response_dict["xColumns"] = xColumns
-    response_dict["yColumn"] = yColumn
+    assert 'r2' in response_dict
+    assert 'coefficients' in response_dict
+    assert len(response_dict['coefficients']) == 1
 
-    return response_dict
+    print("单特征测试通过！")
 
-def init():
-    pd.set_option('display.max_rows', None)  # 设置打印所有行
-    pd.set_option('display.max_columns', None)  # 设置打印所有列
-    pd.set_option('display.width', None)  # 自动检测控制台的宽度
-    pd.set_option('display.max_colwidth', None)  # 设置列的最大宽度
-
-
+# 运行测试
 if __name__ == "__main__":
-    # 根据输入的 股票代码逐个计算线性回归
-    init()
-
-    response_dict = load_param_dict()
-
-    generalLinearRegression = GeneralLinearRegression()
-    generalLinearRegression.run_linear_regression_by_AI(response_dict)
-
-    # scatterPlotManager = ScatterPlotManager()
-    # scatterPlotManager.draw_plot(param_dict)
+    test_perform_linear_regression_single_feature()
