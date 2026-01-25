@@ -151,8 +151,9 @@ class QuickInquiryManagerTest:
 
         '''---Step 1 先看线图----'''
         ax_line = dataFrame.plot.line(x='df_sys_calendar__trade_date', y='df_akshare_spot_hist_sge__pct_chg')
-        ax_scatter = dataFrame.plot.scatter(x='df_sys_calendar__trade_date', y='df_akshare_spot_hist_sge__pct_chg')
         ax_line.set_title(rf'111')
+
+        ax_scatter = dataFrame.plot.scatter(x='df_sys_calendar__trade_date', y='df_akshare_spot_hist_sge__pct_chg')
         ax_scatter.set_title(rf'222')
 
         '''---Step 2 再看点图----'''
