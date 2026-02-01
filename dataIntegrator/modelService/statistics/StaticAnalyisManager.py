@@ -134,15 +134,18 @@ class StaticAnalysisManager:
         plt.tight_layout()
         plt.show()
 
-    def analyze(self, sql, stats_to_show=['均值', '标准差', '均值/标准差', '偏度', '峰度']):
+    def analyze_with_sql(self, sql, stats_to_show=['均值', '标准差', '均值/标准差', '偏度', '峰度']):
         """
         执行完整的分析流程
         """
         # 获取数据
-        df = self.get_data_from_sql(sql)
+        dataframe = self.get_data_from_sql(sql)
+        self.analyze_with_df(dataframe, stats_to_show)
+
+    def analyze_with_dataframe(self, dataframe, stats_to_show=['均值', '标准差', '均值/标准差', '偏度', '峰度']):
 
         # 计算统计量
-        statistics = self.calculate_basic_statistics(df)
+        statistics = self.calculate_basic_statistics(dataframe)
 
         # 显示统计量
         self.display_statistics(statistics)
