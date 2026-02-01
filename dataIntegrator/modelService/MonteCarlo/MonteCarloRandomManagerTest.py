@@ -33,7 +33,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'normal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_normal", "xlsx")
@@ -55,7 +56,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -76,7 +79,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -97,7 +102,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -118,7 +125,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -143,7 +152,8 @@ class MonteCarloRandomTest:
         dataFrame = inquiryManager.get_tushare_stock_dataset(simulat_params['market'], simulat_params['stock'], simulat_params['start_date'],
                                      simulat_params['end_date'])
 
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -252,7 +262,9 @@ class MonteCarloRandomTest:
             dataFrame = inquiryManager.get_tushare_stock_dataset(simulat_params['market'], simulat_params['stock'],
                                                             simulat_params['start_date'],
                                                             simulat_params['end_date'])
-            all_line_df = MonteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(
+                dataFrame, simulat_params)
+            monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
             # 写入excel
             file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
             all_line_df.to_excel(file_full_name)
@@ -273,7 +285,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -294,7 +308,9 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -305,7 +321,7 @@ if __name__ == "__main__":
 
     # 执行各个测试案例
     # monteCarloTest.test_single_line_normal_distribute()
-    # monteCarloTest.test_single_line_lognormal_distribute()
+    monteCarloTest.test_single_line_lognormal_distribute()
     # monteCarloTest.test_multi_series_normal_distribution_citi()
     # monteCarloTest.test_multi_series_lognormal_distribution_citi()
     # monteCarloTest.test_multi_series_lognormal_distribution_jpm()
@@ -314,5 +330,5 @@ if __name__ == "__main__":
     # monteCarloTest.test_multi_series_lognormal_distribution_lvcw()
     # monteCarloTest.test_multi_stock_multi_series_lognormal_distribution()
 
-    # monteCarloTest.test_multi_series_lognormal_distribution_sge()
-    monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()
+    monteCarloTest.test_multi_series_lognormal_distribution_sge()
+    # monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()
