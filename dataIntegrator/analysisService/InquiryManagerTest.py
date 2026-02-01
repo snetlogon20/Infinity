@@ -1,10 +1,12 @@
 from dataIntegrator.analysisService.InquiryManager import InquiryManager
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomManager import MonteCarloRandomManager
 from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
+from dataIntegrator.modelService.statistics.StaticAnalyisManager import StaticAnalysisManager
 from dataIntegrator.plotService.LinePlotManager import LinePlotManager
 from dataIntegrator.plotService.ScatterPlotManager import ScatterPlotManager
 import matplotlib.pyplot as plt
 import seaborn as sns
+import re
 
 class QuickInquiryManagerTest:
     def __init__(self):
@@ -122,6 +124,8 @@ class QuickInquiryManagerTest:
 
     def test_getdata_SQL_tushare_stock_usstock_gold_cn(self):
         """测试获取中国股票数据集"""
+
+        '''---Step 0 参数区----'''
         sql="""
             SELECT 
                 df_sys_calendar.trade_date AS df_sys_calendar__trade_date,
@@ -146,6 +150,7 @@ class QuickInquiryManagerTest:
                 df_sys_calendar.trade_date BETWEEN '20241202' AND '20241231'
             order by df_sys_calendar__trade_date  
         """
+        columns_to_drop = ['df_sys_calendar__trade_date']
 
         dataFrame = InquiryManager().get_sql_dataset(sql)
 
@@ -178,7 +183,17 @@ class QuickInquiryManagerTest:
 
         plt.show()
 
-        '''---Step 4 看蒙特卡罗模拟 ----'''
+        '''---Step 4 基本统计指标 ----'''
+        dataFrame_for_correlation = dataFrame.copy()
+        analyzer = StaticAnalysisManager()
+
+        # 删除名为 "trade_date" 的列
+        for col in columns_to_drop:
+            if col in dataFrame_for_correlation.columns:
+                dataFrame_for_correlation = dataFrame_for_correlation.drop(columns=[col])
+        statistics = analyzer.analyze_with_dataframe(dataFrame_for_correlation)
+
+        '''---Step 5 看蒙特卡罗模拟 ----'''
         monteCarloRandomManager = MonteCarloRandomManager()
 
         simulat_params = {
@@ -191,9 +206,11 @@ class QuickInquiryManagerTest:
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
         #all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
 
 
-        '''---Step 5 regression test ----'''
+        '''---Step 6 regression test ----'''
         '''此处放置你需要回归使用时的X轴'''
         response_dict = {}
         xColumns = "df_tushare_shibor_daily__tenor_on, df_tushare_stock_daily__pct_chg"

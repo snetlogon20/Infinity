@@ -87,7 +87,7 @@ class MonteCarloRandom:
         # 结果存储
         all_lines = []
         final_values = []
-        plt.figure(figsize=(20, 8))
+        #plt.figure(figsize=(20, 8))
 
         # 模拟主循环
         for line in range(series):
@@ -111,63 +111,66 @@ class MonteCarloRandom:
             # 存储结果
             all_lines.extend(zip([line] * len(x), x, y))
             final_values.append(y[-1])
-            plt.plot(x, y, alpha=0.5)
+            #plt.plot(x, y, alpha=0.5)
 
         # 风险值计算
         final_values = sorted(final_values)
         var_index = int(alpha * series)
-        var = final_values[var_index]
+        var_lower_bound = final_values[var_index]
 
-        #股票信息
-        market = simulat_params.get("market","Unknown")
-        stock = simulat_params.get("stock","Unknown")
-        start_date = simulat_params.get("start_date","Unknown")
-        end_date = simulat_params.get("end_date", "Unknown")
+        # 计算上界VaR (1-alpha分位数)
+        upper_alpha = 1 - alpha
+        var_upper_index = int(upper_alpha * series)
+        var_upper_bound = final_values[var_upper_index]
 
-        # # 图表标注
-        # plt.axhline(var, color='red', linestyle='--',
-        #             label=f'VaR ({alpha * 100}%): {var:.2f}')
-        # plt.title(f"Monte Carlo Simulation ({dist_type})\n"
-        #           f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
-        #           f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
-        #           )
-        # plt.legend()
-        # plt.show()
-        #
-        # # 转换为DataFrame
-        # df = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
-        # return df
+        return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound
 
-        dataframe = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
-        df_pivot_MC = dataframe.pivot(index='Step', columns='Path', values='Value').reset_index(drop=True)
-        df_pivot_MC.columns = [f"path{col}" for col in df_pivot_MC.columns]
-        print(df_pivot_MC)
+        #cls.drow_plot(S, all_lines, dist_type, series, simulat_params, stats, times)
 
-        df_pivot_MC.reset_index(inplace=True)
-        df_pivot_MC['step'] = df_pivot_MC.index
-        df_pivot_MC = df_pivot_MC.reindex(columns=['step'] + [col for col in df_pivot_MC.columns if col != 'step'])
 
-        column_names = df_pivot_MC.columns.tolist()
-        path_columns = [col for col in column_names if col.startswith ("path")]
-        yColumn = ",".join(path_columns)
 
-        param_dict = {}
-        param_dict["isPlotRequired"] = "yes"
-        param_dict["results"] = df_pivot_MC
-
-        param_dict["plotRequirement"] = {}
-
-        param_dict["plotRequirement"]["PlotX"] = "index"
-        param_dict["plotRequirement"]["PlotY"] = yColumn
-
-        param_dict["plotRequirement"]["plotTitle"] =  f"Monte Carlo Simulation ({dist_type})\n"
-        f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
-        f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
-
-        param_dict["plotRequirement"]["xlabel"] = "days"
-        param_dict["plotRequirement"]["ylabel"] = "points"
-        linePlotManager = LinePlotManager()
-        linePlotManager.draw_plot(param_dict)
-
-        return dataframe
+    # @classmethod
+    # def drow_plot(cls, S, all_lines, dist_type, series, simulat_params, stats, times):
+    #     # 股票信息
+    #     market = simulat_params.get("market", "Unknown")
+    #     stock = simulat_params.get("stock", "Unknown")
+    #     start_date = simulat_params.get("start_date", "Unknown")
+    #     end_date = simulat_params.get("end_date", "Unknown")
+    #     # # 图表标注
+    #     # plt.axhline(var, color='red', linestyle='--',
+    #     #             label=f'VaR ({alpha * 100}%): {var:.2f}')
+    #     # plt.title(f"Monte Carlo Simulation ({dist_type})\n"
+    #     #           f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
+    #     #           f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
+    #     #           )
+    #     # plt.legend()
+    #     # plt.show()
+    #     #
+    #     # # 转换为DataFrame
+    #     # df = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
+    #     # return df
+    #     dataframe = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
+    #     df_pivot_MC = dataframe.pivot(index='Step', columns='Path', values='Value').reset_index(drop=True)
+    #     df_pivot_MC.columns = [f"path{col}" for col in df_pivot_MC.columns]
+    #     print(df_pivot_MC)
+    #     df_pivot_MC.reset_index(inplace=True)
+    #     df_pivot_MC['step'] = df_pivot_MC.index
+    #     df_pivot_MC = df_pivot_MC.reindex(columns=['step'] + [col for col in df_pivot_MC.columns if col != 'step'])
+    #     column_names = df_pivot_MC.columns.tolist()
+    #     path_columns = [col for col in column_names if col.startswith("path")]
+    #     yColumn = ",".join(path_columns)
+    #     param_dict = {}
+    #     param_dict["isPlotRequired"] = "yes"
+    #     param_dict["results"] = df_pivot_MC
+    #     param_dict["plotRequirement"] = {}
+    #     param_dict["plotRequirement"]["PlotX"] = "index"
+    #     param_dict["plotRequirement"]["PlotY"] = yColumn
+    #     param_dict["plotRequirement"]["plotTitle"] = f"Monte Carlo Simulation ({dist_type})\n"
+    #     f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
+    #     f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
+    #     param_dict["plotRequirement"]["xlabel"] = "days"
+    #     param_dict["plotRequirement"]["ylabel"] = "points"
+    #     linePlotManager = LinePlotManager()
+    #     linePlotManager.draw_plot(param_dict)
+    #     return dataframe
 
