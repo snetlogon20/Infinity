@@ -1,10 +1,12 @@
 from dataIntegrator.analysisService.InquiryManager import InquiryManager
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomManager import MonteCarloRandomManager
 from dataIntegrator.modelService.statistics.GeneralLinearRegression import GeneralLinearRegression
+from dataIntegrator.modelService.statistics.StaticAnalyisManager import StaticAnalysisManager
 from dataIntegrator.plotService.LinePlotManager import LinePlotManager
 from dataIntegrator.plotService.ScatterPlotManager import ScatterPlotManager
 import matplotlib.pyplot as plt
 import seaborn as sns
+import re
 
 class QuickInquiryManagerTest:
     def __init__(self):
@@ -178,7 +180,16 @@ class QuickInquiryManagerTest:
 
         plt.show()
 
-        '''---Step 4 看蒙特卡罗模拟 ----'''
+        '''---Step 4 基本统计指标 ----'''
+        dataFrame_for_correlation = dataFrame.copy()
+        analyzer = StaticAnalysisManager()
+
+        # 删除名为 "trade_date" 的列
+        if 'df_sys_calendar__trade_date' in dataFrame_for_correlation.columns:
+            dataFrame_for_correlation = dataFrame_for_correlation.drop(columns=['df_sys_calendar__trade_date'])
+        statistics = analyzer.analyze_with_dataframe(dataFrame_for_correlation)
+
+        '''---Step 5 看蒙特卡罗模拟 ----'''
         monteCarloRandomManager = MonteCarloRandomManager()
 
         simulat_params = {
@@ -193,7 +204,7 @@ class QuickInquiryManagerTest:
         #all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
 
-        '''---Step 5 regression test ----'''
+        '''---Step 6 regression test ----'''
         '''此处放置你需要回归使用时的X轴'''
         response_dict = {}
         xColumns = "df_tushare_shibor_daily__tenor_on, df_tushare_stock_daily__pct_chg"
