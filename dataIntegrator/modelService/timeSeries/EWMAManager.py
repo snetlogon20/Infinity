@@ -11,7 +11,7 @@ from dataIntegrator.modelService.timeSeries.EWMAAnalyst import EWMAManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
 
-class EWMAAnalyster:
+class EWMAAnalyster1:
     def __init__(self, params):
         """
         Initializes the EWMA_Prediction class.
@@ -33,7 +33,9 @@ class EWMAAnalyster:
     def analysis_date(self):
         self.refresh_data()
 
-        ewmaManager = EWMAManager(params)
+        #ewmaManager = EWMAManager(params)
+        # 确保 params 中的日期参数是字符串格式
+        ewmaManager = EWMAManager(self.params)
         ewmaManager.ewma_stock_analysis()
 
 
