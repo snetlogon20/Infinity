@@ -147,7 +147,7 @@ class QuickInquiryManagerTest:
             LEFT JOIN df_akshare_spot_hist_sge 
                 ON df_sys_calendar.trade_date = formatDateTime(toDate(df_akshare_spot_hist_sge.date), '%Y%m%d')
             WHERE 
-                df_sys_calendar.trade_date BETWEEN '20241202' AND '20241231'
+                df_sys_calendar.trade_date BETWEEN '20250101' AND '20260201'
             order by df_sys_calendar__trade_date  
         """
         columns_to_drop = ['df_sys_calendar__trade_date']
@@ -200,7 +200,7 @@ class QuickInquiryManagerTest:
             'init_value': 'df_akshare_spot_hist_sge__close',
             'analysis_column': 'df_akshare_spot_hist_sge__pct_chg',
             't': 0.01,
-            'times': 30,
+            'times': 300,
             'series': 1000,
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
