@@ -2,6 +2,7 @@ import datetime
 import json
 from dataIntegrator.common.CommonParameters import CommonParameters
 import os
+import re
 
 class FileUtility:
     @staticmethod
@@ -10,6 +11,9 @@ class FileUtility:
         current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         # Concatenate the prefix with the current timestamp
         filename = f"{prefix}_{current_time}.{surfix}"
+
+        # 移除文件名中的非法字符，包括空格
+        filename = re.sub(r'[<>:"/\\|?*\s]', '_', filename)
 
         return filename
 
@@ -27,7 +31,8 @@ class FileUtility:
     def get_full_filename_by_timestamp(prefix, surfix):
         outbound_path = FileUtility.get_outbound_path()
         filename = FileUtility.generate_filename_by_timestamp(prefix,surfix)
-        file_full_name = rf"{outbound_path}{filename}"
+        #file_full_name = rf"{outbound_path}{filename}"
+        file_full_name = os.path.join(outbound_path, filename)
         return file_full_name
 
     @staticmethod
