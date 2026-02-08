@@ -436,10 +436,14 @@ class TuShareServiceManager():
         try:
             logger.info("callTuShareService started")
 
-            start_date = "20250101"
-            end_date = "20251231"
-            start_quarter = "2024Q1"
-            end_quarter = "2025Q1"
+            # start_date = "20250101"
+            # end_date = "20251231"
+            # start_quarter = "2024Q1"
+            # end_quarter = "2025Q1"
+            start_date = "20260101"
+            end_date = "20261231"
+            start_quarter = "2025Q1"
+            end_quarter = "2026Q1"
 
             param_method_dict = {
                 "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
@@ -456,7 +460,8 @@ class TuShareServiceManager():
                 "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
                 "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
                 "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date}
+                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
+                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
             }
 
             # 按顺序调用方法
@@ -469,7 +474,7 @@ class TuShareServiceManager():
                 except Exception as e:
                     logger.error(f"调用 {method_name} 失败: {e}")
 
-            ##### have issue here, just doubt it's the compatibility issue between py312 and tushrae
+            ##### have issue here, just doubt it's the compatibility issue between py312 and tushare
             # param_dict = {"ts_code": "C", "start_date": start_date, "end_date": end_date}
             # self.callTuShareUSStockDailyService(param_dict) #5 times daily
 

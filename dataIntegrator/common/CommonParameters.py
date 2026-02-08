@@ -36,6 +36,8 @@ class CommonParameters():
 
     Default_AI_Engine = 'spark'
 
+    CALENDAR_PRIMARY_KEY_FILED = 'trade_date'
+
     # Configuration - 1
     # SPARKAI_URL_REQUEST_TIMEOUT = 120
     # SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'

@@ -10,7 +10,7 @@ class TuShareUSStockDailyService(TuShareService):
         logger.info("prepareData started")
 
         try:
-            self.dataFrame = self.pro.us_daily(ts_code, start_date=start_date, end_date=end_date) #to check whether ts_code work here
+            self.dataFrame = self.pro.us_daily(ts_code=ts_code, start_date=start_date, end_date=end_date) #to check whether ts_code work here
             self.dataFrame.columns = ['ts_code',
                              'trade_date',
                              'close_point',
@@ -91,3 +91,27 @@ class TuShareUSStockDailyService(TuShareService):
     #     print("saveDateToDisk completed")
     #
     #     return
+
+
+if __name__ == '__main__':
+    try:
+
+        ts_code = 'C'
+        start_date = '20260101'
+        end_date = '20260501'
+        import os
+        from dataIntegrator import CommonLib, CommonParameters
+
+        csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_df_tushare_USStockBasic_20220507.csv")
+
+
+        tuShareService = TuShareUSStockDailyService()
+        dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
+        jsonString = tuShareService.convertDataFrame2JSON()
+        tuShareService.saveDateFrameToDisk(csvFilePath)
+        tuShareService.deleteDateFromClickHouse(start_date, end_date)
+        tuShareService.saveDateToClickHouse()
+
+    except Exception as e:
+        logger.info('Exception', e)
+        raise e
