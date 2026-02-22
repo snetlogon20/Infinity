@@ -182,5 +182,5 @@ if __name__ == "__main__":
     ewmaAnalystTest = EWMAAnalystTest()
     #ewmaAnalystTest.analyz_stock_only()
 
-    #ewmaAnalystTest.analyz_with_sql_sge()
-    ewmaAnalystTest.analyz_with_sql_shibor()
+    ewmaAnalystTest.analyz_with_sql_sge()
+    #ewmaAnalystTest.analyz_with_sql_shibor()
