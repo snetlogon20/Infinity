@@ -36,7 +36,7 @@ class MonteCarloRandomManager:
         return monteCarloRandom.simulation_multi_series(dataFrame, simulat_params)
 
     @classmethod
-    def draw_plot(cls, all_lines, simulat_params, stats, var_lower_bound, var_upper_bound):
+    def draw_plot(cls, all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value):
 
         S = stats["Init_Value"][0]
         times = simulat_params["times"]
@@ -83,6 +83,14 @@ class MonteCarloRandomManager:
         # 添加VaR红线
         plt.axhline(y=var_upper_bound, color='red', linestyle='--', linewidth=2,
                     label=f'VaR ({alpha * 100:.0f}%): {var_upper_bound:.2f}')
+
+        # 添加average
+        plt.axhline(y=average, color='blue', linestyle='--', linewidth=2,
+                    label=f'VaR AVG ({alpha * 100:.0f}%): {average:.2f}')
+
+        # 添加median_value
+        plt.axhline(y=median_value, color='green', linestyle='--', linewidth=2,
+                    label=f'VaR MEDIAN ({alpha * 100:.0f}%): {median_value:.2f}')
 
         plt.xlabel('Time Step')
         plt.ylabel('Value')
