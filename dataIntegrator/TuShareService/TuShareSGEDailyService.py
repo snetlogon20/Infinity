@@ -6,11 +6,11 @@ logger = CommonLib.logger
 
 class TuShareSGEDailyService(TuShareService):
     @classmethod
-    def prepareDataFrame(self, trade_date):
+    def prepareDataFrame(self, start_date, end_date):
         logger.info("prepareData started")
 
         try:
-            self.dataFrame = self.pro.sge_daily(trade_date=trade_date)
+            self.dataFrame = self.pro.sge_daily(start_date=start_date, end_date=end_date, ts_code = 'Au99.99')
             logger.info("self.dataFrame.shape:" + str(self.dataFrame.shape))
 
         except Exception as e:
@@ -40,7 +40,7 @@ class TuShareSGEDailyService(TuShareService):
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_sge_daily DELETE where trade_date>= '%s' and trade_date<='%s'" % (start_date, end_date)
+            del_df_tushare_sql = "ALTER TABLE indexsysdb.df_tushare_sge_daily DELETE where trade_date>= '%s' and trade_date<='%s' and ts_code = 'Au99.99'" % (start_date, end_date)
             self.clickhouseClient.execute(del_df_tushare_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)

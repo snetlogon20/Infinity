@@ -441,7 +441,7 @@ class TuShareServiceManager():
             # start_quarter = "2024Q1"
             # end_quarter = "2025Q1"
             start_date = "20260101"
-            end_date = "20261231"
+            end_date = CommonParameters.today
             start_quarter = "2025Q1"
             end_quarter = "2026Q1"
 
