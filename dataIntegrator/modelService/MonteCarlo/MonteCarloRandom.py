@@ -4,7 +4,7 @@ import random
 import pandas
 import scipy.stats as stats
 from matplotlib import pyplot as plt
-
+import statistics
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.plotService.LinePlotManager import LinePlotManager
 from dataIntegrator.utility.FileUtility import FileUtility
@@ -122,8 +122,11 @@ class MonteCarloRandom:
         upper_alpha = 1 - alpha
         var_upper_index = int(upper_alpha * series)
         var_upper_bound = final_values[var_upper_index]
+        # 计算均数和中位数
+        average = sum(final_values) / len(final_values)
+        median_value = statistics.median(final_values)
 
-        return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound
+        return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value
 
         #cls.drow_plot(S, all_lines, dist_type, series, simulat_params, stats, times)
 

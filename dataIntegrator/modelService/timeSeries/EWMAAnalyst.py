@@ -236,3 +236,5 @@ class EWMAAnalyst:
                        verticalalignment='top', bbox=props)
         plt.show()
 
+        return all_dataframe
+
