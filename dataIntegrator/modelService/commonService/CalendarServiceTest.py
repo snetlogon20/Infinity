@@ -126,7 +126,7 @@ if __name__ == '__main__':
     # calendarServiceTest.load_next_n_days_calendar()
     # calendarServiceTest.load_next_n_working_days_calendar()
 
-    # calendarServiceTest.get_last_date_from_calendar()
+    calendarServiceTest.get_last_date_from_calendar()
 
     calendarServiceTest.find_data_by_given_dataframe_and_date_offset()
     # exit(0)
