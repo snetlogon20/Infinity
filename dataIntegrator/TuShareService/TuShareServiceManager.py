@@ -17,13 +17,15 @@ from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFX
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
-
+from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
 logger = CommonLib.logger
 
 class TuShareServiceManager():
-    
+
+
     def __init__(self):
+        self.calendarService = CalendarService()
         logger.info("__init__ started")
 
     @classmethod
@@ -431,7 +433,7 @@ class TuShareServiceManager():
 
         logger.info("callTushareUSTreasuryYieldCurveService ended...")
 
-    @classmethod
+    #@classmethod
     def callTuShareService(self):
         try:
             logger.info("callTuShareService started")
@@ -442,8 +444,9 @@ class TuShareServiceManager():
             # end_quarter = "2025Q1"
             start_date = "20260101"
             end_date = CommonParameters.today
-            start_quarter = "2025Q1"
-            end_quarter = "2026Q1"
+            start_quarter = "2026Q1"
+            #end_quarter = "2026Q1"
+            end_quarter  = self.calendarService.calculate_quarter(end_date)
 
             param_method_dict = {
                 "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},

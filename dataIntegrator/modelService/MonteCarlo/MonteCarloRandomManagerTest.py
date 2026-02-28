@@ -353,9 +353,9 @@ class MonteCarloRandomTest:
         # start_date = datetime.strptime('2025-01-01', '%Y-%m-%d')
         start_date = datetime.strptime('2025-11-01', '%Y-%m-%d')
         formatted_start_date = start_date.strftime('%Y-%m-%d')
-        end_date = '2025-02-13'
+        #end_date = '2025-02-13'
         # end_date = '2025-12-31'
-        end_date = '2026-02-13'
+        end_date = '2026-02-27'
 
         limit_date = 600
         next_n_working_days = 10
@@ -419,7 +419,8 @@ class MonteCarloRandomTest:
                 't': 0.01,
                 'times': next_n_working_days,
                 'series': 5000,
-                'alpha': 0.05,
+                #'alpha': 0.05,
+                'alpha': 0.30,
                 'distribution_type': 'historical'  # normal/lognormal/historical
             }
             all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)

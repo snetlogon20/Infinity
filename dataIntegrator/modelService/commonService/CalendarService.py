@@ -11,6 +11,10 @@ import sys
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from datetime import timedelta
 
+#from dataIntegrator import CommonLib
+
+#logger = CommonLib.logger
+
 class CalendarService(CommonLib.CommonLib):
     dataFrame = pandas.core.frame.DataFrame
     clickhouseClient = ClickhouseClient(host=CommonParameters.clickhouseHostName,
@@ -183,6 +187,34 @@ class CalendarService(CommonLib.CommonLib):
             self.writeLogError(e, className=self.__class__.__name__,
                                functionName=sys._getframe().f_code.co_name)
             return None
+
+    def calculate_quarter(cls, date):
+        """
+        根据 end_date 计算对应的季度，格式为 yyyyQn
+        :param date: 字符串格式 'yyyymmdd'
+        :return: 季度字符串 'yyyyQn'
+        """
+        try:
+            # 将字符串转换为 datetime 对象
+            date_obj = datetime.strptime(date, '%Y%m%d')
+            year = date_obj.year
+            month = date_obj.month
+
+            # 根据月份确定季度
+            if 1 <= month <= 3:
+                quarter = 1
+            elif 4 <= month <= 6:
+                quarter = 2
+            elif 7 <= month <= 9:
+                quarter = 3
+            else:  # 10 <= month <= 12
+                quarter = 4
+
+            return f"{year}Q{quarter}"
+        except Exception as e:
+            # 静态方法中无法访问实例方法，直接打印错误
+            cls.writeLogError(e, className=cls.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
 
     # def get_last_working_date_from_calendar(self, start_date, end_date, n_working_days):
     #     """
