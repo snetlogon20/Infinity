@@ -100,11 +100,11 @@ class AkShareFuturesForeignHistService(AkShareService):
 
         return
 
-    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000"):  # 实例方法
+    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000", symbol=""):  # 实例方法
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s'" % (start_date, end_date)
+            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
             self.deleteAkDateFromClickHouse(del_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)

@@ -27,7 +27,7 @@ class AkShareFuturesForeignHistServiceTest:
             dataFrame = akShareService.prepareDataFrame(symbol)
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-            akShareService.deleteDateFromClickHouse()
+            akShareService.deleteDateFromClickHouse(symbol)
             transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(transformed_dataFrame)
 
