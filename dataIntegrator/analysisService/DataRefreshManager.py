@@ -18,7 +18,7 @@ class DataRefreshManager:
         """执行数据刷新流程"""
         try:
             self.logger.info("=" * 50)
-            self.logger.info("开始执行数据刷新流程")
+            self.logger.info("Data refresh started")
             self.logger.info("=" * 50)
 
             # Step 1: 执行 TuShare 数据服务
@@ -34,11 +34,11 @@ class DataRefreshManager:
             self.logger.info("Step 2 - AkShareServiceManager ended")
 
             self.logger.info("=" * 50)
-            self.logger.info("数据刷新流程执行完成")
+            self.logger.info("Data refresh finished")
             self.logger.info("=" * 50)
 
         except Exception as e:
-            self.logger.error(f"数据刷新过程中发生错误: {str(e)}")
+            self.logger.error(f"Error hit during the refresh: {str(e)}")
             raise e
 
 if __name__ == '__main__':
@@ -46,5 +46,5 @@ if __name__ == '__main__':
         dataRefreshManager = DataRefreshManager()
         dataRefreshManager.fresh_data()
     except Exception as e:
-        logger.error(f"程序执行失败: {str(e)}")
+        logger.error(f"refresh failed: {str(e)}")
         exit(1)
