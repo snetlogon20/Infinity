@@ -10,7 +10,7 @@ class AkShareSpotHistSGEServiceTest:
     def test1_callAkShareSpotHistSGEService(cls):
         logger.info("callAkShareSpotHistSGEServicee started...")
 
-        start_date = '20240531'
+        start_date = '20240101'
         end_date = CommonParameters.today
         file_path = os.path.join(CommonParameters.outBoundPath,'sakshare_spot_hist_sge_dg.xlsx')
 

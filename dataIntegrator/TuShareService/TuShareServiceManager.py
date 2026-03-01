@@ -17,13 +17,15 @@ from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFX
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
-
+from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
 logger = CommonLib.logger
 
 class TuShareServiceManager():
-    
+
+
     def __init__(self):
+        self.calendarService = CalendarService()
         logger.info("__init__ started")
 
     @classmethod
@@ -395,7 +397,7 @@ class TuShareServiceManager():
 
         try:
             tuShareService = TuShareSGEDailyService()
-            dataFrame = tuShareService.prepareDataFrame(start_date)
+            dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
             tuShareService.saveDateFrameToDisk(csvFilePath)
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
@@ -431,19 +433,16 @@ class TuShareServiceManager():
 
         logger.info("callTushareUSTreasuryYieldCurveService ended...")
 
-    @classmethod
-    def callTuShareService(self):
+    #@classmethod
+    def callTuShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callTuShareService started")
 
-            # start_date = "20250101"
-            # end_date = "20251231"
-            # start_quarter = "2024Q1"
-            # end_quarter = "2025Q1"
-            start_date = "20260101"
-            end_date = CommonParameters.today
-            start_quarter = "2025Q1"
-            end_quarter = "2026Q1"
+            # start_date = "20260101"
+            # end_date = CommonParameters.today
+
+            start_quarter = self.calendarService.calculate_quarter(start_date) # "2026Q1"
+            end_quarter  = self.calendarService.calculate_quarter(end_date) # "2026Q1"
 
             param_method_dict = {
                 "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
@@ -461,7 +460,7 @@ class TuShareServiceManager():
                 "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
                 "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
+                # "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
             }
 
             # 按顺序调用方法
@@ -473,10 +472,6 @@ class TuShareServiceManager():
                     logger.error(f"方法 {method_name} 不存在，请检查拼写！", e)
                 except Exception as e:
                     logger.error(f"调用 {method_name} 失败: {e}")
-
-            ##### have issue here, just doubt it's the compatibility issue between py312 and tushare
-            # param_dict = {"ts_code": "C", "start_date": start_date, "end_date": end_date}
-            # self.callTuShareUSStockDailyService(param_dict) #5 times daily
 
             logger.info("callTuShareService completed successfully")
 

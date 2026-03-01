@@ -202,6 +202,8 @@ class GeneralLinearRegression:
         linePlotManager = LinePlotManager()
         linePlotManager.draw_plot(param_dict)
 
+        return response_dict
+
 
 def test_perform_linear_regression_single_feature():
     """

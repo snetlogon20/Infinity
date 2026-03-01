@@ -25,20 +25,10 @@ class AkShareFuturesForeignHistServiceTest:
 
             # 获取原始数据
             dataFrame = akShareService.prepareDataFrame(symbol)
-
-            # 保存原始数据到Excel
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
-
-            # 从Excel读取数据
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-
-            # 删除所有现有数据
-            akShareService.deleteDateFromClickHouse()
-
-            # 转换数据（计算涨跌幅等）
+            akShareService.deleteDateFromClickHouse(symbol)
             transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
-
-            # 保存到ClickHouse（只保存表结构中存在的字段）
             akShareService.saveDateToClickHouse(transformed_dataFrame)
 
         except Exception as e:
@@ -50,6 +40,7 @@ class AkShareFuturesForeignHistServiceTest:
 if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
-    #akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
-    #akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
     akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('GC', 'GC')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
+
