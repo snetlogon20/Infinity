@@ -8,6 +8,7 @@ class CustomError(Exception):
         self.error_code_map = {
             "000000": "Success",
             "0000001": "Init",
+            "0000002": "Invalid Date format",
 
             "000100": "Oracle Error",
             "000101": "ClickHouse Error",

@@ -3,6 +3,7 @@ import os
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
+from dataIntegrator.common.FileType import FileType
 
 logger = CommonLib.logger
 
@@ -26,10 +27,10 @@ class AkShareServiceManager():
             dataFrame = akShareService.prepareDataFrame(start_date, end_date)
 
             # 保存到磁盘
-            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", "EXCEL"))
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", FileType.EXCEL))
 
             # 从磁盘读取（可选步骤，用于验证）
-            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", "EXCEL"))
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", FileType.EXCEL))
 
             # 删除ClickHouse中的旧数据
             akShareService.deleteDateFromClickHouse(start_date, end_date)
@@ -60,10 +61,10 @@ class AkShareServiceManager():
             dataFrame = akShareService.prepareDataFrame(symbol)
 
             # 保存到磁盘
-            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", "EXCEL"))
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", FileType.EXCEL))
 
             # 从磁盘读取（可选步骤，用于验证）
-            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", "EXCEL"))
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", FileType.EXCEL))
 
             # 删除ClickHouse中的旧数据
             akShareService.deleteDateFromClickHouse()
@@ -81,24 +82,24 @@ class AkShareServiceManager():
         logger.info("callAkShareFuturesForeignHistService ended...")
 
     @classmethod
-    def callAkShareService(self):
+    def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
 
-            start_date = "20240101"
-            end_date = CommonParameters.today
+            # start_date = "20240101"
+            # end_date = CommonParameters.today
 
             param_method_dict = {
                 "callAkShareSpotHistSGEService": {
                     "start_date": start_date,
                     "end_date": end_date,
                     "file_name": "akshare_spot_hist_sge_2024.xlsx",
-                    "file_type": "EXCEL"
+                    "file_type": FileType.EXCEL
                 },
                 "callAkShareFuturesForeignHistService": {
                     "symbol": "XAU",  # 伦敦金
                     "file_name": "akshare_futures_foreign_hist_xau.xlsx",
-                    "file_type": "EXCEL"
+                    "file_type": FileType.EXCEL
                 }
             }
 

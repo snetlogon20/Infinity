@@ -57,6 +57,41 @@ class CalendarServiceTest(CommonLib.CommonLib):
         formatted_last_date = calendar.get_last_date_from_calendar(start_date, end_date, next_n_days)
         print(formatted_last_date)
 
+    def test_calculate_quarter(self):
+        """快速测试calculate_quarter函数"""
+        calendar = CalendarService()
+
+        # 正常测试用例
+        test_cases = [
+            ("20260101", "2026Q1"),
+            ("20260228", "2026Q1"),  # 马年正月十二
+            ("20260331", "2026Q1"),
+            ("20260401", "2026Q2"),
+            ("20260630", "2026Q2"),
+            ("20260701", "2026Q3"),
+            ("20260930", "2026Q3"),
+            ("20261001", "2026Q4"),
+            ("20261231", "2026Q4"),
+        ]
+
+        print("正常测试用例:")
+        for date_str, expected in test_cases:
+            result = calendar.calculate_quarter(date_str)
+            status = "✓" if result == expected else "✗"
+            print(f"  {status} {date_str} -> {result} (期望: {expected})")
+
+        # 异常测试用例
+        error_cases = [
+            "20261301",  # 无效月份
+            "20260132",  # 无效日期
+            "",  # 空字符串
+            "abc",  # 非数字
+        ]
+
+        print("\n异常测试用例:")
+        for date_str in error_cases:
+            result = calendar.calculate_quarter(date_str)
+            print(f"  {date_str} -> {result}")
 
     def createCalendar(self):
 
@@ -126,9 +161,10 @@ if __name__ == '__main__':
     # calendarServiceTest.load_next_n_days_calendar()
     # calendarServiceTest.load_next_n_working_days_calendar()
 
-    # calendarServiceTest.get_last_date_from_calendar()
+    #calendarServiceTest.get_last_date_from_calendar()
+    calendarServiceTest.test_calculate_quarter()
 
-    calendarServiceTest.find_data_by_given_dataframe_and_date_offset()
+    #calendarServiceTest.find_data_by_given_dataframe_and_date_offset()
     # exit(0)
 
     #################################

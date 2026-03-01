@@ -12,8 +12,21 @@ class AkShareFuturesForeignHistService(AkShareService):
 
         try:
             dataFrame = self.ak.futures_foreign_hist(symbol=symbol)
+
+            # 检测并删除字段名为 's' 的列
+            if 's' in dataFrame.columns:
+                logger.info("检测到字段 's'，正在删除...")
+                dataFrame = dataFrame.drop('s', axis=1)
+                logger.info(f"删除 's' 字段后，剩余列: {list(dataFrame.columns)}")
+            if 'settlement' in dataFrame.columns:
+                logger.info("检测到字段 'settlement'，正在删除...")
+                dataFrame = dataFrame.drop('settlement', axis=1)
+                logger.info(f"删除 's' 字段后，剩余列: {list(dataFrame.columns)}")
+
             dataFrame['symbol'] = symbol
-            dataFrame.columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'position', 'settlement', 'symbol']
+
+            #dataFrame.columns = ['date', 'open', 'high', 'low', 'close', ' volume', 'position', 'settlement', 'symbol']
+            dataFrame.columns = ['date', 'open', 'high', 'low', 'close', ' volume', 'position', 'symbol']
 
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
@@ -47,14 +60,37 @@ class AkShareFuturesForeignHistService(AkShareService):
         logger.info("saveDateToClickHouse started")
 
         try:
-            # 注意：数据库表结构中没有 pct_change 字段，需要在插入前处理
-            # 如果要保存涨跌幅，需要修改表结构或只保存基础字段
-            #columns_to_save = ['date', 'open', 'high', 'low', 'close', 'volume', 'position', 'settlement']
-            #dataFrame_to_save = dataFrame[columns_to_save].copy()
+            # 显示数据信息用于调试
+            logger.info(f"准备保存的数据列: {list(dataFrame.columns)}")
+            logger.info(f"数据类型: {dataFrame.dtypes}")
+            logger.info(f"数据形状: {dataFrame.shape}")
+            logger.info(f"前几行数据:\n{dataFrame.head()}")
 
-            dataFrame_to_save = dataFrame.copy()
+            # 确保只保存数据库表中存在的列，并且数据类型正确
+            #db_columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'position', 'settlement', 'symbol','pct_change']
+            db_columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'position', 'symbol', 'pct_change']
+            columns_to_save = [col for col in db_columns if col in dataFrame.columns]
 
-            insert_sql = "INSERT INTO indexsysdb.df_akshare_futures_foreign_hist VALUES"
+            # 创建要保存的数据副本
+            dataFrame_to_save = dataFrame[columns_to_save].copy()
+
+            # 确保数据类型正确
+            if 'date' in dataFrame_to_save.columns:
+                dataFrame_to_save['date'] = dataFrame_to_save['date'].astype(str)
+            if 'volume' in dataFrame_to_save.columns:
+                dataFrame_to_save['volume'] = dataFrame_to_save['volume'].fillna(0).astype('int64')
+            if 'position' in dataFrame_to_save.columns:
+                dataFrame_to_save['position'] = dataFrame_to_save['position'].fillna(0).astype('int64')
+
+            logger.info(f"实际保存的列: {list(dataFrame_to_save.columns)}")
+            logger.info(f"保存前数据类型: {dataFrame_to_save.dtypes}")
+
+            # 使用明确的列名插入语句
+            columns_str = ', '.join(columns_to_save)
+            insert_sql = f"INSERT INTO indexsysdb.df_akshare_futures_foreign_hist ({columns_str}) VALUES"
+
+            logger.info(f"执行的SQL: {insert_sql}")
+
             self.saveAkDateToClickHouse(insert_sql, dataFrame_to_save)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
@@ -64,11 +100,11 @@ class AkShareFuturesForeignHistService(AkShareService):
 
         return
 
-    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000"):  # 实例方法
+    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000", symbol=""):  # 实例方法
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s'" % (start_date, end_date)
+            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
             self.deleteAkDateFromClickHouse(del_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)

@@ -1,0 +1,58 @@
+你是一个资深的 python 专家和 click house 专家，请帮助我完成这个代码。
+
+我给你以下模板：
+
+AkShareService.py：AkShareService 的父类
+df_akshare_spot_hist_sge.sql：专门定义df_akshare_spot_hist_sge这张数据表的SQL
+AkShareSpotHistSGEService.py:继承了AkShareService，然后专门针对df_akshare_spot_hist_sge这张数据表进行操作
+AkShareSpotHistSGEServiceTest.py：AkShareSpotHistSGEService 的测试类
+
+现在我需要你根据以上模板， 根据以下接口的定义
+1. 接口名称：df_akshare_futures_foreign_hist
+
+    名称	类型	默认显示	描述
+    date	str	Y	交易日
+    open	float	Y	开盘价
+    high	float	Y	最高价
+    low	float	Y	最低价
+    close	float	Y	收盘价
+    volume	int	Y	成交量
+
+2. 接口示例
+
+    import akshare as ak
+    futures_foreign_hist_df = ak.futures_foreign_hist(symbol="GC")
+    print(futures_foreign_hist_df)
+
+2.  数据样例
+               date    open    high     low   close  volume
+    0    2010-03-26  2230.0  2272.5  2220.0  2235.0    3013
+    1    2010-03-29  2230.0  2341.0  2230.0  2341.0    5425
+    2    2010-03-30  2340.0  2390.0  2306.0  2368.0    6959
+    3    2010-03-31  2375.0  2408.5  2328.0  2370.0    7462
+    4    2010-04-01  2370.0  2434.0  2350.0  2400.0    5969
+             ...     ...     ...     ...     ...     ...
+    2547 2020-03-20  1842.0  1934.5  1820.0  1845.0   11702
+    2548 2020-03-23  1813.0  1847.5  1785.0  1812.0   10240
+    2549 2020-03-24  1820.0  1873.0  1808.5  1827.0    7269
+    2550 2020-03-25  1833.0  1849.0  1790.5  1844.5    6823
+    2551 2020-03-26  1844.5  1858.0  1819.0  1851.0    2700
+
+完成以下任务：
+1. 按照 SQL template，参考 df_akshare_spot_hist_sge.sql 生成 clickhouse 语法建表的语句。
+    表名：indexsysdb.接口名
+    object 在clickhouse中是 string
+    int64 在clickhouse中是 Int64
+    float64 在clickhouse中是 Float64
+    字段名参考接口中字段名()中的英文
+2. 按照AkShareSpotHistSGEService，生成AkShare接口名Service
+    字段名参考接口中字段名()中的英文
+3. 按照AkShareSpotHistSGEServiceTest，生成AkShare接口名ServiceTest
+    字段名参考接口中字段名()中的英文
+
+注意事项
+1. 需要考虑修改 import 的部分。
+    比如 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService1
+    需要改成from dataIntegrator.AKShareService.AkShareFDIService import AkShareFDIService
+2. 需要根据接口示例中的api调用说明，修改prepareDataFrame中的接口调用
+3. 注意 self.deleteAkDateFromClickHouse() 中传入的参数是根据上下文拼接的 del_sql
