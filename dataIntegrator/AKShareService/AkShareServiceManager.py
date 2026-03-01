@@ -81,12 +81,12 @@ class AkShareServiceManager():
         logger.info("callAkShareFuturesForeignHistService ended...")
 
     @classmethod
-    def callAkShareService(self):
+    def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
 
-            start_date = "20240101"
-            end_date = CommonParameters.today
+            # start_date = "20240101"
+            # end_date = CommonParameters.today
 
             param_method_dict = {
                 "callAkShareSpotHistSGEService": {
