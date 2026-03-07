@@ -356,7 +356,8 @@ class MonteCarloRandomTest:
         formatted_start_date = start_date.strftime('%Y-%m-%d')
         #end_date = '2025-02-13'
         # end_date = '2025-12-31'
-        end_date = '2026-02-27'
+        # end_date = '2026-02-27'
+        end_date = CommonParameters.today
 
         limit_date = 600
         next_n_working_days = 10
@@ -908,6 +909,102 @@ class MonteCarloRandomTest:
 
         return
 
+    def test_multi_series_historical_distribution_GC_pctchagne_rolling(self):
+        """多线模拟 - LogNormal Distribution - Gold"""
+        monteCarloRandomManager = MonteCarloRandomManager()
+        inquiryManager = InquiryManager()
+
+        start_date = datetime.strptime('2025-01-01', '%Y-%m-%d')
+        formatted_start_date = start_date.strftime('%Y-%m-%d')
+        # end_date = '2025-12-31'
+        # end_date = '2026-02-13'
+        end_date = CommonParameters.today
+        limit_date = 600
+
+        results_df = pd.DataFrame(columns=['date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        sql = "select date from indexsysdb.df_akshare_futures_foreign_hist where symbol = 'GC' order by date "
+        working_date_dataFrame = inquiryManager.get_sql_dataset(sql)
+
+        sql = f"select date from indexsysdb.df_akshare_futures_foreign_hist where symbol = 'GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        look_date_dataFrame = inquiryManager.get_sql_dataset(sql)
+
+        for index, row in look_date_dataFrame.iterrows():
+            current_date = row['date']
+            sample_end_date = current_date
+
+            print(f"formatted_start_date: {formatted_start_date}")
+            print(f"current_date: {current_date}")
+            print(f"end_date: {end_date}")
+            print(f"sample_end_date: {sample_end_date}")
+
+            # 格式化当前日期为字符串
+            # formatted_date = current_date.strftime('%Y-%m-%d')
+            formatted_date = current_date
+
+            # 在这里执行你需要的操作，例如查询数据库或处理数据
+            print(f"Processing date: {formatted_date}")
+            sql = f"""
+                     select *
+                     from 
+                     (
+                         select 
+                             date,
+                             open,
+                             close,
+                             low,
+                             high,
+                             pct_change 
+                         from indexsysdb.df_akshare_futures_foreign_hist
+                         where symbol = 'GC' and 
+                         date <= '{sample_end_date}'
+                     order by date desc
+                     limit {limit_date}
+                     )
+                     order by date
+                 """
+            print(sql)
+
+            dataFrame = inquiryManager.get_sql_dataset(sql)
+            print(dataFrame)
+            if dataFrame.empty:
+                print(f"No data found for date: {formatted_date}")
+                current_date += timedelta(days=1)
+                continue  # 跳过当前循环
+
+            simulat_params = {
+                'init_value': 'pct_change',
+                'analysis_column': 'pct_change',
+                't': 0.01,
+                'times': 5,
+                'series': 5000,
+                'alpha': 0.05,
+                'distribution_type': 'historical'  # normal/lognormal/historical
+            }
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(
+                dataFrame, simulat_params)
+            # 将结果添加到 DataFrame 中
+            new_row = pd.DataFrame([{
+                'date': formatted_date,
+                'var_lower_bound': var_lower_bound,
+                'var_upper_bound': var_upper_bound,
+                'average': average,
+                'median_value': median_value
+            }])
+            print(new_row)
+            results_df = pd.concat([results_df, new_row], ignore_index=True)
+
+            # # 增加一天
+            # #current_date += timedelta(days=1)
+            # current_date = self.get_next_working_day(working_date_dataFrame, formatted_date) # 获取下一个工作日，但这个只是临时算法
+            # print(current_date)
+            if current_date > end_date:
+                print(f"current_date: {current_date}")
+                print(f"end_date: {end_date}")
+                break
+
+        print(results_df)
+
+
     def test_multi_series_lognormal_distribution_treasury_yield(self):
         """多线模拟 - LogNormal Distribution - Gold"""
         monteCarloRandomManager = MonteCarloRandomManager()
@@ -962,7 +1059,7 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_lognormal_distribution_sge_pctchange()
     # monteCarloTest.test_multi_series_historical_distribution_sge_pctchange()
-    # monteCarloTest.test_multi_series_historical_distribution_sge_pct_change_rolling()
+    monteCarloTest.test_multi_series_historical_distribution_sge_pct_change_rolling()
 
     """
     用不同方式对伦敦金进行分析， lognormal/historical/historical_rolling
@@ -972,7 +1069,11 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
     #monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
-    monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
+
+    # monteCarloTest.test_multi_series_historical_distribution_GC_pctchagne_rolling()
+     #monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
 
     # monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()
 
