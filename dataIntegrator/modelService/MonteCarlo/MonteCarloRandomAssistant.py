@@ -104,7 +104,7 @@ class MonteCarloRandomAssistant:
 
         return final_dataframe
 
-    def draw_plot(cls, final_result_copy):
+    def draw_plot(cls, final_result_copy, analysis_column='close', analysis_column_label='收盘价'):
         # 创建折线图
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
@@ -116,9 +116,9 @@ class MonteCarloRandomAssistant:
         # 准备绘图数据
         plot_data = final_result_copy.copy()
 
-        # 处理日期列 - 先清理None值和无效数据
+        # 处理日期列 - 先清理 None 值和无效数据
         if 'trade_date' in plot_data.columns:
-            # 移除None值和空值
+            # 移除 None 值和空值
             plot_data = plot_data.dropna(subset=['trade_date'])
             # 移除空字符串
             plot_data = plot_data[plot_data['trade_date'] != '']
@@ -137,55 +137,105 @@ class MonteCarloRandomAssistant:
 
         # 检查是否有足够的数据绘图
         if len(plot_data) == 0:
-            print("警告: 没有足够的有效数据进行绘图")
+            print("警告：没有足够的有效数据进行绘图")
             return
 
-        # 设置图形大小
-        plt.figure(figsize=(12, 8))
+        # 打印调试信息
+        print("\n=== 绘图数据检查 ===")
+        print(f"总数据行数：{len(plot_data)}")
+        for col in ['var_lower_bound', 'var_upper_bound', 'average', 'median_value', analysis_column]:
+            if col in plot_data.columns:
+                non_null_count = plot_data[col].notna().sum()
+                null_count = plot_data[col].isna().sum()
+                print(f"{col}: 非 Null 数量={non_null_count}, Null 数量={null_count}")
+                if non_null_count > 0:
+                    print(f"  数据范围：{plot_data[col].dropna().min():.4f} ~ {plot_data[col].dropna().max():.4f}")
+            else:
+                print(f"{col}: 列不存在")
+        print("=" * 60)
 
-        # 绘制多条线
-        #x_data = plot_data['trade_date']
+        # 设置图形大小
+        plt.figure(figsize=(14, 8))
+
+        # 准备绘图数据
         x_data = plot_data['trade_date']
 
         # 绘制各条线（添加数据存在性检查）
         line_count = 0
-        if 'close' in plot_data.columns and not plot_data['close'].isna().all():
-            plt.plot(x_data, plot_data['close'], linewidth=2, label='收盘价')
+
+        # 绘制分析列（涨跌幅或收盘价）
+        if analysis_column in plot_data.columns and not plot_data[analysis_column].isna().all():
+            plt.plot(x_data, plot_data[analysis_column], linewidth=2.5, label=analysis_column_label, color='blue',
+                     zorder=1)
             line_count += 1
 
+        # 绘制 VaR 下界 - 使用明显的虚线和颜色
         if 'var_lower_bound' in plot_data.columns and not plot_data['var_lower_bound'].isna().all():
-            plt.plot(x_data, plot_data['var_lower_bound'], linestyle='--', linewidth=1, label='VaR下界')
+            plt.plot(x_data, plot_data['var_lower_bound'],
+                     linestyle='--', linewidth=2, label='VaR 下界',
+                     color='orange', alpha=0.7, zorder=2)
             line_count += 1
+        else:
+            print("⚠️  警告：var_lower_bound 数据全为 NaN 或列不存在，无法绘制")
 
+        # 绘制 VaR 上界 - 使用明显的虚线和颜色
         if 'var_upper_bound' in plot_data.columns and not plot_data['var_upper_bound'].isna().all():
-            plt.plot(x_data, plot_data['var_upper_bound'], linestyle='--', linewidth=1, label='VaR上界')
+            plt.plot(x_data, plot_data['var_upper_bound'],
+                     linestyle='--', linewidth=2, label='VaR 上界',
+                     color='green', alpha=0.7, zorder=2)
             line_count += 1
+        else:
+            print("⚠️  警告：var_upper_bound 数据全为 NaN 或列不存在，无法绘制")
 
+        # 绘制平均值 - 使用红色实线
         if 'average' in plot_data.columns and not plot_data['average'].isna().all():
-            plt.plot(x_data, plot_data['average'], linewidth=2, label='平均值')
+            plt.plot(x_data, plot_data['average'],
+                     linewidth=2, label='平均值',
+                     color='red', linestyle='-', zorder=3)
             line_count += 1
 
+        # 绘制中位数 - 使用紫色实线
         if 'median_value' in plot_data.columns and not plot_data['median_value'].isna().all():
-            plt.plot(x_data, plot_data['median_value'], linewidth=2, label='中位数')
+            plt.plot(x_data, plot_data['median_value'],
+                     linewidth=2, label='中位数',
+                     color='purple', linestyle='-', zorder=3)
             line_count += 1
 
         # 如果没有有效的线条，不显示图表
         if line_count == 0:
-            print("警告: 没有有效的数据列可以绘图")
+            print("警告：没有有效的数据列可以绘图")
             return
 
         # 设置图表属性
-        plt.xlabel('交易日期')
-        plt.ylabel('数值')
-        plt.title('蒙特卡洛模拟结果趋势图')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
+        plt.xlabel('交易日期', fontsize=12)
+        plt.ylabel('数值', fontsize=12)
+        plt.title('蒙特卡洛模拟结果趋势图', fontsize=14, fontweight='bold')
+        plt.legend(loc='best', fontsize=10)
+        plt.grid(True, alpha=0.3, linestyle=':')
 
-        # 格式化x轴日期显示
+        # 添加参考线 y=0
+        plt.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
+
+        # 根据 analysis_column 的数据范围设置 y 轴限制，留出上下 10% 的余地
+        if analysis_column in plot_data.columns:
+            valid_data = plot_data[analysis_column].dropna()
+            if len(valid_data) > 0:
+                data_min = valid_data.min()
+                data_max = valid_data.max()
+                data_range = data_max - data_min
+                padding = data_range * 0.10  # 10% 的余地
+
+                y_lower = data_min - padding
+                y_upper = data_max + padding
+
+                plt.ylim(y_lower, y_upper)
+
+        # 格式化 x 轴日期显示 - 显示所有日期
         if len(plot_data) > 0:
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-            plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(plot_data) // 10)))
-            plt.xticks(rotation=45)
+            # 设置每个数据点都显示
+            plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            plt.xticks(rotation=90, fontsize=8)
 
         # 调整布局
         plt.tight_layout()
@@ -195,8 +245,8 @@ class MonteCarloRandomAssistant:
 
         # 打印数据统计信息
         print("=== 图表数据统计 ===")
-        print(f"有效数据点数量: {len(plot_data)}")
-        for col in ['close', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value']:
+        print(f"有效数据点数量：{len(plot_data)}")
+        for col in [analysis_column, 'var_lower_bound', 'var_upper_bound', 'average', 'median_value']:
             if col in plot_data.columns:
                 valid_data = plot_data[col].dropna()
                 if len(valid_data) > 0:
@@ -204,9 +254,9 @@ class MonteCarloRandomAssistant:
                         f"{col}: 最小值={valid_data.min():.2f}, 最大值={valid_data.max():.2f}, 平均值={valid_data.mean():.2f}")
 
         print("\n" + "=" * 60)
-        print("✅ 所有测试通过! 数据生成、合并和NaN处理操作已完成。")
+        print("✅ 所有测试通过！数据生成、合并和 NaN 处理操作已完成。")
 
-    def select_required_columns(self, final_result):
+    def select_required_columns(self, final_result, analysis_column):
         # 选出需要的字段
         final_result_copy = final_result.copy()
         columns_to_keep = ['trade_date_x', 'open', 'close', 'low', 'high', 'pct_change',

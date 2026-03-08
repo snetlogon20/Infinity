@@ -13,107 +13,72 @@ class AkShareServiceManager():
         logger.info("__init__ started")
 
     @classmethod
-    def callAkShareSpotHistSGEService(self, param_dict):
-        logger.info("callAkShareSpotHistSGEService started...")
+    def callAkShareSpotHistSGEService(self, start_date = '20240101', end_date = CommonParameters.today):
+        logger.info("callAkShareSpotHistSGEServicee started...")
 
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        file_path = os.path.join(CommonParameters.outBoundPath, param_dict.get("file_name", "akshare_spot_hist_sge.xlsx"))
+        file_path = os.path.join(CommonParameters.outBoundPath,'sakshare_spot_hist_sge_dg.xlsx')
 
         try:
             akShareService = AkShareSpotHistSGEService()
 
-            # 准备数据
             dataFrame = akShareService.prepareDataFrame(start_date, end_date)
 
-            # 保存到磁盘
-            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", FileType.EXCEL))
+            akShareService.saveDateFrameToDisk(dataFrame,file_path,FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path,FileType.EXCEL)
 
-            # 从磁盘读取（可选步骤，用于验证）
-            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", FileType.EXCEL))
-
-            # 删除ClickHouse中的旧数据
             akShareService.deleteDateFromClickHouse(start_date, end_date)
 
-            # 转换数据
             dataFrame = akShareService.transformDataFrame(dataFrame)
-
-            # 保存到ClickHouse
             akShareService.saveDateToClickHouse(dataFrame)
 
         except Exception as e:
             logger.info('Exception: %s', e)
             raise e
 
-        logger.info("callAkShareSpotHistSGEService ended...")
+        logger.info("callTushareSGEDailyService ended...")
 
     @classmethod
-    def callAkShareFuturesForeignHistService(self, param_dict):
-        logger.info("callAkShareFuturesForeignHistService started...")
+    def callAkShareFuturesForeignHistService(self, symbol='XAU', file_suffix='xau'):
+        """
+        统一的期货外盘历史数据测试方法
 
-        symbol = param_dict.get("symbol")
-        file_path = os.path.join(CommonParameters.outBoundPath, param_dict.get("file_name", f"akshare_futures_foreign_hist_{symbol.lower()}.xlsx"))
+        Args:
+            symbol (str): 期货品种代码，如 'XAU'(黄金), 'XAG'(白银), 'GC'(COMEX黄金)等
+            file_suffix (str): 文件名后缀，用于区分不同品种
+        """
+        logger.info(f"callAkShareFuturesForeignHistService started... Symbol: {symbol}")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, f'akshare_futures_foreign_hist_{file_suffix}.xlsx')
 
         try:
             akShareService = AkShareFuturesForeignHistService()
 
-            # 准备数据
+            # 获取原始数据
             dataFrame = akShareService.prepareDataFrame(symbol)
-
-            # 保存到磁盘
-            akShareService.saveDateFrameToDisk(dataFrame, file_path, param_dict.get("file_type", FileType.EXCEL))
-
-            # 从磁盘读取（可选步骤，用于验证）
-            dataFrame = akShareService.readDataFrameFromDisk(file_path, param_dict.get("file_type", FileType.EXCEL))
-
-            # 删除ClickHouse中的旧数据
-            akShareService.deleteDateFromClickHouse()
-
-            # 转换数据
-            dataFrame = akShareService.transformDataFrame(dataFrame)
-
-            # 保存到ClickHouse
-            akShareService.saveDateToClickHouse(dataFrame)
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse(symbol)
+            transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(transformed_dataFrame)
 
         except Exception as e:
             logger.info('Exception: %s', e)
             raise e
 
-        logger.info("callAkShareFuturesForeignHistService ended...")
+        logger.info(f"callAkShareFuturesForeignHistService ended... Symbol: {symbol}")
 
     @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
 
-            # start_date = "20240101"
-            # end_date = CommonParameters.today
+            start_date = "20240101"
+            end_date = CommonParameters.today
 
-            param_method_dict = {
-                "callAkShareSpotHistSGEService": {
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "file_name": "akshare_spot_hist_sge_2024.xlsx",
-                    "file_type": FileType.EXCEL
-                },
-                "callAkShareFuturesForeignHistService": {
-                    "symbol": "XAU",  # 伦敦金
-                    "file_name": "akshare_futures_foreign_hist_xau.xlsx",
-                    "file_type": FileType.EXCEL
-                }
-            }
-
-            # 按顺序调用方法
-            for method_name, params in param_method_dict.items():
-                try:
-                    method = getattr(self, method_name)
-                    method(params)
-                except AttributeError as e:
-                    logger.error(f"方法 {method_name} 不存在，请检查拼写！", e)
-                except Exception as e:
-                    logger.error(f"调用 {method_name} 失败: {e}")
-
-            logger.info("callAkShareService completed successfully")
+            self.callAkShareSpotHistSGEService(start_date, end_date)
+            self.callAkShareFuturesForeignHistService('GC', 'GC')
+            self.callAkShareFuturesForeignHistService('XAU', 'XAU')
+            self.callAkShareFuturesForeignHistService('XAG', 'XAG')
 
         except Exception as e:
             logger.error('==============================================')
@@ -123,7 +88,7 @@ class AkShareServiceManager():
 
 def main():
     akShareServiceManager = AkShareServiceManager()
-    akShareServiceManager.callAkShareService()
+    akShareServiceManager.callAkShareService(start_date = "20260101", end_date = CommonParameters.today)
 
 if __name__ == '__main__':
     main()

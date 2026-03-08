@@ -460,7 +460,7 @@ class TuShareServiceManager():
                 "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
                 "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                # "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
+                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
             }
 
             # 按顺序调用方法
