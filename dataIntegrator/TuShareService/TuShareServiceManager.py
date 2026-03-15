@@ -470,22 +470,23 @@ class TuShareServiceManager():
             end_quarter  = self.calendarService.calculate_quarter(end_date) # "2026Q1"
 
             param_method_dict = {
-                # "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
-                # "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
-                # "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
-                # "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
-                # "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},
-                # "callTushareCNMondySupplyService": {"start_date": start_date, "end_date": end_date},  # 保持原方法名
-                # "callTushareCNCPIService": {"start_date": start_date, "end_date": end_date},
-                # "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},
-                # "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},
-                # "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
-                # "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
-                # "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
-                # "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
-                # "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
-                # "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                # "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily,
+                "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
+                "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
+                "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
+                "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
+                "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},
+                "callTushareCNMondySupplyService": {"start_date": start_date, "end_date": end_date},  # 保持原方法名
+                "callTushareCNCPIService": {"start_date": start_date, "end_date": end_date},
+                "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},
+                "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},
+                "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
+                "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
+                "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
+                "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
+                "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
+                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
+                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
+
                 "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date}
             }
 
