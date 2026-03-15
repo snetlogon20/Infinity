@@ -1,5 +1,6 @@
 -- D:\workspace_python\infinity\dataIntegrator\sql\ClickHouse\createTables\df_macro_china_shrzgm.sql
 --drop table indexsysdb.df_macro_china_shrzgm
+--社会融资规模增量统计
 CREATE TABLE indexsysdb.df_macro_china_shrzgm (
     month String,
     total_shrzgm Float64,
