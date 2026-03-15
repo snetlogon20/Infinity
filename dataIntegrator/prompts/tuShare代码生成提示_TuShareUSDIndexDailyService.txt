@@ -1,0 +1,7 @@
+df_tushare_fx_daily.sql 是数据库结构
+TuShareFXDailyService 是 主功能类代码
+TuShareFXDailyServiceTest 是测试代码
+
+你参照 以上的代码，帮我生成
+TuShareUSDIndexDailyService 和
+TuShareUSDIndexDailyServiceTest 的代码

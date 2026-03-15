@@ -1409,7 +1409,7 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_lognormal_distribution_sge()
     # monteCarloTest.test_multi_series_historical_distribution_sge()
-    # monteCarloTest.test_multi_series_historical_distribution_sge_rolling()
+    monteCarloTest.test_multi_series_historical_distribution_sge_rolling()
 
     """
     用不同方式对上海金价%进行分析， lognormal/historical/historical_rolling
@@ -1429,7 +1429,7 @@ if __name__ == "__main__":
     # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
 
     # monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
-    monteCarloTest.test_multi_series_historical_distribution_XAU_pctchange_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_XAU_pctchange_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_pctchange_rolling()
 
 

@@ -10,7 +10,7 @@ class TuShareFXDailyService(TuShareService):
         logger.info("prepareData started")
 
         try:
-            #self.dataFrame = self.pro.fx_daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            # self.dataFrame = self.pro.fx_daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
             self.dataFrame = self.pro.fx_daily(start_date=start_date, end_date=end_date)
             logger.info("self.dataFrame.shape:" + str(self.dataFrame.shape))
 

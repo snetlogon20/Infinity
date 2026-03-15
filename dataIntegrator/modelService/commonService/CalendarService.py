@@ -28,6 +28,18 @@ class CalendarService(CommonLib.CommonLib):
         self.writeLogInfo("Calendar.__init__ completed")
 
     @classmethod
+    def generate_date_range(self, start_date, end_date):
+        """生成日期范围列表，按天循环"""
+        date_range = pandas.date_range(start=start_date, end=end_date)
+
+        date_ranges = []
+        for date in date_range:
+            date_str = date.strftime('%Y%m%d')
+            date_ranges.append((date_str, date_str))
+
+        return date_ranges
+
+    @classmethod
     def createCalendar(self, start_date = '1900-01-01', end_date = datetime.now().date()):
         # Define the date range
         date_range = pandas.date_range(start=start_date, end=end_date)

@@ -31,8 +31,8 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
     @classmethod
     def refresh_guomaikeji_index(self):
         try:
-            ts_code = '002093.SZ'  # 上证指数
-            start_date = '20250101'
+            ts_code = '000333.SZ'  # 中远海控
+            start_date = '20240101'
             end_date = '20261231'
 
             csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_china_stock_index_2025.csv")
@@ -50,5 +50,5 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tuShareChinaStockIndexServiceTest = TuShareChinaStockIndexServiceTest()
-    tuShareChinaStockIndexServiceTest.refresh_shanghai_index()
-    #tuShareChinaStockIndexServiceTest.refresh_guomaikeji_index()
+    # tuShareChinaStockIndexServiceTest.refresh_shanghai_index()
+    tuShareChinaStockIndexServiceTest.refresh_guomaikeji_index()

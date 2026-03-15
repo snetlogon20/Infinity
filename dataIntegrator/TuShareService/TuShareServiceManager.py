@@ -3,6 +3,7 @@ import os
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareCNIndexDailyService import TuShareCNIndexDailyService
 from dataIntegrator.TuShareService.TuShareChinaStockIndexService import TuShareChinaStockIndexService
+from dataIntegrator.TuShareService.TuShareUSDIndexDailyService import TuShareUSDIndexDailyService
 from dataIntegrator.TuShareService.TushareShiborDailyService import TushareShiborDailyService
 from dataIntegrator.TuShareService.TushareShiborLPRDailyService import TushareShiborLPRDailyService
 from dataIntegrator.TuShareService.TushareCNGDPService import TushareCNGDPService
@@ -386,6 +387,30 @@ class TuShareServiceManager():
         logger.info("callTuShareFXDailyService ended...")
 
     @classmethod
+    def callUSDIndexDailyService(self, param_dict):
+        logger.info("callUSDIndexDailyService started...")
+
+        # start_date = '20260301'
+        # end_date = '20260315'
+        start_date = param_dict.get("start_date")
+        end_date = param_dict.get("end_date")
+        csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_usd_index_%s-%s.csv" % (start_date, end_date))
+
+        try:
+            tuShareService = TuShareUSDIndexDailyService()
+            dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+            tuShareService.deleteDateFromClickHouse(start_date, end_date)
+            tuShareService.saveDateToClickHouse()
+
+        except Exception as e:
+            logger.info('Exception', e)
+            raise e
+
+        logger.info("callUSDIndexDailyService ended...")
+
+    @classmethod
     def callTushareSGEDailyService(self, param_dict):
         logger.info("callTushareSGEDailyService started...")
 
@@ -460,7 +485,9 @@ class TuShareServiceManager():
                 "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
                 "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date} #5 times daily
+                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
+
+                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date}
             }
 
             # 按顺序调用方法
