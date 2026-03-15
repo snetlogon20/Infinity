@@ -196,6 +196,54 @@ class SharpRatio(TuShareService):
                 plt.grid(True, alpha=0.3)
                 plt.legend()
 
+            # 子图 6: 关键指标摘要
+            plt.subplot(3, 2, 6)
+            plt.axis('off')
+
+            # 确定夏普比率评级
+            if sharpe_ratio > 2:
+                rating = "Excellent ⭐⭐⭐"
+            elif sharpe_ratio > 1:
+                rating = "Good ⭐⭐"
+            elif sharpe_ratio > 0:
+                rating = "Positive ⭐"
+            else:
+                rating = "Negative ⚠️"
+
+            info_text = f"""
+            ╔═══════════════════════════════════════════╗
+            ║     SHARPE RATIO ANALYSIS SUMMARY        ║
+            ╠═══════════════════════════════════════════╣
+            ║                                           ║
+            ║  📊 Portfolio Metrics                     ║
+            ║  ──────────────────────────────           ║
+            ║  Total Trading Days:   {len(portfolio_data):>10}              ║
+            ║  Annual Return:        {annual_return:>10.2%}              ║
+            ║  Annual Volatility:    {annual_volatility:>10.2%}              ║
+            ║                                           ║
+            ║  💰 Risk-Free Rate:     {risk_free_rate:>10.2%}              ║
+            ║                                           ║
+            ║  ⭐ KEY RESULT                            ║
+            ║  ──────────────────────────────           ║
+            ║  Sharpe Ratio:         {sharpe_ratio:>10.4f}              ║
+            ║  Rating:               {rating:>10}              ║
+            ║                                           ║
+            ║  📈 Additional Stats                      ║
+            ║  ──────────────────────────────           ║
+            ║  Avg Daily Return:     {daily_mean:>10.4%}              ║
+            ║  Daily Std Dev:        {daily_std:>10.4%}              ║
+            ║  Cumulative Return:    {portfolio_data['cumulative_return'].iloc[-1]:>10.2%}              ║
+            ║                                           ║
+            ║  🔝 Max Daily Gain:    {portfolio_data['daily_return'].max():>10.4%}              ║
+            ║  🔻 Max Daily Loss:    {portfolio_data['daily_return'].min():>10.4%}              ║
+            ║                                           ║
+            ╚═══════════════════════════════════════════╝
+            """
+            plt.text(0.05, 0.95, info_text, fontsize=8, verticalalignment='top',
+                     bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow",
+                               edgecolor="darkorange", alpha=0.9),
+                     fontfamily='monospace')
+
             plt.tight_layout()
             plt.show()
             print("✅ 图表生成成功")

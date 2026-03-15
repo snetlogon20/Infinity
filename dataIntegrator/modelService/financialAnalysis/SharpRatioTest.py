@@ -31,12 +31,47 @@ def get_sharpe_ratio_of_m1_m2():
     sharp_ratio_calculator = SharpRatio()
     sharpe_ratio = sharp_ratio_calculator.calculate_sharpe_ratio_from_data(riskfree_data, portfolio_data, riskfree_column, portfolio_price_column)
 
-def get_sharpe_ratio_of_citi():
+def get_sharpe_ratio_of_US_stock(ts_code='C'):
     riskfree_sql = """SELECT 4.5 AS risk_free_rate;"""
     portfolio_sql = """
             select * from indexsysdb.df_tushare_us_stock_daily
-            where ts_code = 'C' AND trade_date >= '20240308' and trade_date <='20260308'
-        """
+            where ts_code = '%s' AND trade_date >= '20240308' and trade_date <='20260308'
+        """ % ts_code
+
+    riskfree_column = 'risk_free_rate'
+    portfolio_price_column = 'close_point'
+
+    clickhouClickhouseService = ClickhouseService()
+    riskfree_data = clickhouClickhouseService.getDataFrameWithoutColumnsName(riskfree_sql)
+    portfolio_data = clickhouClickhouseService.getDataFrameWithoutColumnsName(portfolio_sql)
+
+    sharp_ratio_calculator = SharpRatio()
+    sharpe_ratio = sharp_ratio_calculator.calculate_sharpe_ratio_from_data(riskfree_data, portfolio_data, riskfree_column, portfolio_price_column)
+
+    return sharpe_ratio
+
+def get_sharpe_ratio_of_CN_stock(ts_code='000902.SZ'):
+    riskfree_sql = """SELECT 1.5 AS risk_free_rate;"""
+    portfolio_sql = """
+            select 
+                ts_code,
+                trade_date,
+                open,
+                high,
+                low,
+                close as close_point,
+                pre_close,
+                change,
+                pct_chg,
+                vol,
+                amount
+            from indexsysdb.df_tushare_stock_daily
+            where ts_code = '%s'
+       			and trade_date >= '20220101'
+       			and trade_date <= '20260307'
+            order by trade_date
+        """ % ts_code
+
     riskfree_column = 'risk_free_rate'
     portfolio_price_column = 'close_point'
 
@@ -75,6 +110,7 @@ def get_sharpe_ratio_of_GC():
 
     return sharpe_ratio
 
+
 if __name__ == "__main__":
     #Example 1.6
     sharp_ratio_caculator = SharpRatio()
@@ -88,8 +124,29 @@ if __name__ == "__main__":
 
     # '''Test the sharpe ration for Citi/Treasury rate'''
     # logger.info("="*10 + '''Test the sharpe ration for Citi/Treasury rate''' + "=" * 10)
-    # get_sharpe_ratio_of_citi()
+    # get_sharpe_ratio_of_US_stock(ts_code='C')
 
-    '''Test the sharpe ration for Citi/Treasury rate'''
-    logger.info("="*10 + '''Test the sharpe ration for GC/Treasury rate''' + "=" * 10)
-    get_sharpe_ratio_of_GC()
+    # '''Test the sharpe ration for JPM/Treasury rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for Citi/Treasury rate''' + "=" * 10)
+    # get_sharpe_ratio_of_US_stock(ts_code='JPM')
+
+    # '''Test the sharpe ration for Gold-AU/Treasury rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for GC/Treasury rate''' + "=" * 10)
+    # get_sharpe_ratio_of_GC()
+
+    # '''Test the sharpe ration for 000902.SZ 新洋丰/Treasury rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for 000902.SZ 新洋丰/Treasury rate''' + "=" * 10)
+    # get_sharpe_ratio_of_CN_stock(ts_code='000902.SZ')
+
+    # '''Test the sharpe ration for 603839.SH 安正时尚/Treasury rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for 603839.SH 安正时尚/Treasury rate''' + "=" * 10)
+    # get_sharpe_ratio_of_CN_stock(ts_code='603839.SH')
+
+    # '''Test the sharpe ration for 601919.SH 中远海控/Treasury rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for 601919.SH 中远海控/Treasury rate''' + "=" * 10)
+    # get_sharpe_ratio_of_CN_stock(ts_code='601919.SH')
+
+
+    '''Test the sharpe ration for 000333.SZ 美的集团/Treasury rate'''
+    logger.info("="*10 + '''Test the sharpe ration for 000333.SZ 美的集团/Treasury rate''' + "=" * 10)
+    get_sharpe_ratio_of_CN_stock(ts_code='000333.SZ')
