@@ -65,6 +65,7 @@ class AkShareFuturesForeignHistService(AkShareService):
             logger.info(f"数据类型: {dataFrame.dtypes}")
             logger.info(f"数据形状: {dataFrame.shape}")
             logger.info(f"前几行数据:\n{dataFrame.head()}")
+            logger.info(f"前几行数据:\n{dataFrame.tail()}")
 
             # 确保只保存数据库表中存在的列，并且数据类型正确
             #db_columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'position', 'settlement', 'symbol','pct_change']

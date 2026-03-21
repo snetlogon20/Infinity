@@ -65,7 +65,7 @@ class MonteCarloRandomAssistant:
         original_columns = ['open', 'close', 'low', 'high', 'pct_change']
         logger.info(f"成功带入的original列: {[col for col in original_columns if col in joined_dataframe.columns]}")
         logger.info(f"左连接后形状: {joined_dataframe.shape}")
-        logger.info("左连接后的列:", list(joined_dataframe.columns))
+        logger.info(f"左连接后的列：{list(joined_dataframe.columns)}")
         logger.info("左连接结果 (显示带入的original值):")
         logger.info(joined_dataframe[['trade_date'] + [col for col in original_columns if col in joined_dataframe.columns]].head())
 
