@@ -266,17 +266,17 @@ class CalendarService(CommonLib.CommonLib):
 
             start_index = start_rows.index[0]
 
-            # 计算目标索引
+            # 根据当前日期的位置先在给定的日历中找，看看有没有第next_n_working_days个工作日
             target_index = start_index + next_n_working_days
 
-            # 检查索引是否有效
+            # 如果有，就用给定的日历里面的日期
             if target_index < len(sorted_df):
                 target_row = sorted_df.iloc[target_index]
                 data_value = target_row.get('trade_date', None)  # 使用get方法避免KeyError
 
                 self.logger.info(f"找到日期 {target_row['trade_date']} 的数据: {data_value}")
                 return data_value
-            else:
+            else: # 没有，只能到 indexsysdb.df_sys_calendar 去找了
                 self.logger.warning(f"索引 {target_index} 超出数据范围，最大索引为 {len(sorted_df) - 1}")
                 # 没有日历了， 只能到 indexsysdb.df_sys_calendar 去找了
                 inquiryManager = InquiryManager()

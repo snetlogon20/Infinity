@@ -1,4 +1,4 @@
-from dataIntegrator import CommonParameters
+from dataIntegrator import CommonParameters, CommonLib
 from dataIntegrator.analysisService.InquiryManager import InquiryManager
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomAssistant import MonteCarloRandomAssistant
 from dataIntegrator.modelService.MonteCarlo.MonteCarloRandomManager import MonteCarloRandomManager
@@ -6,6 +6,9 @@ from dataIntegrator.modelService.commonService.CalendarService import CalendarSe
 from dataIntegrator.utility.FileUtility import FileUtility
 from datetime import datetime, timedelta
 import pandas as pd
+
+logger = CommonLib.logger
+commonLib = CommonLib()
 
 class MonteCarloRandomTest:
     @classmethod
@@ -661,7 +664,8 @@ class MonteCarloRandomTest:
         monteCarloRandomManager = MonteCarloRandomManager()
         inquiryManager = InquiryManager()
 
-        start_date = datetime.strptime('2025-11-01', '%Y-%m-%d')
+        #start_date = datetime.strptime('2025-11-01', '%Y-%m-%d')
+        start_date = datetime.strptime('2025-04-01', '%Y-%m-%d')
         formatted_start_date = start_date.strftime('%Y-%m-%d')
         end_date = CommonParameters.today
 
@@ -670,14 +674,18 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 5
 
-        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        #获取原始数据
+        #results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        results_df = None
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
         original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame_GC.xlsx")
 
+        # 获取原始数据中的日期，作为循环条件
         sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         loop_date_dataFrame = inquiryManager.get_sql_dataset(sql)
 
+        # 获取原始数据中的过去日期，推算预测日期？？
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' order by date "
         past_calendar_dataFrame = inquiryManager.get_sql_dataset(sql)
 
@@ -685,10 +693,7 @@ class MonteCarloRandomTest:
             current_date = row['trade_date']
             sample_end_date = current_date
 
-            print(f"formatted_start_date: {formatted_start_date}")
-            print(f"current_date: {current_date}")
-            print(f"end_date: {end_date}")
-            print(f"sample_end_date: {sample_end_date}")
+            logger.info(f"formatted_start_date: {formatted_start_date} | current_date: {current_date} | end_date: {end_date} | sample_end_date: {sample_end_date}")
 
             formatted_date = current_date
 
@@ -731,23 +736,28 @@ class MonteCarloRandomTest:
             }
             all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
+            # 计算当前日期 + n 工作日
             calendarService = CalendarService()
-            last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
-                         (past_calendar_dataFrame, current_date, next_n_working_days))
-            print(f"current_date:{current_date}, last date: {last_date} ============================================================> ")
-            if last_date is None:
-                print(f"No next working day found for date: {current_date}")
+            next_n_working_date = calendarService.find_data_by_given_dataframe_and_date_offset(past_calendar_dataFrame, current_date, next_n_working_days)
+            print(f"current_date:{current_date}, next_n_working_days:{next_n_working_days} , next_n_working_date: {next_n_working_date} ============================================================> ")
+            if next_n_working_date is None:
+                print(f"No next working date found for date: {current_date}")
 
             new_row = pd.DataFrame([{
                 'trade_date': formatted_date,
-                'predict_date': last_date,
+                'predict_date': next_n_working_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
-            print(new_row)
-            results_df = pd.concat([results_df, new_row], ignore_index=True)
+            print("next row======================>", new_row)
+            #results_df = pd.concat([results_df, new_row], ignore_index=True)
+            if results_df is None:
+                results_df = new_row  # 第一次赋值
+            else:
+                results_df = pd.concat([results_df, new_row])  # 后续拼接
+
 
             if current_date > end_date:
                 print(f"current_date: {current_date}")
@@ -1409,7 +1419,7 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_lognormal_distribution_sge()
     # monteCarloTest.test_multi_series_historical_distribution_sge()
-    monteCarloTest.test_multi_series_historical_distribution_sge_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_sge_rolling()
 
     """
     用不同方式对上海金价%进行分析， lognormal/historical/historical_rolling
@@ -1424,7 +1434,7 @@ if __name__ == "__main__":
     -- XAU - 伦敦金
     -- XAG - 白银
     """
-    # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
+    monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
 

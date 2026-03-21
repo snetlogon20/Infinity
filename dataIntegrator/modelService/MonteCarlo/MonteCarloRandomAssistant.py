@@ -94,9 +94,9 @@ class MonteCarloRandomAssistant:
         #final_dataframe = final_dataframe.fillna(0)
 
         # 验证结果
-        logger.info(f"最终左连接后形状: {final_dataframe.shape}")
-        logger.info("最终左连接后的列:", list(final_dataframe.columns))
-        logger.info("最终左连接结果 (NaN已填充为0):")
+        logger.info(f"最终左连接后形状：{final_dataframe.shape}")
+        logger.info(f"最终左连接后的列：{list(final_dataframe.columns)}")
+        logger.info("最终左连接结果 (NaN 已填充为 0):")
         logger.info(final_dataframe)
 
         # 验证NaN值处理
@@ -270,7 +270,9 @@ class MonteCarloRandomAssistant:
         return final_result_copy
 
     def save_file_to_excel(self, final_result_copy):
+
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_normal", "xlsx")
+        logger.info(f"保存文件到 Excel...{file_full_name}")
         final_result_copy.to_excel(file_full_name)
         return final_result_copy
 
