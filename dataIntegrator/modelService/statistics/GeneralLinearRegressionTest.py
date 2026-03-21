@@ -301,7 +301,7 @@ LEFT JOIN (
 LEFT JOIN indexsysdb.df_tushare_usd_index_daily
     ON df_sys_calendar.trade_date = df_tushare_usd_index_daily.trade_date
 WHERE
-    df_sys_calendar.trade_date BETWEEN '20241202' AND '20260317' and   
+    df_sys_calendar.trade_date BETWEEN '20241202' AND '20260318' and   
     df_akshare_spot_hist_sge__close <> 0
     AND df_akshare_spot_hist_sge.close <> 0
     AND df_tushare_us_stock_daily.close_point <> 0
