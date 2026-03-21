@@ -674,8 +674,8 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 5
 
-        #获取原始数据
-        #results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        # Step 1 收集基础数据
+        # 获取原始数据
         results_df = None
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
@@ -685,19 +685,20 @@ class MonteCarloRandomTest:
         sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         loop_date_dataFrame = inquiryManager.get_sql_dataset(sql)
 
-        # 获取原始数据中的过去日期，推算预测日期？？
+        # 获取原始数据中的过去日期，推算T+N的工作日
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' order by date "
         past_calendar_dataFrame = inquiryManager.get_sql_dataset(sql)
 
+        # Step 2 逐天计算们特卡逻辑预测值
         for index, row in loop_date_dataFrame.iterrows():
+            # Step 2.1 先拿到当前的日期
             current_date = row['trade_date']
             sample_end_date = current_date
-
+            formatted_date = current_date
             logger.info(f"formatted_start_date: {formatted_start_date} | current_date: {current_date} | end_date: {end_date} | sample_end_date: {sample_end_date}")
 
-            formatted_date = current_date
-
-            print(f"Processing date: {formatted_date}")
+            # Step 2.2 获取当前日前的的样本数据
+            logger.info(f"Processing date: {formatted_date}")
             sql = f"""
                     select *
                     from 
@@ -716,15 +717,15 @@ class MonteCarloRandomTest:
                     )
                     order by trade_date
                 """
-            print(sql)
+            logger.info(f"sql: {sql}")
 
             dataFrame = inquiryManager.get_sql_dataset(sql)
-
             if dataFrame.empty:
-                print(f"No data found for date: {formatted_date}")
+                logger.warning(f"No data found...")
                 current_date += timedelta(days=1)
                 continue
 
+            # Step 2.3 设置蒙特卡洛模拟参数
             simulat_params = {
                 'init_value': 'close',
                 'analysis_column': 'pct_change',
@@ -736,35 +737,36 @@ class MonteCarloRandomTest:
             }
             all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
-            # 计算当前日期 + n 工作日
+            # Step 2.4 计算 predict_date = 当前日期 + n 工作日，
             calendarService = CalendarService()
             next_n_working_date = calendarService.find_data_by_given_dataframe_and_date_offset(past_calendar_dataFrame, current_date, next_n_working_days)
-            print(f"current_date:{current_date}, next_n_working_days:{next_n_working_days} , next_n_working_date: {next_n_working_date} ============================================================> ")
+            logger.info(f"current_date:{current_date}, next_n_working_days:{next_n_working_days} , next_n_working_date: {next_n_working_date}")
             if next_n_working_date is None:
-                print(f"No next working date found for date: {current_date}")
+                logger.warning(f"No next working date found for date: {current_date}")
+            predict_date = next_n_working_date
 
+            # Step 2.5 插入新值，
             new_row = pd.DataFrame([{
                 'trade_date': formatted_date,
-                'predict_date': next_n_working_date,
+                'predict_date': predict_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
-            print("next row======================>", new_row)
-            #results_df = pd.concat([results_df, new_row], ignore_index=True)
+            logger.info("next row: ", new_row)
             if results_df is None:
                 results_df = new_row  # 第一次赋值
             else:
                 results_df = pd.concat([results_df, new_row])  # 后续拼接
 
-
+            # Step 2.6 到末尾，结束
             if current_date > end_date:
-                print(f"current_date: {current_date}")
-                print(f"end_date: {end_date}")
+                logger.info(f"current_date: {current_date}")
+                logger.info(f"end_date: {end_date}")
                 break
 
-        print(results_df)
+        logger.info(results_df)
 
         monteCarloRandomAssistant = MonteCarloRandomAssistant()
         final_result = monteCarloRandomAssistant.generate_forecast_dataframes(original_dataFrame, results_df)
