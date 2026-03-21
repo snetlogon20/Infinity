@@ -101,11 +101,15 @@ class TuShareUSDIndexDailyService(TuShareService):
                 AND USDSEK.ts_code = 'USDSEK.FXCM'
             WHERE c.trade_date >= '%s' 
               AND c.trade_date <= '%s'
-            ORDER BY c.trade_date desc
             """ % (start_date, end_date)
 
             # 执行查询
             self.dataFrame = self.clickhouseClient.query_dataframe(query_sql)
+
+            self.dataFrame = self.dataFrame.sort_values('trade_date', ascending=True)
+            # 计算变化率：(下一个交易日的值 - 当前值) / 当前值 * 100
+            self.dataFrame['pct_change'] = self.dataFrame['USDX_index'].pct_change() * 100
+
             logger.info("self.dataFrame.shape:" + str(self.dataFrame.shape))
 
         except Exception as e:
@@ -129,6 +133,7 @@ class TuShareUSDIndexDailyService(TuShareService):
             INSERT INTO indexsysdb.df_tushare_usd_index_daily (
                 trade_date,
                 USDX_index,
+                pct_change,
                 USDJPY_bid_open, USDJPY_ask_open,
                 USDHKD_bid_open, USDHKD_ask_open,
                 USDCNH_bid_open, USDCNH_ask_open,
@@ -155,6 +160,7 @@ class TuShareUSDIndexDailyService(TuShareService):
             # 确保 DataFrame 包含所有必需的列
             required_columns = [
                 'trade_date',
+                'pct_change',
                 'USDX_index',
                 'USDJPY_bid_open', 'USDJPY_ask_open',
                 'USDHKD_bid_open', 'USDHKD_ask_open',

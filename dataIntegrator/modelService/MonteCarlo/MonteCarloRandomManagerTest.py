@@ -1411,6 +1411,68 @@ class MonteCarloRandomTest:
         all_line_df.to_excel(file_full_name)
         return all_line_df
 
+    def test_multi_series_historical_distribution_USD_index_rolling(self):
+        """多线模拟 - Historical Distribution - USD Index (美元指数) - Rolling"""
+
+        symbol = 'USDX'  # 交易标的代码：美元指数
+        start_date = '2024-03-01'  # 开始日期
+        end_date = None  # 结束日期：None 表示使用今天
+        analysis_column = 'close'  # 分析列名：美元指数
+        analysis_column_label = '美元指数'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'close',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': 5,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'historical'
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+
+        # 从 ClickHouse 查询美元指数数据
+        get_original_data_sql = f"select trade_date, USDX_index as open, USDX_index as close, USDX_index as low, USDX_index as high, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
+        get_trade_date_sql = f"select trade_date from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
+        get_past_calendar_sql = f"select trade_date, USDX_index as close, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        trade_date,
+                        USDX_index as close,
+                        pct_change
+                    from indexsysdb.df_tushare_usd_index_daily
+                    where trade_date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：美元指数
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：美元指数
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数
+            output_path=rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame_USDX.xlsx",  # Excel 输出路径
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template  # 蒙特卡洛模拟 SQL 模板
+        )
+
+        return
 
     # 通用代码
     def test_multi_series_historical_rolling(
@@ -1703,7 +1765,7 @@ if __name__ == "__main__":
     -- XAU - 伦敦金
     -- XAG - 白银
     """
-    monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
 
@@ -1717,3 +1779,4 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()
 
+    monteCarloTest.test_multi_series_historical_distribution_USD_index_rolling()
