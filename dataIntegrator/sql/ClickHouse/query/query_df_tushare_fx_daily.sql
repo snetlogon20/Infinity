@@ -188,3 +188,6 @@ LEFT JOIN indexsysdb.df_tushare_fx_daily USDSEK
 WHERE c.trade_date >= '20200101' 
   AND c.trade_date <= '20260317'
 ORDER BY c.trade_date desc
+
+
+select trade_date, USDX_index, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='2025-01-01'
