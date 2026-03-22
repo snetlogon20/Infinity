@@ -367,26 +367,55 @@ class TuShareServiceManager():
         # ts_code = 'US30.FXCM'
         # start_date = '20220101'
         # end_date = '20220521'
-        ts_code = param_dict.get("ts_code")
+        # ts_code = param_dict.get("ts_code")
+        # start_date = param_dict.get("start_date")
+        # end_date = param_dict.get("end_date")
+        # csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.txt")
+        #
+        # try:
+        #     tuShareService = TuShareFXDailyService()
+        #     dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
+        #     jsonString = tuShareService.convertDataFrame2JSON()
+        #     tuShareService.saveDateFrameToDisk(csvFilePath)
+        #     tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
+        #     tuShareService.saveDateToClickHouse()
+        #
+        # except Exception as e:
+        #     logger.info('Exception', e)
+        #     raise e
+        #
+        # logger.info("callTuShareFXDailyService ended...")
+
+        ts_code = "nothing"
         start_date = param_dict.get("start_date")
         end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.txt")
+        calendar = CalendarService()
+        date_range = calendar.generate_date_range(start_date, end_date)
 
-        try:
-            tuShareService = TuShareFXDailyService()
-            dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
-            jsonString = tuShareService.convertDataFrame2JSON()
-            tuShareService.saveDateFrameToDisk(csvFilePath)
-            tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-            tuShareService.saveDateToClickHouse()
+        for i, (current_start, current_end) in enumerate(date_range, 1):
+            try:
+                csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                           "df_tushare_fx_%s-%s.csv" % (start_date, start_date))
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+                tuShareService = TuShareFXDailyService()
+                dataFrame = tuShareService.prepareDataFrame(ts_code, current_start, current_start)
+                jsonString = tuShareService.convertDataFrame2JSON()
+                tuShareService.saveDateFrameToDisk(csvFilePath)
+                tuShareService.deleteDateFromClickHouse(ts_code, current_start, current_start)
+                tuShareService.saveDateToClickHouse()
 
-        logger.info("callTuShareFXDailyService ended...")
+                logger.info(f"✅ {current_start} - {current_end} 刷新成功，共 {len(dataFrame)} 条数据")
+
+            except Exception as e:
+                logger.error(f"❌ {current_start} - {current_end} - 刷新失败：{e}")
+                continue
+
+    logger.info("\n" + "=" * 60)
+    logger.info("所有外汇对刷新完成")
+    logger.info("=" * 60)
 
     @classmethod
+    # 美元指数
     def callUSDIndexDailyService(self, param_dict):
         logger.info("callUSDIndexDailyService started...")
 

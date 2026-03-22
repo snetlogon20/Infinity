@@ -1,7 +1,8 @@
 --drop table indexsysdb.df_tushare_usd_index_daily
 CREATE TABLE indexsysdb.df_tushare_usd_index_daily(
-    trade_date     String,
+    trade_date           String,
     USDX_index           Float64,
+    pct_change           Float64,
     USDJPY_bid_open      Float64,
     USDJPY_ask_open      Float64,
     USDHKD_bid_open      Float64,

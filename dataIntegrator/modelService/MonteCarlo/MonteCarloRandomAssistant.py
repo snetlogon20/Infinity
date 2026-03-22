@@ -65,7 +65,7 @@ class MonteCarloRandomAssistant:
         original_columns = ['open', 'close', 'low', 'high', 'pct_change']
         logger.info(f"成功带入的original列: {[col for col in original_columns if col in joined_dataframe.columns]}")
         logger.info(f"左连接后形状: {joined_dataframe.shape}")
-        logger.info("左连接后的列:", list(joined_dataframe.columns))
+        logger.info(f"左连接后的列：{list(joined_dataframe.columns)}")
         logger.info("左连接结果 (显示带入的original值):")
         logger.info(joined_dataframe[['trade_date'] + [col for col in original_columns if col in joined_dataframe.columns]].head())
 
@@ -94,9 +94,9 @@ class MonteCarloRandomAssistant:
         #final_dataframe = final_dataframe.fillna(0)
 
         # 验证结果
-        logger.info(f"最终左连接后形状: {final_dataframe.shape}")
-        logger.info("最终左连接后的列:", list(final_dataframe.columns))
-        logger.info("最终左连接结果 (NaN已填充为0):")
+        logger.info(f"最终左连接后形状：{final_dataframe.shape}")
+        logger.info(f"最终左连接后的列：{list(final_dataframe.columns)}")
+        logger.info("最终左连接结果 (NaN 已填充为 0):")
         logger.info(final_dataframe)
 
         # 验证NaN值处理
@@ -270,7 +270,9 @@ class MonteCarloRandomAssistant:
         return final_result_copy
 
     def save_file_to_excel(self, final_result_copy):
+
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_normal", "xlsx")
+        logger.info(f"保存文件到 Excel...{file_full_name}")
         final_result_copy.to_excel(file_full_name)
         return final_result_copy
 

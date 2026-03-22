@@ -145,7 +145,13 @@ SELECT
     -- 新增的纽约金数据字段
     df_akshare_futures_foreign_hist_GC.pct_change AS df_akshare_futures_foreign_hist__GC_pct_change,
     -- 伦敦金数据字段
-    df_akshare_futures_foreign_hist_XAU.pct_change AS df_akshare_futures_foreign_hist__XAU_pct_change
+    df_akshare_futures_foreign_hist_XAU.pct_change AS df_akshare_futures_foreign_hist__XAU_pct_change,
+    -- 美元指数数据字段
+    df_tushare_usd_index_daily.USDX_index AS df_tushare_usd_index_daily__USDX_index,
+    df_tushare_usd_index_daily.USDCNH_ask_close AS df_tushare_usd_index_daily__USDCNH_ask_close,
+    -- 美元指数数据字段
+    df_tushare_usd_index_daily.USDX_index AS df_tushare_usd_index_daily__USDX_index,
+    df_tushare_usd_index_daily.USDCNH_ask_close AS df_tushare_usd_index_daily__USDCNH_ask_close
 FROM df_sys_calendar
 LEFT JOIN df_tushare_us_stock_daily
     ON df_sys_calendar.trade_date = df_tushare_us_stock_daily.trade_date
@@ -183,9 +189,21 @@ LEFT JOIN (
     WHERE symbol = 'GC'
 ) AS df_akshare_futures_foreign_hist_GC
     ON df_sys_calendar.trade_date = formatDateTime(toDate(df_akshare_futures_foreign_hist_GC.date), '%Y%m%d')
+-- 新增的美元指数数据连接
+LEFT JOIN indexsysdb.df_tushare_usd_index_daily
+    ON df_sys_calendar.trade_date = df_tushare_usd_index_daily.trade_date
 WHERE
     df_sys_calendar.trade_date BETWEEN '20241202' AND '20260227' and   
-    df_akshare_spot_hist_sge__pct_change <> 0
+    df_akshare_spot_hist_sge__pct_change <> 0    
+    AND isNaN(df_akshare_spot_hist_sge__pct_change) = 0
+    AND isNaN(df_akshare_spot_hist_sge.pct_change) = 0
+    AND isNaN(df_tushare_us_stock_daily.pct_change) = 0
+    AND isNaN(df_tushare_shibor_daily.tenor_on) = 0
+    AND isNaN(df_tushare_stock_daily.pct_chg) = 0
+    AND isNaN(df_akshare_futures_foreign_hist_XAU.pct_change) = 0
+    AND isNaN(df_akshare_futures_foreign_hist_GC.pct_change) = 0
+    AND isNaN(df_tushare_usd_index_daily.USDX_index) = 0
+    AND isNaN(df_tushare_usd_index_daily.USDCNH_ask_close) = 0
 ORDER BY df_sys_calendar__trade_date 
     """
 
@@ -199,7 +217,9 @@ ORDER BY df_sys_calendar__trade_date
     df_tushare_shibor_daily__tenor_on,
     df_tushare_stock_daily__pct_chg,
     df_akshare_futures_foreign_hist__GC_pct_change,
-    df_akshare_futures_foreign_hist__XAU_pct_change
+    df_akshare_futures_foreign_hist__XAU_pct_change,
+    df_tushare_usd_index_daily__USDX_index,
+    df_tushare_usd_index_daily__USDCNH_ask_close
     """
     yColumn = "df_akshare_spot_hist_sge__pct_change"
 
@@ -227,8 +247,8 @@ def load_param_dict_gold_close_analysis_004():
     response_dict = {}
 
     sql = """
-SELECT
-    df_sys_calendar.trade_date AS df_sys_calendar__trade_date,
+select
+   df_sys_calendar.trade_date AS df_sys_calendar__trade_date,
     df_tushare_us_stock_daily.close_point AS df_tushare_us_stock_daily__close,
     df_tushare_shibor_daily.tenor_on AS df_tushare_shibor_daily__tenor_on,
     df_tushare_stock_daily.close AS df_tushare_stock_daily__close,
@@ -236,7 +256,10 @@ SELECT
     -- 新增的纽约金收盘价数据字段
     df_akshare_futures_foreign_hist_GC.close AS df_akshare_futures_foreign_hist__GC_close,
     -- 伦敦金收盘价数据字段
-    df_akshare_futures_foreign_hist_XAU.close AS df_akshare_futures_foreign_hist__XAU_close
+    df_akshare_futures_foreign_hist_XAU.close AS df_akshare_futures_foreign_hist__XAU_close,
+    -- 美元指数数据字段
+    df_tushare_usd_index_daily.USDX_index AS df_tushare_usd_index_daily__USDX_index,
+    df_tushare_usd_index_daily.USDCNH_ask_close AS df_tushare_usd_index_daily__USDCNH_ask_close
 FROM df_sys_calendar
 LEFT JOIN df_tushare_us_stock_daily
     ON df_sys_calendar.trade_date = df_tushare_us_stock_daily.trade_date
@@ -271,12 +294,27 @@ LEFT JOIN (
         high,
         volume
     FROM indexsysdb.df_akshare_futures_foreign_hist
-    WHERE symbol = 'GC'
+    WHERE symbol = 'GC' AND close > 0
 ) AS df_akshare_futures_foreign_hist_GC
     ON df_sys_calendar.trade_date = formatDateTime(toDate(df_akshare_futures_foreign_hist_GC.date), '%Y%m%d')
+-- 新增的美元指数数据连接
+LEFT JOIN indexsysdb.df_tushare_usd_index_daily
+    ON df_sys_calendar.trade_date = df_tushare_usd_index_daily.trade_date
 WHERE
-    df_sys_calendar.trade_date BETWEEN '20241202' AND '20260227' and   
+    df_sys_calendar.trade_date BETWEEN '20241202' AND '20260318' and   
     df_akshare_spot_hist_sge__close <> 0
+    AND df_akshare_spot_hist_sge.close <> 0
+    AND df_tushare_us_stock_daily.close_point <> 0
+    AND df_akshare_futures_foreign_hist_GC.close > 0    
+    -- 排除NaN值
+    AND NOT isNaN(df_akshare_spot_hist_sge.close)
+    AND NOT isNaN(df_tushare_us_stock_daily.close_point)
+    AND NOT isNaN(df_tushare_shibor_daily.tenor_on)
+    AND NOT isNaN(df_tushare_stock_daily.close)
+    AND NOT isNaN(df_akshare_futures_foreign_hist_GC.close)
+    AND NOT isNaN(df_akshare_futures_foreign_hist_XAU.close)
+    AND NOT isNaN(df_tushare_usd_index_daily.USDX_index)
+    AND NOT isNaN(df_tushare_usd_index_daily.USDCNH_ask_close)
 ORDER BY df_sys_calendar__trade_date
     """
 
@@ -290,7 +328,9 @@ ORDER BY df_sys_calendar__trade_date
     df_tushare_shibor_daily__tenor_on,
     df_tushare_stock_daily__close,
     df_akshare_futures_foreign_hist__GC_close,
-    df_akshare_futures_foreign_hist__XAU_close
+    df_akshare_futures_foreign_hist__XAU_close,
+    df_tushare_usd_index_daily__USDX_index,
+    df_tushare_usd_index_daily__USDCNH_ask_close
     """
     yColumn = "df_akshare_spot_hist_sge__close"
 
@@ -339,16 +379,16 @@ if __name__ == "__main__":
     '''
         预测上海金，和花旗股票，纽约金、伦敦金涨跌幅的关系
     '''
-    response_dict = load_param_dict_gold_pct_analysis_003()
-    generalLinearRegression = GeneralLinearRegression()
-    generalLinearRegression.run_linear_regression_by_AI(response_dict)
+    # response_dict = load_param_dict_gold_pct_analysis_003()
+    # generalLinearRegression = GeneralLinearRegression()
+    # generalLinearRegression.run_linear_regression_by_AI(response_dict)
 
 
     '''
         预测上海金收盘价，和股票、纽约金、伦敦金收盘价的关系
     '''
-    # response_dict = load_param_dict_gold_close_analysis_004()
-    # generalLinearRegression = GeneralLinearRegression()
-    # response_dict = generalLinearRegression.run_linear_regression_by_AI(response_dict)
-    # full_test_df = response_dict["full_test_df"]
-    # full_test_df.to_excel(rf"e:\tmp\full_test_df.xlsx")
+    response_dict = load_param_dict_gold_close_analysis_004()
+    generalLinearRegression = GeneralLinearRegression()
+    response_dict = generalLinearRegression.run_linear_regression_by_AI(response_dict)
+    full_test_df = response_dict["full_test_df"]
+    full_test_df.to_excel(rf"e:\tmp\full_test_df.xlsx")
