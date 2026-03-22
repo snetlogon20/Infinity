@@ -1436,9 +1436,9 @@ class MonteCarloRandomTest:
         formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
 
         # 从 ClickHouse 查询美元指数数据
-        get_original_data_sql = f"select trade_date, USDX_index as open, USDX_index as close, USDX_index as low, USDX_index as high, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
-        get_trade_date_sql = f"select trade_date from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
-        get_past_calendar_sql = f"select trade_date, USDX_index as close, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}'  AND USDX_index IS NOT NULL AND USDX_index != 0 AND NOT isNaN(USDX_index) order by trade_date "
+        get_original_data_sql = f"select trade_date, USDX_index as open, USDX_index as close, USDX_index as low, USDX_index as high, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index > 0 AND NOT isNaN(USDX_index)  AND pct_change > 0 AND isFinite(pct_change) order by trade_date "
+        get_trade_date_sql = f"select trade_date from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}' and trade_date<='{end_date}'  AND USDX_index IS NOT NULL AND USDX_index > 0 AND NOT isNaN(USDX_index)  AND pct_change > 0 AND isFinite(pct_change) order by trade_date "
+        get_past_calendar_sql = f"select trade_date, USDX_index as close, pct_change from indexsysdb.df_tushare_usd_index_daily where trade_date>='{formatted_start_date}'  AND USDX_index IS NOT NULL AND USDX_index > 0 AND NOT isNaN(USDX_index)  AND pct_change > 0 AND isFinite(pct_change) order by trade_date "
 
         monteCarlo_simulation_sql_template = """
                 select *
