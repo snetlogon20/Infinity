@@ -16,7 +16,7 @@ class TuShareUSDIndexDailyServiceTest(TuShareService):
         logger.info("开始刷新美元指数数据")
         logger.info("="*60)
 
-        start_date = '20260301'
+        start_date = '20200101'
         end_date = CommonParameters.today
 
         calendar = CalendarService()

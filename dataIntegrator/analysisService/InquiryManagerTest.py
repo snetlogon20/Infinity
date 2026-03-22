@@ -127,13 +127,15 @@ class QuickInquiryManagerTest:
 
         '''---Step 0 参数区----'''
         sql="""
-            SELECT 
+           SELECT 
                 df_sys_calendar.trade_date AS df_sys_calendar__trade_date,
                 df_tushare_us_stock_daily.pct_change AS df_tushare_us_stock_daily__pct_change,
                 df_tushare_shibor_daily.tenor_on AS df_tushare_shibor_daily__tenor_on,
                 df_tushare_stock_daily.pct_chg AS df_tushare_stock_daily__pct_chg,
                 df_akshare_spot_hist_sge.close AS df_akshare_spot_hist_sge__close,
-                df_akshare_spot_hist_sge.pct_change AS df_akshare_spot_hist_sge__pct_chg
+                df_akshare_spot_hist_sge.pct_change AS df_akshare_spot_hist_sge__pct_chg,
+                df_tushare_usd_index_daily.USDX_index AS df_tushare_usd_index_daily__USDX_index,
+                df_tushare_usd_index_daily.USDCNH_ask_close AS df_tushare_usd_index_daily__USDCNH_ask_close
             FROM
                 df_sys_calendar
             LEFT JOIN df_tushare_us_stock_daily 
@@ -146,6 +148,8 @@ class QuickInquiryManagerTest:
                 AND df_tushare_stock_daily.ts_code = '002093.SZ'
             LEFT JOIN df_akshare_spot_hist_sge 
                 ON df_sys_calendar.trade_date = formatDateTime(toDate(df_akshare_spot_hist_sge.date), '%Y%m%d')
+            LEFT JOIN indexsysdb.df_tushare_usd_index_daily
+                ON df_sys_calendar.trade_date = df_tushare_usd_index_daily.trade_date
             WHERE 
                 df_sys_calendar.trade_date BETWEEN '20250101' AND '20260301'
             order by df_sys_calendar__trade_date  
@@ -206,8 +210,9 @@ class QuickInquiryManagerTest:
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
         #all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        #all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
 
         '''---Step 6 regression test ----'''

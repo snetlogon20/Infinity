@@ -228,43 +228,7 @@ class CalendarService(CommonLib.CommonLib):
             cls.writeLogError(e, className=cls.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
-    # def get_last_working_date_from_calendar(self, start_date, end_date, n_working_days):
-    #     """
-    #     根据load_next_n_working_days_calendar的返回结果，获取最后一个工作日日期
-    #
-    #     Args:
-    #         start_date (str): 开始日期，格式为 'YYYY-MM-DD'
-    #         end_date (str): 结束日期，格式为 'YYYY-MM-DD'
-    #         n_working_days (int): 工作日天数
-    #
-    #     Returns:
-    #         str: 最后一个工作日，格式为 'YYYY-MM-DD'
-    #     """
-    #     try:
-    #         # 调用现有的load_next_n_working_days_calendar方法
-    #         working_calendar_df = self.load_next_n_working_days_calendar(start_date, end_date, n_working_days)
-    #
-    #         # 检查返回的数据框是否为空
-    #         if working_calendar_df is not None and not working_calendar_df.empty:
-    #             # 获取最后一个工作日日期值
-    #             last_working_date = working_calendar_df['trade_date'].iloc[-1]
-    #
-    #             # 确保返回格式为 YYYY-MM-DD 字符串
-    #             if isinstance(last_working_date, str):
-    #                 formatted_last_date = last_working_date
-    #             else:
-    #                 # 如果是日期对象，转换为字符串
-    #                 formatted_last_date = pd.to_datetime(last_working_date).strftime('%Y-%m-%d')
-    #
-    #             self.logger.info(f"获取到最后一个工作日: {formatted_last_date}")
-    #             return formatted_last_date
-    #         else:
-    #             self.logger.warning("工作日历数据为空，无法获取最后工作日")
-    #             return None
-    #
-    #     except Exception as e:
-    #         self.logger.error(f"获取最后工作日失败: {e}")
-    #         return None
+
 
     def find_data_by_given_dataframe_and_date_offset(self, original_dataFrame, formatted_start_date, next_n_working_days):
         """
@@ -302,17 +266,17 @@ class CalendarService(CommonLib.CommonLib):
 
             start_index = start_rows.index[0]
 
-            # 计算目标索引
+            # 根据当前日期的位置先在给定的日历中找，看看有没有第next_n_working_days个工作日
             target_index = start_index + next_n_working_days
 
-            # 检查索引是否有效
+            # 如果有，就用给定的日历里面的日期
             if target_index < len(sorted_df):
                 target_row = sorted_df.iloc[target_index]
                 data_value = target_row.get('trade_date', None)  # 使用get方法避免KeyError
 
                 self.logger.info(f"找到日期 {target_row['trade_date']} 的数据: {data_value}")
                 return data_value
-            else:
+            else: # 没有，只能到 indexsysdb.df_sys_calendar 去找了
                 self.logger.warning(f"索引 {target_index} 超出数据范围，最大索引为 {len(sorted_df) - 1}")
                 # 没有日历了， 只能到 indexsysdb.df_sys_calendar 去找了
                 inquiryManager = InquiryManager()
@@ -332,3 +296,18 @@ class CalendarService(CommonLib.CommonLib):
         except Exception as e:
             self.logger.error(f"查找数据失败: {e}")
             return None
+
+    def calculate_T_minus_n_days(self, end_date_str, days=31):
+        """
+        计算起始日期
+
+        Args:
+            end_date_str: 结束日期字符串，格式 'YYYYMMDD'
+            days: 减去的天数，默认 31 天
+
+        Returns:
+            起始日期字符串，格式 'YYYYMMDD'
+        """
+        date = (datetime.strptime(end_date_str, '%Y%m%d') - timedelta(days=days)).strftime('%Y%m%d')
+
+        return date
