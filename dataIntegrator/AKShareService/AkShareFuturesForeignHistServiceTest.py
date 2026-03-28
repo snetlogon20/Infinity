@@ -41,6 +41,6 @@ if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('GC', 'GC')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
 
