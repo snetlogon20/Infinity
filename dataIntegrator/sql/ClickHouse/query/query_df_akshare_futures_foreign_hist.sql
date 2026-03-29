@@ -122,3 +122,34 @@ SELECT
     volume
 FROM indexsysdb.df_akshare_futures_foreign_hist
 WHERE symbol = 'XAU' order by date desc
+
+
+SELECT
+    date,
+    open,
+    close,
+    low,
+    high,
+    volume
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol = 'CL' AND close > 0 order by date desc
+
+SELECT
+    date,
+    open,
+    close,
+    low,
+    high,
+    volume
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol = 'OIL' AND close > 0 order by date desc
+
+SELECT
+    date,
+    open,
+    close,
+    low,
+    high,
+    volume
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol = 'NG' AND close > 0 order by date desc
