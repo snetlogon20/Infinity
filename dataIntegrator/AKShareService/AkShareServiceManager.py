@@ -120,6 +120,9 @@ class AkShareServiceManager():
             self.callAkShareFuturesForeignHistService('GC', 'GC')
             self.callAkShareFuturesForeignHistService('XAU', 'XAU')
             self.callAkShareFuturesForeignHistService('XAG', 'XAG')
+            self.callAkShareFuturesForeignHistService('CL', 'CL')
+            self.callAkShareFuturesForeignHistService('OIL', 'OIL')
+            self.callAkShareFuturesForeignHistService('NG', 'NG')
             self.callAkShareMacroChinaShrzgmService()
 
         except Exception as e:

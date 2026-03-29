@@ -63,6 +63,14 @@ class CommonParameters():
     IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
     # IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
+    STOCK_LIST=[
+            {'ts_code': '002093.SZ', 'name': '国脉科技'},
+            {'ts_code': '600490.SH', 'name': '鹏欣资源'},
+            {'ts_code': '000902.SZ', 'name': '新洋丰'},
+            {'ts_code': '601368.SH', 'name': '绿城水务'},
+            {'ts_code': '603839.SH', 'name': '安正时尚'}
+        ]
+
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
 

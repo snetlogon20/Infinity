@@ -1765,7 +1765,7 @@ if __name__ == "__main__":
     -- XAU - 伦敦金
     -- XAG - 白银
     """
-    # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
+    monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
 
@@ -1779,4 +1779,4 @@ if __name__ == "__main__":
     """
     # monteCarloTest.test_multi_series_lognormal_distribution_treasury_yield()
 
-    monteCarloTest.test_multi_series_historical_distribution_USD_index_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_USD_index_rolling()

@@ -75,8 +75,20 @@ class GeneralLinearRegression:
 
             coefficients = pd.DataFrame(model.coef_, X.columns, columns=["Coefficient"])
 
+            # 获取 alpha (截距) 和 beta (系数)
+            alpha = model.intercept_  # 截距
+            beta_dict = {}  # 存储每个 x 变量的 beta 值
+            for i, col in enumerate(X.columns):
+                beta_dict[col] = model.coef_[i]
+                logger.info(f"{col} 的 beta 值 (系数): {model.coef_[i]:.6f}")
+
+            logger.info(f"alpha 值 (截距): {alpha:.6f}")
+
             logger.info(f"r2:{r2},mse:{mse}")
-            logger.info(f"rss:{rss},tss:{tss},f_statistic(越大越好):{f_statistic},p_value(越小越好):{p_value}")
+            logger.info(f"rss: {rss}")
+            logger.info(f"tss: {tss}")
+            logger.info(f"f_statistic (越大越好): {f_statistic}")
+            logger.info(f"p_value (越小越好): {p_value}")
             logger.info(coefficients)
 
             ##################################################

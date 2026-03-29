@@ -9,9 +9,10 @@ class TuShareChinaStockIndexService(TuShareService):
     def prepareDataFrame(self, ts_code, start_date, end_date):
         logger.info("prepareData started")
         try:
-            #self.dataFrame = self.pro.index_daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
             self.dataFrame = self.pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
 
+            row_count = len(self.dataFrame)
+            logger.info(f"成功获取股票 {ts_code} 的数据，共 {row_count} 行")
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
