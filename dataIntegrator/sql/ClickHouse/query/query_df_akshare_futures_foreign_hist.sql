@@ -83,7 +83,18 @@ from
 )
 ORDER BY df_sys_calendar__trade_date
 
-
+	SELECT
+	    '20260426' AS df_sys_calendar__trade_date,
+	    90.41 AS df_tushare_us_stock_daily__close,
+	    1.32 AS df_tushare_shibor_daily__tenor_on,
+	    9.42 AS df_tushare_stock_daily__close,
+	    991.36 AS df_akshare_spot_hist_sge__close,
+	    4000.9 AS df_akshare_futures_foreign_hist__GC_close,
+	    4000.85 AS df_akshare_futures_foreign_hist__XAU_close,
+	    99.88 AS df_tushare_usd_index_daily__USDX_index,
+	    7.01947 AS df_tushare_usd_index_daily__USDCNH_ask_close
+	    
+	    
 select * from indexsysdb.df_akshare_spot_hist_sge order by date desc
 
 select * from  indexsysdb.df_akshare_futures_foreign_hist order by date desc
@@ -91,23 +102,23 @@ select * from  indexsysdb.df_akshare_futures_foreign_hist order by date desc
 
 
 
-	    SELECT
-	        date,
-	        open,
-	        close,
-	        low,
-	        high,
-	        volume
-	    FROM indexsysdb.df_akshare_futures_foreign_hist
-	    WHERE symbol = 'GC' AND close > 0 order by date desc
-	    
-	    
-	    SELECT
-	        date,
-	        open,
-	        close,
-	        low,
-	        high,
-	        volume
-	    FROM indexsysdb.df_akshare_futures_foreign_hist
-	    WHERE symbol = 'XAU' order by date desc
+SELECT
+    date,
+    open,
+    close,
+    low,
+    high,
+    volume
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol = 'GC' AND close > 0 order by date desc
+
+
+SELECT
+    date,
+    open,
+    close,
+    low,
+    high,
+    volume
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol = 'XAU' order by date desc
