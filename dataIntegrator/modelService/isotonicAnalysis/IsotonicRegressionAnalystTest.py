@@ -52,6 +52,24 @@ def analyze_gc():
     )
     call_isotonic_regression_analyst(symbol, start_date, end_date, sql_template, x_column, y_column, title)
 
+def analyze_wti():
+    # 设置参数
+    symbol = 'CL'  # 例如：WTI OIL
+    start_date = '2024-01-01'
+    end_date = '2026-12-31'
+    x_column = 'trade_date'
+    y_column = 'close'
+    title = f'Isotonic Regression - {symbol} Close Price Analysis'
+
+    # 定义 SQL 模板
+    sql_template = (
+        f"select date as trade_date, open, close, low, high, pct_change "
+        f"from indexsysdb.df_akshare_futures_foreign_hist "
+        f"where symbol='{symbol}' and date>='{start_date.replace('-', '')}' "
+        f"and date<='{end_date.replace('-', '')}' order by date"
+    )
+    print(sql_template)
+    call_isotonic_regression_analyst(symbol, start_date, end_date, sql_template, x_column, y_column, title)
 
 def analyze_usd_index():
     """
@@ -169,4 +187,5 @@ if __name__ == "__main__":
     # analyze_gc()
     # analyze_usd_index()
     # analyze_usd_cny()
-    analyze_stock_daily()
+    # analyze_stock_daily()
+    analyze_wti()
