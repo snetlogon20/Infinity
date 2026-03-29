@@ -61,35 +61,53 @@ class TuShareServiceManager():
     def callTuShareChinaStockIndexService(self, param_dict):
         logger.info("callTuShareService started...")
 
-        # 002093.SZ 国脉科技
-        # 600490.SH 鹏欣资源
-        # 000902.SZ 新洋丰
-        # 601368.SH 绿城水务
-        # 603839.SH 安正时尚
-        # 000001.SH 上证综指
+        """批量处理多个股票"""
+        # 定义股票列表
+        stock_list = CommonParameters.STOCK_LIST
 
-        # ts_code = '603839.SH'
-        # start_date = '20220521'
-        # end_date = '20241230'
-        # ccsvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_daily_20220507.csv")
+        # 设置日期范围
+        start_date = '20250101'
+        end_date = CommonParameters.today
 
-        ts_code = param_dict.get("ts_code")
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
+        logger.info(f"开始批量处理 {len(stock_list)} 只股票...")
 
-        #CommonParameters.outBoundPath, "df_tushare_df_tushare_shibor_daily_20220507.csv")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_daily_20220507.csv")
-        try:
-            tuShareService = TuShareChinaStockIndexService()
-            dataFrame = tuShareService.prepareDataFrame(ts_code,start_date,end_date)
-            jsonString = tuShareService.convertDataFrame2JSON()
-            tuShareService.saveDateFrameToDisk(csvFilePath)
-            tuShareService.deleteDateFromClickHouse(ts_code,start_date,end_date)
-            tuShareService.saveDateToClickHouse()
+        for stock in stock_list:
+            ts_code = stock['ts_code']
+            name = stock['name']
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            try:
+                logger.info(f"\n{'=' * 60}")
+                logger.info(f"正在处理：{name} ({ts_code})")
+                logger.info(f"{'=' * 60}")
+
+                csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                           f"df_tushare_{ts_code.replace('.', '_')}_{start_date[:4]}.csv")
+
+                tuShareService = TuShareChinaStockIndexService()
+                dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
+
+                if dataFrame.empty:
+                    logger.warning(f"{name} ({ts_code}) 没有获取到数据，跳过...")
+                    continue
+
+                logger.info(f"转换数据为 JSON...")
+                jsonString = tuShareService.convertDataFrame2JSON()
+                logger.info(f"保存到：{csvFilePath}")
+                tuShareService.saveDateFrameToDisk(csvFilePath)
+                tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
+                tuShareService.saveDateToClickHouse()
+
+                logger.info(f"✅ {name} ({ts_code}) 处理完成！")
+
+            except Exception as e:
+                logger.error(f"❌ {name} ({ts_code}) 处理失败：{str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                continue
+
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"批量处理完成！共处理 {len(stock_list)} 只股票")
+        logger.info(f"{'=' * 60}")
 
         logger.info("callTuShareService ended...")
 
