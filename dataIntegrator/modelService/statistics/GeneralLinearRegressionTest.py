@@ -420,4 +420,3 @@ if __name__ == "__main__":
     fileName = FileUtility.generate_filename_by_timestamp(rf"prediction_with_sample_data", "xlsx")
     db_persistent_path = FileUtility.get_full_outbound_path("outbound",fileName)
     full_test_df.to_excel(db_persistent_path)
-    print(db_persistent_path)
