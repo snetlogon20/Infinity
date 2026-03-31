@@ -44,6 +44,6 @@ if __name__ == '__main__':
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
     akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('CL', 'CL') ## WTI
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('OIL', 'OIL')  ## Brent
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('NG', 'NG')  ## 天然气
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('OIL', 'OIL')  ## Brent
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('NG', 'NG')  ## 天然气
 

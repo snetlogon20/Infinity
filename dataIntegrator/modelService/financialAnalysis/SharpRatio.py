@@ -242,7 +242,7 @@ class SharpRatio(TuShareService):
             plt.text(0.05, 0.95, info_text, fontsize=8, verticalalignment='top',
                      bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow",
                                edgecolor="darkorange", alpha=0.9),
-                     fontfamily='monospace')
+                     fontfamily='sans-serif')
 
             plt.tight_layout()
             plt.show()
@@ -256,7 +256,7 @@ class SharpRatio(TuShareService):
         print("💾 数据保存")
         print("=" * 80)
         try:
-            file_name = f"e:\tmp\Sharpe_Analysis_{portfolio_data['trade_date'].iloc[0]}_{portfolio_data['trade_date'].iloc[-1]}.csv"
+            file_name = rf"e:\tmp\Sharpe_Analysis_{portfolio_data['trade_date'].iloc[0]}_{portfolio_data['trade_date'].iloc[-1]}.csv"
             portfolio_data.to_csv(file_name, encoding='utf-8-sig', index=False)
             print(f"✅ 数据已保存到：{file_name}")
             print(f"   文件包含 {len(portfolio_data)} 行数据")
