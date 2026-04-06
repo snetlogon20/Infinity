@@ -109,7 +109,7 @@ class AkShareFuturesForeignHistService(AkShareService):
 
         return
 
-    def deleteDateFromClickHouse(self, start_date="0000000", end_date="0000000", symbol=""):  # 实例方法
+    def deleteDateFromClickHouse(self, symbol):  # 实例方法
         logger.info("deleteDataFromClickHouse started")
 
         try:

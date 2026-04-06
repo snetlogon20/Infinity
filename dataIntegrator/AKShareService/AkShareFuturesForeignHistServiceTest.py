@@ -9,7 +9,7 @@ logger = CommonLib.logger
 
 class AkShareFuturesForeignHistServiceTest:
 
-    def callAkShareFuturesForeignHistService(self, symbol='=', file_suffix='='):
+    def callAkShareFuturesForeignHistService(self, symbol, file_suffix):
         """
         统一的期货外盘历史数据测试方法
 
@@ -28,7 +28,7 @@ class AkShareFuturesForeignHistServiceTest:
             dataFrame = akShareService.prepareDataFrame(symbol)
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-            akShareService.deleteDateFromClickHouse(symbol=symbol)
+            akShareService.deleteDateFromClickHouse(symbol)
             transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(transformed_dataFrame)
 
@@ -42,9 +42,9 @@ if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
     # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Brent
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
 
