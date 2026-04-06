@@ -3,12 +3,13 @@ from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkSha
 from dataIntegrator.common.FileType import FileType
 import os
 import sys
+import time
 
 logger = CommonLib.logger
 
 class AkShareFuturesForeignHistServiceTest:
 
-    def callAkShareFuturesForeignHistService(self, symbol='XAU', file_suffix='xau'):
+    def callAkShareFuturesForeignHistService(self, symbol, file_suffix):
         """
         统一的期货外盘历史数据测试方法
 
@@ -40,10 +41,10 @@ class AkShareFuturesForeignHistServiceTest:
 if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('GC', 'GC')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAU', 'XAU')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('XAG', 'XAG')
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('CL', 'CL') ## WTI
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('OIL', 'OIL')  ## Brent
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService('NG', 'NG')  ## 天然气
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Brent
+    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
 

@@ -10,7 +10,7 @@ logger = CommonLib.logger
 
 class TuShareUSStockDailyServiceTest(TuShareService):
     @classmethod
-    def refresh_citi(self):
+    def refresh_stocks(self):
 
             # ts_code = 'C'
             # start_date = '20250101'
@@ -47,4 +47,4 @@ class TuShareUSStockDailyServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tuShareUSStockDailyServiceTest = TuShareUSStockDailyServiceTest()
-    tuShareUSStockDailyServiceTest.refresh_citi()
+    tuShareUSStockDailyServiceTest.refresh_stocks()

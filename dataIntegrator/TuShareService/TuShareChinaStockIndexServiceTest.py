@@ -32,12 +32,21 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
     def refresh_any_china_stock_index(self):
         """批量处理多个股票"""
         # 定义股票列表
+        # stock_list = [
+        #     {'ts_code': '002093.SZ', 'name': '国脉科技'},
+        #     {'ts_code': '600490.SH', 'name': '鹏欣资源'},
+        #     {'ts_code': '000902.SZ', 'name': '新洋丰'},
+        #     {'ts_code': '601368.SH', 'name': '绿城水务'},
+        #     {'ts_code': '603839.SH', 'name': '安正时尚'}
+        # ]
+
+        # AI 推荐
         stock_list = [
-            {'ts_code': '002093.SZ', 'name': '国脉科技'},
-            {'ts_code': '600490.SH', 'name': '鹏欣资源'},
-            {'ts_code': '000902.SZ', 'name': '新洋丰'},
-            {'ts_code': '601368.SH', 'name': '绿城水务'},
-            {'ts_code': '603839.SH', 'name': '安正时尚'}
+            {'ts_code': '688585.SH', 'name': '上纬新材'},
+            {'ts_code': '605255.SH', 'name': '天普股份'},
+            {'ts_code': '300476.SZ', 'name': '胜宏科技'},
+            {'ts_code': '301232.SZ', 'name': '飞沃科技'},
+            {'ts_code': '603226.SH', 'name': '菲林格尔'}
         ]
 
         # 设置日期范围

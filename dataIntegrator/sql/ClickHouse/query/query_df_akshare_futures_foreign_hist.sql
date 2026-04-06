@@ -192,3 +192,9 @@ SELECT
     volume
 FROM indexsysdb.df_akshare_futures_foreign_hist
 WHERE symbol = 'NG' AND close > 0 order by date desc
+
+
+SELECT *
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE symbol in ('GC','CL','OIL','NG') AND close > 0 
+order by date desc, symbol
