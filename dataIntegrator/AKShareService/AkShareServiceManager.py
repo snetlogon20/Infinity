@@ -39,7 +39,7 @@ class AkShareServiceManager():
         logger.info("callTushareSGEDailyService ended...")
 
     @classmethod
-    def callAkShareFuturesForeignHistService(self, symbol='XAU', file_suffix='xau'):
+    def callAkShareFuturesForeignHistService(self, symbol='=', file_suffix='='):
         """
         统一的期货外盘历史数据测试方法
 
@@ -58,7 +58,7 @@ class AkShareServiceManager():
             dataFrame = akShareService.prepareDataFrame(symbol)
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-            akShareService.deleteDateFromClickHouse(symbol)
+            akShareService.deleteDateFromClickHouse(symbol=symbol)
             transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(transformed_dataFrame)
 
@@ -117,12 +117,12 @@ class AkShareServiceManager():
             end_date = CommonParameters.today
 
             self.callAkShareSpotHistSGEService(start_date, end_date)
-            self.callAkShareFuturesForeignHistService('GC', 'GC')
-            self.callAkShareFuturesForeignHistService('XAU', 'XAU')
-            self.callAkShareFuturesForeignHistService('XAG', 'XAG')
-            self.callAkShareFuturesForeignHistService('CL', 'CL')
-            self.callAkShareFuturesForeignHistService('OIL', 'OIL')
-            self.callAkShareFuturesForeignHistService('NG', 'NG')
+            self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
+            self.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
+            self.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
+            self.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
+            self.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Bre
+            self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
             self.callAkShareMacroChinaShrzgmService()
 
         except Exception as e:
