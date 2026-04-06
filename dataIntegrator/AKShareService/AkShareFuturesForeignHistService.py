@@ -32,6 +32,14 @@ class AkShareFuturesForeignHistService(AkShareService):
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
+        logger.info(f"处理后数据 - Symbol: {symbol}")
+        logger.info(f"处理后数据 Shape: {dataFrame.shape}")
+        logger.info(f"处理后数据列数: {len(dataFrame.columns)}")
+        logger.info(f"处理后数据列名: {list(dataFrame.columns)}")
+        logger.info(f"处理后数据类型:\n{dataFrame.dtypes}")
+        logger.info(f"处理后数据前3行:\n{dataFrame.head(3)}")
+        logger.info(f"处理后数据后3行:\n{dataFrame.tail(3)}")
+
         logger.info("prepareData completed")
         return dataFrame
 
@@ -105,7 +113,8 @@ class AkShareFuturesForeignHistService(AkShareService):
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
+            #del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
+            del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where symbol='%s' " % (symbol)
             self.deleteAkDateFromClickHouse(del_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
