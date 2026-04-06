@@ -48,6 +48,6 @@ class TushareShiborDailyServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tushareShiborDailyServiceTest = TushareShiborDailyServiceTest()
-    # tushareShiborDailyServiceTest.refresh_shibor_daily()
+    tushareShiborDailyServiceTest.refresh_shibor_daily()
 
-    tushareShiborDailyServiceTest.get_rate_for_term()
+    # tushareShiborDailyServiceTest.get_rate_for_term()
