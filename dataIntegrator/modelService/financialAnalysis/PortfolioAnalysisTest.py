@@ -1,4 +1,6 @@
 from dataIntegrator import CommonLib
+from dataIntegrator.TuShareService.TushareShiborDailyService import TushareShiborDailyService
+from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.financialAnalysis.PortfolioAnalysis import PortfolioAnalysis
 import numpy as np
@@ -9,143 +11,132 @@ commonLib = CommonLib()
 
 class PortfolioAnalysisTest():
 
-    def test_simple_portfolio_p41(cls):
-        portfolioAnalysis = PortfolioAnalysis()
+    #def prepare_sql(self, stock_codes=None, start_date=None, end_date=None, sql_type="commodities"):
+    def prepare_sql(self, start_date=None, end_date=None, sql_type="us_stocks"):
+        """
+        根据类型生成 SQL 查询语句
 
-        # 示例值 P41, Example of Computing the risk of a portfolio
-        print("given 2 products")
-        w = np.array([0.6, 0.4])  # 权重
-        u = np.array([0.00, 1])  # 预期收益率
-        sigma = np.array([5, 9.95])  # 标准差
-        rho = np.array([[1, 0.3], [0.3, 1]])  # 相关系数矩阵
-        portfolio_return, portfolio_volatility = portfolioAnalysis.calculate_portfolio_return_and_volatility(w, u, sigma,
-                                                                                                             rho)
-        print(f"投资组合的波动率为: {portfolio_return}")
-        print(f"投资组合的波动率为: {portfolio_volatility}")
+        参数:
+        - stock_codes: 股票代码列表
+        - start_date: 开始日期 (格式: 'YYYYMMDD')
+        - end_date: 结束日期 (格式: 'YYYYMMDD')
+        - sql_type: SQL 类型 ['us_stocks', 'us_stocks_gold', 'china_self_selected', 'ai_selected', 'commodities']
 
+        返回:
+        - sql: SQL 查询语句
+        """
+        if sql_type == "us_stocks":
+            # stock_codes_str = ','.join([f"'{code}'" for code in stock_codes])
+            sql = f"""
+                select ts_code, trade_date, close_point
+                from df_tushare_us_stock_daily
+                where ts_code in ('C', 'JPM', 'NVDA', 'MSFT', 'AAPL')
+                AND trade_date >= '{start_date}' and trade_date <='{end_date}'
+                order by trade_date asc
+            """
 
-    def test_parameter_portfolio(cls):
-        portfolioAnalysis = PortfolioAnalysis()
+        elif sql_type == "us_stocks_gold":
+            #stock_codes_str = ','.join([f"'{code}'" for code in stock_codes])
+            start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
+            end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+            sql = f"""
+                SELECT
+                    ts_code,
+                    trade_date,
+                    close_point
+                FROM
+                (
+                    SELECT
+                        ts_code,
+                        trade_date,
+                        close_point
+                    FROM df_tushare_us_stock_daily
+                    WHERE ts_code IN ('C', 'JPM', 'NVDA', 'MSFT', 'AAPL')
+                        AND trade_date >= '{start_date}'
+                        AND trade_date <= '{end_date}'
+                    UNION DISTINCT
+                    SELECT
+                        'GC' AS ts_code,
+                        replaceAll(toString(date), '-', '') AS trade_date,
+                        close AS close_point
+                    FROM indexsysdb.df_akshare_futures_foreign_hist
+                    WHERE symbol = 'GC'
+                        AND date >= '{start_date_formatted}'
+                        AND date <= '{end_date_formatted}'
+                        AND close > 0
+                )
+                ORDER BY trade_date, ts_code
+            """
 
-        # 示例值
-        print("given 5 products")
-        w = np.array([0.1, 0.2, 0.3, 0.25, 0.15])  # 权重
-        u = np.array([0.05, 0.1, 0.15, 0.2, 0.25])  # 预期收益率
-        sigma = np.array([0.1, 0.2, 0.15, 0.25, 0.18])  # 标准差
-        rho = np.array([[1, 0.3, 0.2, 0.1, 0.2],
-                        [0.3, 1, 0.4, 0.3, 0.25],
-                        [0.2, 0.4, 1, 0.2, 0.15],
-                        [0.1, 0.3, 0.2, 1, 0.2],
-                        [0.2, 0.25, 0.15, 0.2, 1]])  # 相关系数矩阵
-        portfolio_return, portfolio_volatility = portfolioAnalysis.calculate_portfolio_return_and_volatility(w, u, sigma,
-                                                                                                             rho)
-        print(f"投资组合的波动率为: {portfolio_return}")
-        print(f"投资组合的波动率为: {portfolio_volatility}")
+        elif sql_type == "china_self_selected":
+            sql = f"""
+                select
+                    ts_code as ts_code,
+                    trade_date as trade_date,
+                    close as close_point
+                from indexsysdb.df_tushare_stock_daily
+                where ts_code in
+                (
+                            '002093.SZ',
+                            '600490.SH',
+                            '000902.SZ',
+                            '601368.SH',
+                            '603839.SH'
+                )
+                AND
+                        trade_date >= '20241001' AND
+                        trade_date <= '20261231'
+                order by trade_date desc
+             """
 
-    def prepare_data_from_clickhouse(self, stock_codes, start_date, end_date):
+        elif sql_type == "ai_selected":
+            sql = f"""
+                select
+                    ts_code as ts_code,
+                    trade_date as trade_date,
+                    close as close_point
+                from indexsysdb.df_tushare_stock_daily
+                where ts_code in
+                (
+                            '688585.SH',
+                            '605255.SH',
+                            '300476.SZ',
+                            '301232.SZ',
+                            '603226.SH'
+                )
+                AND
+                        trade_date >= '20241001' AND
+                        trade_date <= '20261231'
+                order by trade_date desc
+             """
+
+        elif sql_type == "commodities":
+            sql = """
+                SELECT
+                    symbol as ts_code,
+                    replaceAll(toString(date), '-', '') as trade_date,
+                    close AS close_point
+                FROM indexsysdb.df_akshare_futures_foreign_hist
+                WHERE symbol in ('GC','CL','OIL','NG')
+                    AND close > 0
+                    AND date >= '2022-01-01'
+                    AND date <= '2026-03-31'
+                order by date desc
+            """
+
+        else:
+            raise ValueError(
+                f"不支持的 SQL 类型: {sql_type}。支持的类型: ['us_stocks', 'us_stocks_gold', 'china_self_selected', 'ai_selected', 'commodities']")
+
+        return sql
+
+    def prepare_data_from_clickhouse(self, sql):
         """
         从 ClickHouse 获取数据并计算 u, sigma, rho
+
+        参数:
+        - sql: SQL 查询语句
         """
-        stock_codes_str = ','.join([f"'{code}'" for code in stock_codes])
-        # 转换日期格式：从 'YYYYMMDD' 转为 'YYYY-MM-DD' 用于伦敦金查询
-        start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
-        end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
-
-        # 纯美国股票
-        # sql = f"""
-        #     select ts_code, trade_date, close_point
-        #     from df_tushare_us_stock_daily
-        #     where ts_code in ({stock_codes_str})
-        #     AND trade_date >= '{start_date}' and trade_date <='{end_date}'
-        #     order by trade_date asc
-        # """
-
-        # 纯美国股票 + 黄金
-        # sql = f"""
-        #     SELECT
-        #         ts_code,
-        #         trade_date,
-        #         close_point
-        #     FROM
-        #     (
-        #         SELECT
-        #             ts_code,
-        #             trade_date,
-        #             close_point
-        #         FROM df_tushare_us_stock_daily
-        #         WHERE ts_code IN ({stock_codes_str})
-        #             AND trade_date >= '{start_date}'
-        #             AND trade_date <= '{end_date}'
-        #         UNION DISTINCT
-        #         SELECT
-        #             'GC' AS ts_code,
-        #             replaceAll(toString(date), '-', '') AS trade_date,
-        #             close AS close_point
-        #         FROM indexsysdb.df_akshare_futures_foreign_hist
-        #         WHERE symbol = 'GC'
-        #             AND date >= '{start_date_formatted}'
-        #             AND date <= '{end_date_formatted}'
-        #             AND close > 0
-        #     )
-        #     ORDER BY trade_date, ts_code
-        # """
-
-        # 国内自选股票
-        # sql = f"""
-        #     select
-        #         ts_code as ts_code,
-        #         trade_date as trade_date,
-        #         close as close_point
-        #     from indexsysdb.df_tushare_stock_daily
-        #     where ts_code in
-        #     (
-        #                 '002093.SZ',
-        #                 '600490.SH',
-        #                 '000902.SZ',
-        #                 '601368.SH',
-        #                 '603839.SH'
-        #     )
-        #     AND
-        #             trade_date >= '20241001' AND
-        #             trade_date <= '20261231'
-        #     order by trade_date desc
-        #  """
-
-        # AI选股票
-        # sql = f"""
-        #     select
-        #         ts_code as ts_code,
-        #         trade_date as trade_date,
-        #         close as close_point
-        #     from indexsysdb.df_tushare_stock_daily
-        #     where ts_code in
-        #     (
-        #                 '688585.SH',
-        #                 '605255.SH',
-        #                 '300476.SZ',
-        #                 '301232.SZ',
-        #                 '603226.SH'
-        #     )
-        #     AND
-        #             trade_date >= '20241001' AND
-        #             trade_date <= '20261231'
-        #     order by trade_date desc
-        #  """
-
-        # 大宗商品
-        sql="""
-            SELECT
-                symbol as ts_code,
-                replaceAll(toString(date), '-', '') as trade_date,
-                close AS close_point
-            FROM indexsysdb.df_akshare_futures_foreign_hist
-            WHERE symbol in ('GC','CL','OIL','NG')
-                AND close > 0
-                AND date >= '2022-01-01'  -- 注意：这里的 date 列是原始列名
-                AND date <= '2026-03-31'  -- 注意：原表中的日期格式是 yyyy-mm-dd
-            order by date desc
-        """
-
         logger.info(f"执行 SQL 查询: {sql}")
         clickhouseService = ClickhouseService()
         df = clickhouseService.getDataFrameWithoutColumnsName(sql)
@@ -293,54 +284,6 @@ class PortfolioAnalysisTest():
             logger.error(f"优化失败: {result.message}")
             return None, None
 
-    def test_optimal_portfolio_weights(self, option="best_sharpe_ratio"):
-        """
-        测试计算最优投资组合权重
-
-        参数:
-        - option: 优化目标 ['best_sharpe_ratio', 'best_return', 'lowest_volatility']
-        """
-
-        portfolioAnalysis = PortfolioAnalysis()
-
-        # 定义股票池和日期范围
-        stock_codes = ['C', 'JPM', 'NVDA', 'MSFT', 'AAPL']
-        start_date = '20220101'
-        end_date = '20260331'
-        option = "best_sharpe_ratio"
-
-        valid_options = ['best_sharpe_ratio', 'best_return', 'lowest_volatility']
-        if option not in valid_options:
-            logger.error(f"无效的优化选项: {option}。请使用: {valid_options}")
-            return
-
-
-        # 1. 从数据库获取数据并计算参数
-        u, sigma, rho, actual_codes = self.prepare_data_from_clickhouse(stock_codes, start_date, end_date)
-
-        # 2. 优化权重
-        logger.info("=" * 80)
-        logger.info(f"🔍 开始优化投资组合权重（{option}）")
-        logger.info("=" * 80)
-
-        optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option)
-
-        if optimal_weights is not None and result is not None:
-            logger.info("✅ 优化成功！")
-            logger.info("-" * 80)
-            logger.info(f"📊 最优权重配置 ({result['optimization_name']}):")
-            for i, (code, weight) in enumerate(zip(actual_codes, optimal_weights)):
-                logger.info(f"  {code}: {weight:.4f} ({weight * 100:.2f}%)")
-            logger.info("-" * 80)
-
-            logger.info("📈 最优投资组合计算结果")
-            logger.info("-" * 80)
-            logger.info(f"投资组合年化收益率: {result['annual_return']:.4f} ({result['annual_return'] * 100:.2f}%)")
-            logger.info(f"投资组合年化波动率: {result['annual_volatility']:.4f} ({result['annual_volatility'] * 100:.2f}%)")
-            logger.info(f"夏普比率: {result['sharpe_ratio']:.4f}")
-            logger.info("=" * 80)
-        else:
-            logger.error("❌ 权重优化失败")
 
     def test_all_optimization_options(self):
         """
@@ -352,13 +295,26 @@ class PortfolioAnalysisTest():
         logger.info("╚" + "═" * 78 + "╝")
         logger.info("\n")
 
-        # 定义股票池和日期范围
-        stock_codes = ['C', 'JPM', 'NVDA', 'MSFT', 'AAPL']
-        start_date = '20220101'
-        end_date = '20260331'
+        # 定义美国股票池和日期范围
+        # start_date = '20240101'
+        # end_date = '20260331'
+        # interest_country = "US"
+        # sql_type = "us_stocks"  #us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
-        # 从数据库获取数据并计算参数
-        u, sigma, rho, actual_codes = self.prepare_data_from_clickhouse(stock_codes, start_date, end_date)
+        # 定义中国自选股票池和日期范围
+        start_date = '20240101'
+        end_date = '20260331'
+        interest_country = "CN"
+        sql_type = "china_self_selected"  #us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+
+        # 定义中国AI推荐股票池和日期范围
+        start_date = '20240101'
+        end_date = '20260331'
+        interest_country = "CN"
+        sql_type = "ai_selected"  #us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+
+        sql = self.prepare_sql(start_date, end_date, sql_type)
+        u, sigma, rho, actual_codes = self.prepare_data_from_clickhouse(sql)
 
         # 测试三种优化方案
         options = ['best_sharpe_ratio', 'best_return', 'lowest_volatility']
@@ -369,7 +325,34 @@ class PortfolioAnalysisTest():
             logger.info(f"正在优化: {option}")
             logger.info(f"{'=' * 80}")
 
-            optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option)
+
+            if interest_country == "US":
+                # 根据输入的起止日期计算使用的年化收益率
+                tushareUSTreasuryYieldCurveService = TushareUSTreasuryYieldCurveService()
+                avg_yield, earliest_yield, latest_yield, max_yield, min_yield = tushareUSTreasuryYieldCurveService.get_yield_for_term(
+                start_date, end_date)
+
+                logger.info(f"  平均收益率: {avg_yield:.4f}")
+                logger.info(f"  最早日期收益率: {earliest_yield:.4f}")
+                logger.info(f"  最晚日期收益率: {latest_yield:.4f}")
+                logger.info(f"  最大收益率: {max_yield:.4f}")
+                logger.info(f"  最小收益率: {min_yield:.4f}")
+
+            else:
+                tushareShiborDailyService = TushareShiborDailyService()
+                avg_rate, earliest_rate, latest_rate, max_rate, min_rate = tushareShiborDailyService.get_rate_for_term(
+                    start_date, end_date)
+
+                logger.info(f"  平均收益率: {avg_rate:.4f}")
+                logger.info(f"  最早日期收益率: {earliest_rate:.4f}")
+                logger.info(f"  最晚日期收益率: {latest_rate:.4f}")
+                logger.info(f"  最大收益率: {max_rate:.4f}")
+                logger.info(f"  最小收益率: {min_rate:.4f}")
+
+                latest_yield =latest_rate
+
+            optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option, risk_free_rate=latest_yield)
+            # optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option)
 
             if optimal_weights is not None and result is not None:
                 results[option] = {
@@ -432,70 +415,9 @@ class PortfolioAnalysisTest():
 
             logger.info("=" * 80)
 
-    def test_portfolio_with_data(cls):
-        portfolioAnalysis = PortfolioAnalysis()
-
-        # 定义股票池和日期范围
-        stock_codes = ['C', 'JPM', 'NVDA', 'MSFT', 'AAPL']
-        start_date = '20220101'
-        end_date = '20260331'
-
-        # 1. 从数据库获取数据并计算参数
-        u, sigma, rho, actual_codes = cls.prepare_data_from_clickhouse(stock_codes, start_date, end_date)
-
-        # 2. 设置权重 (示例：等权重)
-        w = np.array([0.2, 0.2, 0.2, 0.2, 0.2])  # 等权重配置
-        # w = np.array([0.1, 0.2, 0.2, 0.2, 0.3])
-        # w = np.array([0.0, 0.2, 0.2, 0.2, 0.4])
-
-        logger.info("=" * 80)
-        logger.info("📊 投资组合分析参数")
-        logger.info("=" * 80)
-        logger.info(f"股票列表: {actual_codes}")
-        logger.info(f"权重配置: {w}")
-        logger.info(f"预期收益率 (u): {u}")
-        logger.info(f"标准差 (sigma): {sigma}")
-        logger.info(f"相关系数矩阵 (rho) 维度: {rho.shape}")
-        logger.info("-" * 80)
-
-        # 3. 调用原有算法计算投资组合收益和波动率
-        portfolio_return, portfolio_volatility = (
-            portfolioAnalysis.calculate_portfolio_return_and_volatility(w, u, sigma, rho))
-
-        logger.info("📈 投资组合计算结果")
-        logger.info("-" * 80)
-        logger.info(f"投资组合日收益率: {portfolio_return:.6f} ({portfolio_return * 100:.4f}%)")
-        logger.info(f"投资组合日波动率: {portfolio_volatility:.6f} ({portfolio_volatility * 100:.4f}%)")
-
-        # 年化计算 (假设 252 个交易日)
-        trading_days = 252
-        annual_return = portfolio_return * trading_days
-        annual_volatility = portfolio_volatility * np.sqrt(trading_days)
-
-        logger.info(f"投资组合年化收益率: {annual_return:.4f} ({annual_return * 100:.2f}%)")
-        logger.info(f"投资组合年化波动率: {annual_volatility:.4f} ({annual_volatility * 100:.2f}%)")
-
-        # 计算夏普比率 (假设无风险利率 1.5%)
-        risk_free_rate = 0.015
-        sharpe_ratio = (annual_return - risk_free_rate) / annual_volatility
-        logger.info(f"夏普比率: {sharpe_ratio:.4f}")
-        logger.info("=" * 80)
-
-
 
 if __name__ == "__main__":
     portfolioAnalysisTest = PortfolioAnalysisTest()
-
-    # portfolioAnalysisTest.test_simple_portfolio_p41()
-    #
-    # portfolioAnalysisTest.test_parameter_portfolio()
-
-    # portfolioAnalysisTest.test_portfolio_with_data()
-
-    # 测试单个优化选项
-    # portfolioAnalysisTest.test_optimal_portfolio_weights(option="best_sharpe_ratio")
-    # portfolioAnalysisTest.test_optimal_portfolio_weights(option="best_return")
-    # portfolioAnalysisTest.test_optimal_portfolio_weights(option="lowest_volatility")
 
     # 测试所有优化选项并对比
     portfolioAnalysisTest.test_all_optimization_options()
