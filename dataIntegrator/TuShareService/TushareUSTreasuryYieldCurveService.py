@@ -120,10 +120,10 @@ class TushareUSTreasuryYieldCurveService(TuShareService):
 
         # 计算该期限列在日期范围内的平均值
         # 假设列名是 'm1', 'm2', ..., 'y30'，且数据按 trade_date 排序
-        avg_yield = df[best_term].mean()
-        earliest_yield = df[best_term].iloc[0]
-        latest_yield = df[best_term].iloc[-1]
-        max_yield = df[best_term].max()
-        min_yield = df[best_term].min()
+        avg_yield = df[best_term].mean()/100
+        earliest_yield = df[best_term].iloc[0]/100
+        latest_yield = df[best_term].iloc[-1]/100
+        max_yield = df[best_term].max()/100
+        min_yield = df[best_term].min()/100
 
-        return avg_yield, earliest_yield, earliest_yield, max_yield, min_yield
+        return avg_yield, earliest_yield, latest_yield, max_yield, min_yield
