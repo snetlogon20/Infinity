@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
 from dataIntegrator import CommonLib
+from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
 
@@ -49,34 +52,58 @@ class TushareShiborDailyService(TuShareService):
 
         logger.info("deleteDateFromClickHouse completed")
 
-    # @classmethod
-    # def convertDataFrame2JSON(self):
-    #     print("prepareData started")
-    #
-    #     try:
-    #         self.jsonString = self.dataFrame.to_json(orient='table')
-    #     except Exception as e:
-    #         print('Exception', e)
-    #         raise e
-    #
-    #     print("prepareData ended")
-    #
-    #     return self.jsonString
+    def get_rate_for_term(self, start_date: str, end_date: str) -> tuple:
+        """
+        根据开始和结束日期，从 ClickHouse 表中筛选数据，
+        计算日期范围内的平均利率，并选择合适的期限列返回单个值。
 
-    # @classmethod
-    # def saveDateFrameToDisk(self, fileName, sep='\u0001',mode="w", header="true"):
-    #     print("saveDateToDisk started")
-    #
-    #     try:
-    #         self.dataFrame.to_csv(
-    #             fileName,
-    #             sep=sep,
-    #             mode=mode,
-    #             header=header)
-    #     except Exception as e:
-    #         print(e.message)
-    #         raise e
-    #
-    #     print("saveDateToDisk completed")
-    #
-    #     return
+        参数:
+            start_date (str): 开始日期，格式 'YYYYMMDD'（如 '20220103'）
+            end_date (str): 结束日期，格式 'YYYYMMDD'
+
+        返回:
+            tuple: (平均利率, 最早日期利率, 最晚日期利率, 最大利率, 最小利率)
+        """
+        # 初始化 ClickHouse 服务
+        clickhouseService = ClickhouseService()
+
+        # 构建 SQL 查询语句，筛选日期范围内的数据
+        sql = f"""
+        SELECT * 
+        FROM df_tushare_shibor_daily 
+        WHERE trade_date >= '{start_date}' AND trade_date <= '{end_date}'
+        """
+
+        # 获取数据（不带列名）
+        df = clickhouseService.getDataFrameWithoutColumnsName(sql)
+
+        # 检查是否有数据
+        if df.empty:
+            raise ValueError(f"在日期范围 {start_date} 到 {end_date} 内没有数据")
+
+        # 自动选择最合适的期限列（基于日期跨度天数）
+        date_range_days = (datetime.strptime(end_date, '%Y%m%d') - datetime.strptime(start_date, '%Y%m%d')).days
+
+        # 定义期限列与对应天数的映射
+        term_columns = {
+            'tenor_on': 1,
+            'tenor_1w': 7,
+            'tenor_2w': 14,
+            'tenor_1m': 30,
+            'tenor_3m': 90,
+            'tenor_6m': 180,
+            'tenor_9m': 270,
+            'tenor_1y': 365
+        }
+
+        # 选择最接近日期跨度的期限列
+        best_term = min(term_columns.keys(), key=lambda x: abs(term_columns[x] - date_range_days))
+
+        # 计算该期限列在日期范围内的统计值
+        avg_rate = df[best_term].mean()/100
+        earliest_rate = df[best_term].iloc[0]/100
+        latest_rate = df[best_term].iloc[-1]/100
+        max_rate = df[best_term].max()/100
+        min_rate = df[best_term].min()/100
+
+        return avg_rate, earliest_rate, latest_rate, max_rate, min_rate
