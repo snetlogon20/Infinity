@@ -131,6 +131,62 @@ def get_sharpe_ratio_of_commodity(symbol, start_date, end_date):
 
     return sharpe_ratio
 
+def get_sharpe_ratio_of_FX(start_date, end_date):
+    fx_ts_code_list = [
+        'USDJPY.FXCM',
+        'USDHKD.FXCM',
+        'USDCAD.FXCM',
+        'USDCHF.FXCM',
+        'USDCNH.FXCM',
+        'GBPUSD.FXCM',
+        'GBPNZD.FXCM',
+        'GBPJPY.FXCM',
+        'GBPCHF.FXCM',
+        'GBPCAD.FXCM',
+        'GBPAUD.FXCM',
+        'EURUSD.FXCM',
+        'EURNZD.FXCM',
+        'EURJPY.FXCM',
+        'EURGBP.FXCM',
+        'EURCHF.FXCM',
+        'EURCAD.FXCM',
+        'AUDUSD.FXCM'
+    ]
+
+    fx_ts_code_dict = {f"fx_{i}": code for i, code in enumerate(fx_ts_code_list, 1)}
+
+    for key, ts_code in fx_ts_code_dict.items():
+
+        riskfree_sql = rf"""
+            SELECT y5 as risk_free_rate
+            FROM indexsysdb.df_tushare_us_treasury_yield_cruve
+            WHERE trade_date <= '{end_date.replace('-', '')}'
+            ORDER BY trade_date DESC
+            LIMIT 1
+        """
+
+        portfolio_sql = rf"""
+                         select trade_date, 
+                         bid_open, 
+                         bid_close as close_point, 
+                         bid_low, 
+                         bid_high
+                    from indexsysdb.df_tushare_fx_daily
+                    where ts_code = '{ts_code}'
+                    and trade_date>= '{start_date}' and trade_date<='{end_date}'
+                 order by trade_date
+            """
+        riskfree_column = 'risk_free_rate'
+        portfolio_price_column = 'close_point'
+
+        clickhouClickhouseService = ClickhouseService()
+        riskfree_data = clickhouClickhouseService.getDataFrameWithoutColumnsName(riskfree_sql)
+        portfolio_data = clickhouClickhouseService.getDataFrameWithoutColumnsName(portfolio_sql)
+
+        sharp_ratio_calculator = SharpRatio()
+        sharpe_ratio = sharp_ratio_calculator.calculate_sharpe_ratio_from_data(riskfree_data, portfolio_data, riskfree_column, portfolio_price_column, ts_code)
+
+    return sharpe_ratio
 
 if __name__ == "__main__":
     #Example 1.6
@@ -145,7 +201,7 @@ if __name__ == "__main__":
 
     '''Test the sharpe ration for Citi/Treasury rate'''
     logger.info("="*10 + '''Test the sharpe ration for Citi/Treasury rate''' + "=" * 10)
-    get_sharpe_ratio_of_US_stock(ts_code='C')
+    # get_sharpe_ratio_of_US_stock(ts_code='C')
 
     '''Test the sharpe ration for JPM/Treasury rate'''
     # logger.info("="*10 + '''Test the sharpe ration for Citi/Treasury rate''' + "=" * 10)
@@ -162,6 +218,10 @@ if __name__ == "__main__":
     '''Test the sharpe ration for XAG/Treasury rate'''
     # logger.info("="*10 + '''Test the sharpe ration for WTI/Treasury rate''' + "=" * 10)
     # get_sharpe_ratio_of_commodity("XAG", '2022-01-01', '2026-03-29')
+
+    '''Test the sharpe ration for USD/JPY rate'''
+    # logger.info("="*10 + '''Test the sharpe ration for WTI/Treasury rate''' + "=" * 10)
+    get_sharpe_ratio_of_FX('2022-01-01', '2026-03-31')
 
     '''Test the sharpe ration for 000902.SZ 新洋丰/Treasury rate'''
     # logger.info("="*10 + '''Test the sharpe ration for 000902.SZ 新洋丰/Treasury rate''' + "=" * 10)

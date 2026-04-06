@@ -11,7 +11,7 @@ class SharpRatio(TuShareService):
     def __init__(self):
         logger.info("SharpRatio started")
 
-    def calculate_sharpe_ratio_from_data(self, riskfree_data, portfolio_data, riskfree_column, portfolio_price_column):
+    def calculate_sharpe_ratio_from_data(self, riskfree_data, portfolio_data, riskfree_column, portfolio_price_column, ts_code=""):
         price_col = portfolio_price_column
 
         # Calculate mean and segma for risk-free asset
@@ -212,7 +212,8 @@ class SharpRatio(TuShareService):
 
             info_text = f"""
             ╔═══════════════════════════════════════════╗
-            ║     SHARPE RATIO ANALYSIS SUMMARY        ║
+            ║     SHARPE RATIO ANALYSIS SUMMARY         ║
+            ║     {ts_code }                            ║
             ╠═══════════════════════════════════════════╣
             ║                                           ║
             ║  📊 Portfolio Metrics                     ║
