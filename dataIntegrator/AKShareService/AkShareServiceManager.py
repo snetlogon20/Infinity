@@ -136,10 +136,7 @@ class AkShareServiceManager():
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
 
             # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
-            if not dataFrame.empty:
-                min_date = dataFrame['date'].min()
-                max_date = dataFrame['date'].max()
-                akShareService.deleteDateFromClickHouse(min_date, max_date)
+            akShareService.deleteDateFromClickHouse()
 
             # 转换数据格式
             dataFrame = akShareService.transformDataFrame(dataFrame)
