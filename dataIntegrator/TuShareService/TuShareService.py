@@ -1,3 +1,4 @@
+import os
 import pandas
 from clickhouse_driver import Client as ClickhouseClient
 import tushare as ts
@@ -50,10 +51,12 @@ class TuShareService(CommonLib):
 
     @classmethod
     def convertDataFrame2JSON(self, orient='table'):
+        file_path = os.path.join(CommonParameters.outBoundPath, orient)
+
         logger.info("prepareData started")
 
         try:
-            self.jsonString = self.dataFrame.to_json(orient)
+            self.jsonString = self.dataFrame.to_json(file_path)
         except Exception as e:
             print('Exception', e)
             raise e

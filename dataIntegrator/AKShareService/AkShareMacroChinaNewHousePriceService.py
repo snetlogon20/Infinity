@@ -88,7 +88,8 @@ class AkShareMacroChinaNewHousePriceService(AkShareService):
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            del_sql = "ALTER TABLE indexsysdb.df_macro_china_new_house_price DELETE where date>= '%s' and date<='%s'" % (start_date, end_date)
+            #del_sql = "ALTER TABLE indexsysdb.df_macro_china_new_house_price DELETE where date>= '%s' and date<='%s'" % (start_date, end_date)
+            del_sql = "ALTER TABLE indexsysdb.df_macro_china_new_house_price DELETE where 1=1"
             self.deleteAkDateFromClickHouse(del_sql)
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)

@@ -1,4 +1,3 @@
-# D:\workspace_python\infinity\dataIntegrator\AKShareService\AkShareMacroChinaNewHousePriceServiceTest.py
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.AKShareService.AkShareMacroChinaNewHousePriceService import AkShareMacroChinaNewHousePriceService
 from dataIntegrator.common.FileType import FileType
