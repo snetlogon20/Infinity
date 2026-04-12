@@ -107,7 +107,7 @@ class PortfolioAnalysisTest():
                 order by trade_date desc
              """
 
-        elif sql_type == "commodities":
+        elif sql_type == "commodities-gold":
             sql = """
                 SELECT
                     symbol as ts_code,
@@ -115,6 +115,20 @@ class PortfolioAnalysisTest():
                     close AS close_point
                 FROM indexsysdb.df_akshare_futures_foreign_hist
                 WHERE symbol in ('GC','CL','OIL','NG','XAG','XAU','S','W','C','CAD','AHD','SZD','NID')
+                    AND close > 0
+                    AND date >= '2022-01-01'
+                    AND date <= '2026-03-31'
+                order by date desc
+            """
+
+        elif sql_type == "commodities-nongold":
+            sql = """
+                SELECT
+                    symbol as ts_code,
+                    replaceAll(toString(date), '-', '') as trade_date,
+                    close AS close_point
+                FROM indexsysdb.df_akshare_futures_foreign_hist
+                WHERE symbol in ('OIL','NG','S','W','C','CAD','AHD','SZD','NID')
                     AND close > 0
                     AND date >= '2022-01-01'
                     AND date <= '2026-03-31'
@@ -166,12 +180,21 @@ if __name__ == "__main__":
     sql_type = "china_self_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
     """
-        测试案例：美国大宗商品
+        测试案例：美国大宗商品（包括黄金）
     """
     # end_date_start = '20260101'  # end_date 起始日期
     # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
     # interest_country = "US"  # US, CN
-    # sql_type = "commodities"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+    # sql_type = "commodities-gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+
+    """
+        测试案例：美国大宗商品（非黄金）
+    """
+    end_date_start = '20260101'  # end_date 起始日期
+    end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
+    interest_country = "US"  # US, CN
+    sql_type = "commodities-nongold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+
 
     """
         总体操控代码如下
