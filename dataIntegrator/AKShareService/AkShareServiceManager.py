@@ -1,6 +1,7 @@
 import os
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.AKShareService.AkShareMacroChinaNewHousePriceService import AkShareMacroChinaNewHousePriceService
 from dataIntegrator.AKShareService.AkShareMacroChinaShrzgmService import AkShareMacroChinaShrzgmService
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
@@ -109,6 +110,48 @@ class AkShareServiceManager():
         logger.info(f"callAkShareFuturesForeignHistService ended...")
 
     @classmethod
+    def callAkShareMacroChinaNewHousePriceService(self, city_first="北京", city_second="上海"):
+        """
+        调用 AkShare 中国新建商品住宅价格指数数据服务
+
+        Args:
+            city_first (str): 第一个城市，默认为"北京"
+            city_second (str): 第二个城市，默认为"上海"
+        """
+        logger.info("callAkShareMacroChinaNewHousePriceService started...")
+
+        # 新建商品住宅价格指数数据不需要日期范围，获取全部历史数据
+        file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_new_house_price.xlsx')
+
+        try:
+            akShareService = AkShareMacroChinaNewHousePriceService()
+
+            # 获取数据（传入城市参数）
+            dataFrame = akShareService.prepareDataFrame(city_first=city_first, city_second=city_second)
+
+            # 保存到磁盘
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+
+            # 从磁盘读取
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+
+            # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
+            akShareService.deleteDateFromClickHouse()
+
+            # 转换数据格式
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+
+            # 保存到 ClickHouse
+            akShareService.saveDateToClickHouse(dataFrame)
+
+        except Exception as e:
+            logger.info('Exception: %s', e)
+            raise e
+
+        logger.info("callAkShareMacroChinaNewHousePriceService ended...")
+
+
+    @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
@@ -124,6 +167,7 @@ class AkShareServiceManager():
             self.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Bre
             self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
             self.callAkShareMacroChinaShrzgmService()
+            self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
 
         except Exception as e:
             logger.error('==============================================')
