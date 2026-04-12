@@ -41,10 +41,10 @@ class AkShareFuturesForeignHistServiceTest:
 if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
     akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Brent
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Brent
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
 

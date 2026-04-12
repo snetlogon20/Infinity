@@ -160,9 +160,9 @@ class AkShareServiceManager():
             end_date = CommonParameters.today
 
             self.callAkShareSpotHistSGEService(start_date, end_date)
-            # self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
+            self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
             self.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
-            # self.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
+            self.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
             self.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
             self.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Bre
             self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
