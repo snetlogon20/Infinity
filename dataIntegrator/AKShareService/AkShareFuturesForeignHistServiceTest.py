@@ -41,10 +41,27 @@ class AkShareFuturesForeignHistServiceTest:
 if __name__ == '__main__':
     akShareFuturesForeignHistServiceTest = AkShareFuturesForeignHistServiceTest()
 
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
-    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Brent
-    # akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
+    # ==================== 贵金属 ====================
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')  # 伦敦银
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')  # COMEX黄金
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')  # 伦敦金
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='SI', file_suffix='SI')  # COMEX白银
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='HG', file_suffix='HG')  # COMEX铜
+
+    # ==================== 能源 ====================
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL')  # NYMEX原油 (WTI)
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  # 布伦特原油
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  # NYMEX天然气
+
+    # ==================== 农产品 ====================
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='S', file_suffix='S')  # CBOT大豆
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='W', file_suffix='W')  # CBOT小麦
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='C', file_suffix='C')  # CBOT玉米
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='FCPO', file_suffix='FCPO')  # 马棕油
+
+    # ==================== LME金属（3个月）====================
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='CAD', file_suffix='CAD')  # LME铜3个月
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='AHD', file_suffix='AHD')  # LME铝3个月
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='ZSD', file_suffix='ZSD')  # LME锌3个月
+    akShareFuturesForeignHistServiceTest.callAkShareFuturesForeignHistService(symbol='NID', file_suffix='NID')  # LME镍3个月
 

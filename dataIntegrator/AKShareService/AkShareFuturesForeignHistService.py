@@ -113,9 +113,13 @@ class AkShareFuturesForeignHistService(AkShareService):
         logger.info("deleteDataFromClickHouse started")
 
         try:
-            #del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
+            # del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where date>= '%s' and date<='%s' and symbol='%s' " % (start_date, end_date, symbol)
             del_sql = "ALTER TABLE indexsysdb.df_akshare_futures_foreign_hist DELETE where symbol='%s' " % (symbol)
             self.deleteAkDateFromClickHouse(del_sql)
+            # self.clickhouseClient.execute(del_sql)
+
+            # 等待 mutation 完成（ClickHouse DELETE 是异步的）
+            self._wait_for_mutation_complete()
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e

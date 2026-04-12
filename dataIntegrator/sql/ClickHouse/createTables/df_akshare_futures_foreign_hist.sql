@@ -11,6 +11,6 @@ CREATE TABLE indexsysdb.df_akshare_futures_foreign_hist (
     symbol String,
     pct_change Float64
 )
-ENGINE=SummingMergeTree(date)
-ORDER BY (date)
+ENGINE=MergeTree()
+ORDER BY (symbol, date)
 SETTINGS index_granularity = 8192;

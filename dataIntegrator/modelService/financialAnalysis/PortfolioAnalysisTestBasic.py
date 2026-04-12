@@ -274,7 +274,10 @@ class PortfolioAnalysisTest():
         u, sigma, rho, actual_codes = self.prepare_data_from_clickhouse(sql)
 
         # 2. 设置权重 (示例：等权重)
-        w = np.array([0.2, 0.2, 0.2, 0.2, 0.2])  # 等权重配置
+        # w = np.array([0.2, 0.2, 0.2, 0.2, 0.2])  # 等权重配置
+        # 2. 设置权重 (根据实际股票数量动态生成等权重)
+        n_assets = len(actual_codes)
+        w = np.array([1.0 / n_assets] * n_assets)
 
         logger.info("=" * 80)
         logger.info("📊 投资组合分析参数")

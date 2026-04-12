@@ -120,3 +120,35 @@ class AkShareService(CommonLib):
         logger.info("saveDataToClickHouse completed")
 
         return
+
+    @classmethod
+    def _wait_for_mutation_complete(self, max_wait_seconds=60):
+        """
+        等待 ClickHouse mutation 完成
+        """
+        import time
+        start_time = time.time()
+
+        while True:
+            try:
+                # 查询是否有正在执行的 mutation
+                result = self.clickhouseClient.execute(
+                    "SELECT count() FROM system.mutations WHERE is_done = 0"
+                )
+                pending_count = result[0][0] if result else 0
+
+                if pending_count == 0:
+                    logger.info("所有 mutation 已完成")
+                    break
+
+                elapsed = time.time() - start_time
+                if elapsed > max_wait_seconds:
+                    logger.warning(f"等待 mutation 完成超时 ({max_wait_seconds}秒)，当前待处理: {pending_count}")
+                    break
+
+                logger.info(f"等待 mutation 完成... 待处理: {pending_count}, 已等待: {elapsed:.1f}秒")
+                time.sleep(2)  # 每2秒检查一次
+
+            except Exception as e:
+                logger.warning(f"检查 mutation 状态失败: {e}")
+                break

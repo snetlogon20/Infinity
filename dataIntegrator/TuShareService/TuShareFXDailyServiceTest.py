@@ -23,7 +23,7 @@ class TuShareFXDailyServiceTest(TuShareService):
         # start_date = '20231028'
         # end_date = '20231028'
 
-        start_date = '20231028'
+        start_date = '20260101'
         end_date = CommonParameters.today
 
         calendar = CalendarService()
@@ -50,25 +50,6 @@ class TuShareFXDailyServiceTest(TuShareService):
         logger.info("\n" + "="*60)
         logger.info("所有外汇对刷新完成")
         logger.info("="*60)
-
-    # @classmethod
-    # def generate_date_range(self, start_date, end_date):
-    #     """生成日期范围列表，按天循环"""
-    #     date_ranges = []
-    #
-    #     from datetime import datetime, timedelta
-    #
-    #     start = datetime.strptime(start_date, '%Y%m%d')
-    #     end = datetime.strptime(end_date, '%Y%m%d')
-    #
-    #     current = start
-    #     while current <= end:
-    #         date_str = current.strftime('%Y%m%d')
-    #         date_ranges.append((date_str, date_str))
-    #         current += timedelta(days=1)
-    #
-    #     return date_ranges
-
 
 
 if __name__ == '__main__':
