@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import pandas as pd
 
@@ -100,6 +101,71 @@ class PortfolioAnalysis(TuShareService):
         logger.info(f"相关系数矩阵 (rho):\n{rho}")
 
         return u, sigma, rho, pivot_df.columns.tolist()
+
+    def execute_full_analysis_workflow(self, end_date_start, end_date_end, interest_country, sql_type,
+                                       prepare_sql_func):
+        """
+        执行完整的投资组合分析工作流
+
+        包括：
+        1. 滚动窗口优化
+        2. 合并保存结果
+        3. 生成 PDF 报告
+        4. 生成 PNG 图表
+
+        参数:
+        - end_date_start: 结束日期起始值 (格式: 'YYYYMMDD')
+        - end_date_end: 结束日期终止值 (格式: 'YYYYMMDD')
+        - interest_country: 利率国家 ('US' 或 'CN')
+        - sql_type: SQL 类型
+        - prepare_sql_func: SQL 生成函数（由外部传入）
+
+        返回:
+        - all_products_results: 产品权重结果列表
+        - all_metrics_results: 指标结果列表
+        - pdf_path: PDF 报告路径
+        """
+        logger.info("=" * 80)
+        logger.info("🚀 开始执行完整分析工作流")
+        logger.info(f"   日期范围: {end_date_start} 至 {end_date_end}")
+        logger.info(f"   利率国家: {interest_country}")
+        logger.info(f"   数据类型: {sql_type}")
+        logger.info("=" * 80)
+
+        # 步骤1: 滚动优化
+        logger.info("\n📊 步骤 1/4: 执行滚动窗口优化...")
+        all_products_results, all_metrics_results = self.run_rolling_optimization(
+            end_date_start,
+            end_date_end,
+            interest_country,
+            sql_type,
+            prepare_sql_func
+        )
+
+        # 步骤2: 合并保存结果
+        logger.info("\n💾 步骤 2/4: 合并并保存结果...")
+        self.merge_and_save_results(all_products_results, all_metrics_results, end_date_start, end_date_end)
+
+        # 步骤3: 生成 PDF 报告
+        logger.info("\n📄 步骤 3/4: 生成 PDF 报告...")
+        pdf_path = self.generate_pdf_report(
+            all_products_results,
+            all_metrics_results,
+            end_date_start,
+            end_date_end,
+            sql_type
+        )
+
+        # 步骤4: 生成 PNG 图表
+        logger.info("\n📈 步骤 4/4: 生成 PNG 图表...")
+        self.plot_optimization_results(all_products_results, all_metrics_results)
+
+        logger.info("\n" + "=" * 80)
+        logger.info("✅ 完整分析工作流执行完毕！")
+        logger.info(f"   PDF 报告: {pdf_path}")
+        logger.info("=" * 80)
+
+        return all_products_results, all_metrics_results, pdf_path
 
     #外围处理的主程序
     def run_rolling_optimization(self, end_date_start, end_date_end, interest_country, sql_type, prepare_sql_func):
@@ -742,3 +808,299 @@ class PortfolioAnalysis(TuShareService):
         logger.info("\n" + "=" * 80)
         logger.info("所有图表生成完成！")
         logger.info("=" * 80)
+
+    def generate_pdf_report(self, all_products_results, all_metrics_results, end_date_start, end_date_end,
+                            sql_type="unknown"):
+        """
+        生成专业的金融报告 PDF
+
+        参数:
+        - all_products_results: 产品权重结果列表
+        - all_metrics_results: 指标结果列表
+        - end_date_start: 开始日期
+        - end_date_end: 结束日期
+        - sql_type: SQL 类型（用于区分不同报告）
+        """
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch, cm
+        from reportlab.lib import colors
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import tempfile
+
+        # 注册中文字体 - 尝试多个可能的路径
+        chinese_font = 'Helvetica'
+        font_paths = [
+            'C:/Windows/Fonts/simhei.ttf',  # 黑体
+            'C:/Windows/Fonts/msyh.ttc',  # 微软雅黑
+            'C:/Windows/Fonts/msyh.ttf',  # 微软雅黑 (旧版)
+            'C:/Windows/Fonts/simsun.ttc',  # 宋体
+        ]
+
+        for font_path in font_paths:
+            try:
+                if os.path.exists(font_path):
+                    font_name = os.path.basename(font_path).split('.')[0]
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    chinese_font = font_name
+                    logger.info(f"成功加载中文字体: {font_path}")
+                    break
+            except Exception as e:
+                logger.warning(f"字体加载失败 {font_path}: {e}")
+                continue
+
+        if chinese_font == 'Helvetica':
+            logger.warning("未找到中文字体，PDF 中的中文可能无法正常显示")
+
+        # 生成临时图表文件
+        temp_files = []
+
+        # 生成图表1：策略对比
+        chart1_path = None
+        if all_metrics_results:
+            final_metrics_df_plot = pd.concat(all_metrics_results, ignore_index=True)
+            final_metrics_df_plot['date'] = pd.to_datetime(final_metrics_df_plot['date'], format='%Y%m%d')
+            final_metrics_df_plot = final_metrics_df_plot.sort_values('date')
+
+            fig, axes = plt.subplots(3, 1, figsize=(14, 12))
+            fig.suptitle('投资组合优化策略对比分析', fontsize=16, fontweight='bold', fontname=chinese_font)
+
+            strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
+            colors_list = ['#FF6B6B', '#4ECDC4', '#45B7D1']
+            markers = ['o', 's', '^']
+
+            for idx, (metric, title, ylabel) in enumerate([
+                ('年化收益率', '年化收益率对比 (%)', '收益率 (%)'),
+                ('年化波动率', '年化波动率对比 (%)', '波动率 (%)'),
+                ('夏普比率', '夏普比率对比', '夏普比率')
+            ]):
+                ax = axes[idx]
+                for strategy, color, marker in zip(strategies, colors_list, markers):
+                    strategy_data = final_metrics_df_plot[final_metrics_df_plot['优化目标'] == strategy]
+                    if not strategy_data.empty:
+                        ax.plot(strategy_data['date'], strategy_data[metric],
+                                label=strategy, color=color, marker=marker,
+                                linewidth=2, markersize=4, alpha=0.8)
+
+                ax.set_title(title, fontsize=12, fontweight='bold', fontname=chinese_font)
+                ax.set_xlabel('日期', fontsize=10, fontname=chinese_font)
+                ax.set_ylabel(ylabel, fontsize=10, fontname=chinese_font)
+                ax.legend(loc='best', fontsize=9, prop={'family': chinese_font})
+                ax.grid(True, alpha=0.3, linestyle='--')
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+                ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+
+            plt.tight_layout()
+            chart1_path = os.path.join(tempfile.gettempdir(), 'chart1.png')
+            plt.savefig(chart1_path, dpi=150, bbox_inches='tight')
+            temp_files.append(chart1_path)
+            plt.close()
+
+        # 生成图表2：产品权重
+        chart2_path = None
+        if all_products_results:
+            final_products_df_plot = pd.concat(all_products_results, ignore_index=True)
+            final_products_df_plot['date'] = pd.to_datetime(final_products_df_plot['date'], format='%Y%m%d')
+            final_products_df_plot = final_products_df_plot.sort_values('date')
+
+            fig, axes = plt.subplots(3, 1, figsize=(16, 12))
+            fig.suptitle('各策略下产品权重配置对比', fontsize=16, fontweight='bold', fontname=chinese_font)
+
+            strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
+            products = final_products_df_plot['products'].unique()
+            product_colors = plt.cm.tab10(np.linspace(0, 1, len(products)))
+
+            for idx, strategy in enumerate(strategies):
+                ax = axes[idx]
+                strategy_data = final_products_df_plot[final_products_df_plot['strategy'] == strategy]
+
+                if not strategy_data.empty:
+                    for prod_idx, product in enumerate(products):
+                        product_data = strategy_data[strategy_data['products'] == product]
+                        if not product_data.empty:
+                            color = product_colors[prod_idx % len(product_colors)]
+                            ax.plot(product_data['date'], product_data['rate'] * 100,
+                                    label=product, color=color, linewidth=2, alpha=0.85)
+
+                    ax.set_title(strategy, fontsize=13, fontweight='bold', fontname=chinese_font, loc='left')
+                    ax.set_xlabel('日期', fontsize=11, fontname=chinese_font)
+                    ax.set_ylabel('权重 (%)', fontsize=11, fontname=chinese_font)
+                    ax.legend(loc='upper right', fontsize=9, prop={'family': chinese_font}, ncol=2)
+                    ax.grid(True, alpha=0.3, linestyle='--')
+                    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+                    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+                    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+
+            plt.tight_layout()
+            chart2_path = os.path.join(tempfile.gettempdir(), 'chart2.png')
+            plt.savefig(chart2_path, dpi=150, bbox_inches='tight')
+            temp_files.append(chart2_path)
+            plt.close()
+
+        # 创建 PDF - 文件名中包含 sql_type
+        pdf_filename = FileUtility.generate_filename_by_timestamp(
+            f"portfolio_report_{sql_type}_{end_date_start}_to_{end_date_end}", "pdf"
+        )
+        pdf_path = os.path.join(CommonParameters.outBoundPath, pdf_filename)
+
+        doc = SimpleDocTemplate(pdf_path, pagesize=landscape(A4),
+                                rightMargin=72, leftMargin=72,
+                                topMargin=72, bottomMargin=18)
+
+        # 获取页面可用宽度
+        page_width = landscape(A4)[0] - 144  # 减去左右边距
+        page_height = landscape(A4)[1] - 90  # 减去上下边距
+
+        # 样式
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            leading=32,
+            alignment=1,
+            fontName=chinese_font,
+            spaceAfter=30
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            leading=24,
+            fontName=chinese_font,
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            leading=14,
+            fontName=chinese_font
+        )
+
+        story = []
+
+        # 标题页 - 添加 sql_type 信息
+        story.append(Paragraph('投资组合优化分析报告', title_style))
+        story.append(Spacer(1, 0.3 * inch))
+        story.append(Paragraph(f'数据类型: {sql_type}', normal_style))
+        story.append(Paragraph(f'报告期间: {end_date_start} 至 {end_date_end}', normal_style))
+        story.append(Paragraph(f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', normal_style))
+        story.append(PageBreak())
+
+        # 执行摘要
+        story.append(Paragraph('一、执行摘要', heading_style))
+        if all_metrics_results:
+            final_metrics_df = pd.concat(all_metrics_results, ignore_index=True)
+            summary_text = f"""
+            本报告分析了从 {end_date_start} 到 {end_date_end} 期间的投资组合优化结果。
+            数据类型: {sql_type}。
+            共进行了 {len(final_metrics_df)} 次优化计算，涵盖三种策略：最大化夏普比率、最大化收益率、最小化波动率。
+            """
+            story.append(Paragraph(summary_text, normal_style))
+        story.append(Spacer(1, 0.3 * inch))
+
+        # 策略对比图表
+        if chart1_path:
+            story.append(Paragraph('二、策略性能对比', heading_style))
+            img = Image(chart1_path, width=page_width, height=page_width * 0.7)
+            story.append(img)
+            story.append(Spacer(1, 0.3 * inch))
+            story.append(Paragraph('上图展示了三种优化策略在年化收益率、波动率和夏普比率方面的表现对比。', normal_style))
+            story.append(PageBreak())
+
+        # 产品权重图表
+        if chart2_path:
+            story.append(Paragraph('三、产品权重配置', heading_style))
+            img = Image(chart2_path, width=page_width, height=page_width * 0.7)
+            story.append(img)
+            story.append(Spacer(1, 0.3 * inch))
+            story.append(Paragraph('上图展示了不同策略下各产品的权重配置变化。', normal_style))
+            story.append(PageBreak())
+
+        # 详细数据表格
+        if all_metrics_results:
+            story.append(Paragraph('四、关键指标统计', heading_style))
+            final_metrics_df = pd.concat(all_metrics_results, ignore_index=True)
+
+            # 汇总统计
+            summary_stats = final_metrics_df.groupby('优化目标')[['年化收益率', '年化波动率', '夏普比率']].agg(
+                ['mean', 'std', 'min', 'max'])
+
+            # 创建表格数据
+            table_data = [['策略', '指标', '均值', '标准差', '最小值', '最大值']]
+            for strategy in summary_stats.index:
+                for metric in ['年化收益率', '年化波动率', '夏普比率']:
+                    row = [
+                        strategy,
+                        metric,
+                        f"{summary_stats.loc[strategy, (metric, 'mean')]:.2f}",
+                        f"{summary_stats.loc[strategy, (metric, 'std')]:.2f}",
+                        f"{summary_stats.loc[strategy, (metric, 'min')]:.2f}",
+                        f"{summary_stats.loc[strategy, (metric, 'max')]:.2f}"
+                    ]
+                    table_data.append(row)
+
+            table = Table(table_data, colWidths=[2 * inch, 1.5 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), chinese_font),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('FONTNAME', (0, 1), (-1, -1), chinese_font),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(table)
+            story.append(PageBreak())
+
+        # 最新权重配置
+        if all_products_results:
+            story.append(Paragraph('五、最新权重配置', heading_style))
+            final_products_df = pd.concat(all_products_results, ignore_index=True)
+            latest_date = final_products_df['date'].max()
+            latest_data = final_products_df[final_products_df['date'] == latest_date]
+
+            table_data = [['策略', '产品', '权重(%)', '无风险利率(%)']]
+            for _, row in latest_data.iterrows():
+                table_data.append([
+                    row['strategy'],
+                    row['products'],
+                    f"{row['rate'] * 100:.2f}",
+                    f"{row.get('risk_free_rate', 0) * 100:.2f}" if 'risk_free_rate' in row else 'N/A'
+                ])
+
+            table = Table(table_data, colWidths=[2 * inch, 1.5 * inch, 1.5 * inch, 1.5 * inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), chinese_font),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('FONTNAME', (0, 1), (-1, -1), chinese_font),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(table)
+
+        # 生成 PDF
+        doc.build(story)
+
+        # 清理临时文件
+        for temp_file in temp_files:
+            try:
+                os.remove(temp_file)
+            except:
+                pass
+
+        logger.info(f"✅ PDF 报告已生成: {pdf_path}")
+        return pdf_path

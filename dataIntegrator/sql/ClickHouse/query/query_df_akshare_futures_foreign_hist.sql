@@ -196,5 +196,12 @@ WHERE symbol = 'NG' AND close > 0 order by date desc
 
 SELECT *
 FROM indexsysdb.df_akshare_futures_foreign_hist
-WHERE symbol in ('GC','CL','OIL','NG') AND close > 0 
+WHERE symbol in ('GC','CL','OIL','NG','XAG','XAU','S','W','C','CAD','AHD','SZD','NID',) AND close > 0 
 order by date desc, symbol
+
+SELECT *
+FROM indexsysdb.df_akshare_futures_foreign_hist
+WHERE  close > 0 
+order by date desc, symbol
+
+

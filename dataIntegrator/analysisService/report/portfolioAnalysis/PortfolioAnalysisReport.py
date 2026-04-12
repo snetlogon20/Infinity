@@ -5,7 +5,7 @@ from dataIntegrator.modelService.financialAnalysis.PortfolioAnalysis import Port
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-class PortfolioAnalysisTest():
+class PortfolioAnalysisReport():
 
     def prepare_sql(self, start_date=None, end_date=None, sql_type="us_stocks"):
         """
@@ -158,78 +158,90 @@ class PortfolioAnalysisTest():
         return sql
 
 
-
 if __name__ == "__main__":
 
-    portfolioAnalysisTest = PortfolioAnalysisTest()
-
-    """
-        测试案例：选定的美国股票
-    """
-    # end_date_start = '20260301'  # end_date 起始日期
-    # end_date_end = '20260331'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "US"  # US, CN
-    # sql_type = "us_stocks"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：选定的美国股票 + 黄金
-    """
-    end_date_start = '20260301'  # end_date 起始日期
-    end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    interest_country = "US"  # US, CN
-    sql_type = "us_stocks_gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：AI选定的中国股票
-    """
-    # end_date_start = '20251001'  # end_date 起始日期
-    # end_date_end = '20260331'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "CN"  # US, CN
-    # sql_type = "ai_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：人选定的中国股票
-    """
-    # end_date_start = '20260301'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "CN"  # US, CN
-    # sql_type = "china_self_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：美国大宗商品（包括黄金）
-    """
-    # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "US"  # US, CN
-    # sql_type = "commodities-gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：美国大宗商品（非黄金）
-    """
-    # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "US"  # US, CN
-    # sql_type = "commodities-nongold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
-
-    """
-        测试案例：外币
-    """
-    # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "US"  # US, CN
-    # sql_type = "fx"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities, fx
-
-
-    """
-        总体操控代码如下
-    """
+    portfolioAnalysisTest = PortfolioAnalysisReport()
     portfolioAnalysis = PortfolioAnalysis()
 
-    # 一键执行完整分析工作流
-    all_products_results, all_metrics_results, pdf_path = portfolioAnalysis.execute_full_analysis_workflow(
-        end_date_start,
-        end_date_end,
-        interest_country,
-        sql_type,
-        portfolioAnalysisTest.prepare_sql
-    )
+    # 定义所有报表配置参数列表
+    report_configs = [
+        {
+            "name": "报表1：选定的美国股票",
+            "end_date_start": "20260301",
+            "end_date_end": "20260331",
+            "interest_country": "US",
+            "sql_type": "us_stocks"
+        },
+        {
+            "name": "报表2：选定的美国股票 + 黄金",
+            "end_date_start": "20260301",
+            "end_date_end": "20260411",
+            "interest_country": "US",
+            "sql_type": "us_stocks_gold"
+        },
+        {
+            "name": "测试案例：AI选定的中国股票",
+            "end_date_start": "20251001",
+            "end_date_end": "20260331",
+            "interest_country": "CN",
+            "sql_type": "ai_selected"
+        },
+        {
+            "name": "测试案例：人选定的中国股票",
+            "end_date_start": "20260301",
+            "end_date_end": "20260411",
+            "interest_country": "CN",
+            "sql_type": "china_self_selected"
+        },
+        {
+            "name": "测试案例：美国大宗商品（包括黄金）",
+            "end_date_start": "20260101",
+            "end_date_end": "20260411",
+            "interest_country": "US",
+            "sql_type": "commodities-gold"
+        },
+        {
+            "name": "测试案例：美国大宗商品（非黄金）",
+            "end_date_start": "20260101",
+            "end_date_end": "20260411",
+            "interest_country": "US",
+            "sql_type": "commodities-nongold"
+        },
+        {
+            "name": "测试案例：外币",
+            "end_date_start": "20260101",
+            "end_date_end": "20260411",
+            "interest_country": "US",
+            "sql_type": "fx"
+        }
+    ]
+
+    # 循环执行所有报表
+    for idx, config in enumerate(report_configs, 1):
+        logger.info("\n" + "=" * 80)
+        logger.info(f"📊 开始生成第 {idx}/{len(report_configs)} 个报表")
+        logger.info(f"   报表名称: {config['name']}")
+        logger.info("=" * 80)
+
+        try:
+            all_products_results, all_metrics_results, pdf_path = portfolioAnalysis.execute_full_analysis_workflow(
+                config["end_date_start"],
+                config["end_date_end"],
+                config["interest_country"],
+                config["sql_type"],
+                portfolioAnalysisTest.prepare_sql
+            )
+
+            logger.info(f"✅ 第 {idx} 个报表生成成功: {pdf_path}")
+
+        except Exception as e:
+            logger.error(f"❌ 第 {idx} 个报表生成失败: {config['name']}")
+            logger.error(f"   错误信息: {str(e)}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            continue
+
+    logger.info("\n" + "=" * 80)
+    logger.info("🎉 所有报表生成完毕！")
+    logger.info("=" * 80)
