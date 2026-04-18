@@ -1,9 +1,12 @@
 import os
+import tempfile
 from datetime import datetime
+import matplotlib.font_manager as fm
 
 import pandas as pd
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.TuShareService.TuShareChinaStockBasicService import TuShareStockBasicService
 from dataIntegrator.TuShareService.TushareShiborDailyService import TushareShiborDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -18,6 +21,47 @@ from dataIntegrator.utility.FileUtility import FileUtility
 
 logger = CommonLib.logger
 commonLib = CommonLib()
+
+
+# 配置中文字体
+def setup_chinese_font():
+    """配置中文字体"""
+    # Windows 系统常见中文字体路径
+    font_paths = [
+        r'C:\Windows\Fonts\msyh.ttc',  # Microsoft YaHei (微软雅黑)
+        r'C:\Windows\Fonts\msyhbd.ttc',  # Microsoft YaHei Bold
+        r'C:\Windows\Fonts\simhei.ttf',  # SimHei (黑体)
+        r'C:\Windows\Fonts\simsun.ttc',  # SimSun (宋体)
+        r'C:\Windows\Fonts\simfang.ttf',  # FangSong (仿宋)
+    ]
+
+    chinese_font = 'SimHei'  # 默认字体
+
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                # 获取字体名称
+                font_name = fm.FontProperties(fname=font_path).get_name()
+                fm.fontManager.addfont(font_path)
+                chinese_font = font_name
+                logger.info(f"✅ 成功加载中文字体: {font_path} -> {font_name}")
+                break
+            except Exception as e:
+                logger.warning(f"⚠️ 字体加载失败 {font_path}: {e}")
+                continue
+
+    if chinese_font == 'SimHei':
+        logger.warning("⚠️ 未找到中文字体，图表中的中文可能无法正常显示")
+
+    # 设置 matplotlib 字体
+    rcParams['font.sans-serif'] = [chinese_font, 'Arial Unicode MS', 'Microsoft YaHei', 'SimHei']
+    rcParams['axes.unicode_minus'] = False  # 正常显示负号
+
+    return chinese_font
+
+
+# 在模块加载时配置字体
+chinese_font = setup_chinese_font()
 
 class PortfolioAnalysis(TuShareService):
 
@@ -102,16 +146,9 @@ class PortfolioAnalysis(TuShareService):
 
         return u, sigma, rho, pivot_df.columns.tolist()
 
-    def execute_full_analysis_workflow(self, end_date_start, end_date_end, interest_country, sql_type,
-                                       prepare_sql_func):
+    def execute_full_analysis_workflow(self, end_date_start, end_date_end, interest_country, sql_type, prepare_sql_func):
         """
-        执行完整的投资组合分析工作流
-
-        包括：
-        1. 滚动窗口优化
-        2. 合并保存结果
-        3. 生成 PDF 报告
-        4. 生成 PNG 图表
+        执行完整分析工作流
 
         参数:
         - end_date_start: 结束日期起始值 (格式: 'YYYYMMDD')
@@ -142,9 +179,9 @@ class PortfolioAnalysis(TuShareService):
             prepare_sql_func
         )
 
-        # 步骤2: 合并保存结果
+        # 步骤2: 合并保存结果（传入 interest_country 和 sql_type）
         logger.info("\n💾 步骤 2/4: 合并并保存结果...")
-        self.merge_and_save_results(all_products_results, all_metrics_results, end_date_start, end_date_end)
+        self.merge_and_save_results(all_products_results, all_metrics_results, end_date_start, end_date_end, interest_country, sql_type)
 
         # 步骤3: 生成 PDF 报告
         logger.info("\n📄 步骤 3/4: 生成 PDF 报告...")
@@ -156,7 +193,7 @@ class PortfolioAnalysis(TuShareService):
             sql_type
         )
 
-        # 步骤4: 生成 PNG 图表
+        # 步骤4: 生成 PNG 图表（传入 products 结果用于更新产品名称）
         logger.info("\n📈 步骤 4/4: 生成 PNG 图表...")
         self.plot_optimization_results(all_products_results, all_metrics_results)
 
@@ -572,7 +609,7 @@ class PortfolioAnalysis(TuShareService):
 
         return (result_dfs, latest_yield) if result_dfs else (None, None)
 
-    def merge_and_save_results(self, all_products_results, all_metrics_results, end_date_start, end_date_end):
+    def merge_and_save_results(self, all_products_results, all_metrics_results, end_date_start, end_date_end, interest_country="CN", sql_type="unknown"):
         """
         合并并保存投资组合优化结果
 
@@ -581,10 +618,29 @@ class PortfolioAnalysis(TuShareService):
         - all_metrics_results: 指标结果列表
         - end_date_start: 开始日期
         - end_date_end: 结束日期
+        - interest_country: 利率国家 ('US' 或 'CN')
+        - sql_type: SQL 类型（用于区分不同报告）
         """
+        # 如果是中国股票且是中国自选股，获取股票名称
+        if interest_country == "CN" and sql_type == "china_self_selected":
+            logger.info("📊 检测到中国自选股，正在获取股票名称...")
+            tuShareChinaStockBasicService = TuShareStockBasicService()
+            stock_name_map = tuShareChinaStockBasicService.get_stock_names(all_products_results)
+
+            logger.info(f"✅ 获取到 {len(stock_name_map)} 只股票名称")
+        else:
+            stock_name_map = {}
+
         # 合并所有 products 结果
         if all_products_results:
             final_products_df = pd.concat(all_products_results, ignore_index=True)
+
+            # 替换股票代码为 "代码 - 名称" 格式
+            if stock_name_map:
+                final_products_df['products'] = final_products_df['products'].apply(
+                    lambda code: f"{code} - {stock_name_map.get(code, '')}" if code in stock_name_map else code
+                )
+                logger.info("✅ 股票代码已替换为 '代码 - 名称' 格式")
 
             # 保存到磁盘
             output_file_name = FileUtility.generate_filename_by_timestamp(
@@ -638,10 +694,8 @@ class PortfolioAnalysis(TuShareService):
         - all_products_results: 产品权重结果列表
         - all_metrics_results: 指标结果列表
         """
-
-        # 设置中文字体
-        rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
-        rcParams['axes.unicode_minus'] = False
+        # 中文字体已在模块加载时配置，这里只需确保设置正确
+        logger.info(f"使用字体: {rcParams['font.sans-serif']}")
 
         # 图1: 三种优化策略的指标对比（按日期）
         if all_metrics_results:
@@ -650,7 +704,7 @@ class PortfolioAnalysis(TuShareService):
             final_metrics_df_plot = final_metrics_df_plot.sort_values('date')
 
             fig, axes = plt.subplots(3, 1, figsize=(14, 14))
-            fig.suptitle('投资组合优化策略对比分析', fontsize=16, fontweight='bold')
+            fig.suptitle('投资组合优化策略对比分析', fontsize=16, fontweight='bold', fontname=chinese_font)
 
             strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
             colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
@@ -685,7 +739,7 @@ class PortfolioAnalysis(TuShareService):
                              label='无风险利率', marker='s', markersize=5)
 
                     # 设置右侧 Y 轴
-                    ax2.set_ylabel('无风险利率 (%)', fontsize=10, color='red')
+                    ax2.set_ylabel('无风险利率 (%)', fontsize=10, color='red', fontname=chinese_font)
                     ax2.tick_params(axis='y', labelcolor='red')
                     ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.2f}'))
 
@@ -699,13 +753,13 @@ class PortfolioAnalysis(TuShareService):
                     lines1, labels1 = ax.get_legend_handles_labels()
                     lines2, labels2 = ax2.get_legend_handles_labels()
                     ax.legend(lines1 + lines2, labels1 + labels2,
-                              loc='best', fontsize=9, framealpha=0.95, shadow=True)
+                              loc='best', fontsize=9, framealpha=0.95, shadow=True, prop={'family': chinese_font})
                 else:
-                    ax.legend(loc='best', fontsize=9)
+                    ax.legend(loc='best', fontsize=9, prop={'family': chinese_font})
 
-                ax.set_title(title, fontsize=12, fontweight='bold')
-                ax.set_xlabel('日期', fontsize=10)
-                ax.set_ylabel(ylabel, fontsize=10)
+                ax.set_title(title, fontsize=12, fontweight='bold', fontname=chinese_font)
+                ax.set_xlabel('日期', fontsize=10, fontname=chinese_font)
+                ax.set_ylabel(ylabel, fontsize=10, fontname=chinese_font)
                 ax.grid(True, alpha=0.3, linestyle='--')
                 ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
                 ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
@@ -726,7 +780,7 @@ class PortfolioAnalysis(TuShareService):
             final_products_df_plot = final_products_df_plot.sort_values('date')
 
             fig, axes = plt.subplots(3, 1, figsize=(16, 14))
-            fig.suptitle('各策略下产品权重配置与无风险利率对比', fontsize=16, fontweight='bold')
+            fig.suptitle('各策略下产品权重配置与无风险利率对比', fontsize=16, fontweight='bold', fontname=chinese_font)
 
             strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
 
@@ -764,7 +818,7 @@ class PortfolioAnalysis(TuShareService):
                                  label='无风险利率', marker='s', markersize=5)
 
                         # 设置右侧 Y 轴
-                        ax2.set_ylabel('无风险利率 (%)', fontsize=11, color='red')
+                        ax2.set_ylabel('无风险利率 (%)', fontsize=11, color='red', fontname=chinese_font)
                         ax2.tick_params(axis='y', labelcolor='red')
                         ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.2f}%'))
 
@@ -775,16 +829,16 @@ class PortfolioAnalysis(TuShareService):
                         ax2.set_ylim(max(0, rf_min - rf_padding), rf_max + rf_padding)
 
                     ax.set_title(f'{strategy}', fontsize=13, fontweight='bold',
-                                 loc='left', pad=10)
-                    ax.set_xlabel('日期', fontsize=11)
-                    ax.set_ylabel('权重 (%)', fontsize=11)
+                                 loc='left', pad=10, fontname=chinese_font)
+                    ax.set_xlabel('日期', fontsize=11, fontname=chinese_font)
+                    ax.set_ylabel('权重 (%)', fontsize=11, fontname=chinese_font)
 
                     # 合并两个轴的图例
                     lines1, labels1 = ax.get_legend_handles_labels()
                     lines2, labels2 = ax2.get_legend_handles_labels()
                     ax.legend(lines1 + lines2, labels1 + labels2,
                               loc='upper right', fontsize=9, ncol=2,
-                              framealpha=0.95, shadow=True)
+                              framealpha=0.95, shadow=True, prop={'family': chinese_font})
 
                     ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
@@ -809,8 +863,7 @@ class PortfolioAnalysis(TuShareService):
         logger.info("所有图表生成完成！")
         logger.info("=" * 80)
 
-    def generate_pdf_report(self, all_products_results, all_metrics_results, end_date_start, end_date_end,
-                            sql_type="unknown"):
+    def generate_pdf_report(self, all_products_results, all_metrics_results, end_date_start, end_date_end, sql_type="unknown"):
         """
         生成专业的金融报告 PDF
 
@@ -828,36 +881,58 @@ class PortfolioAnalysis(TuShareService):
         from reportlab.lib import colors
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        import tempfile
+        from datetime import datetime
 
-        # 注册中文字体 - 尝试多个可能的路径
-        chinese_font = 'Helvetica'
-        font_paths = [
-            'C:/Windows/Fonts/simhei.ttf',  # 黑体
-            'C:/Windows/Fonts/msyh.ttc',  # 微软雅黑
-            'C:/Windows/Fonts/msyh.ttf',  # 微软雅黑 (旧版)
-            'C:/Windows/Fonts/simsun.ttc',  # 宋体
+        # 注册中文字体（使用明确的映射关系）
+        reportlab_font = 'Helvetica'
+        font_mapping = [
+            (r'C:\Windows\Fonts\msyh.ttc', 'MicrosoftYaHei'),
+            (r'C:\Windows\Fonts\simhei.ttf', 'SimHei'),
+            (r'C:\Windows\Fonts\simfang.ttf', 'FangSong'),
+            (r'C:\Windows\Fonts\simsun.ttc', 'SimSun'),
         ]
 
-        for font_path in font_paths:
-            try:
-                if os.path.exists(font_path):
-                    font_name = os.path.basename(font_path).split('.')[0]
+        for font_path, font_name in font_mapping:
+            if os.path.exists(font_path):
+                try:
                     pdfmetrics.registerFont(TTFont(font_name, font_path))
-                    chinese_font = font_name
-                    logger.info(f"成功加载中文字体: {font_path}")
+                    reportlab_font = font_name
+                    logger.info(f"✅ ReportLab 成功加载中文字体: {font_path} -> {font_name}")
                     break
-            except Exception as e:
-                logger.warning(f"字体加载失败 {font_path}: {e}")
-                continue
+                except Exception as e:
+                    logger.warning(f"⚠️ ReportLab 字体加载失败 {font_path}: {e}")
+                    continue
 
-        if chinese_font == 'Helvetica':
-            logger.warning("未找到中文字体，PDF 中的中文可能无法正常显示")
+        if reportlab_font == 'Helvetica':
+            logger.warning("⚠️ ReportLab 未找到中文字体，PDF 中的中文可能无法正常显示")
+
+        logger.info(f"ReportLab 使用中文字体: {reportlab_font}")
+
+        # 如果是中国股票且是中国自选股，获取股票名称用于图表显示
+        stock_name_map = {}
+        if all_products_results:
+            # 从 all_products_results 中提取所有股票代码
+            temp_df = pd.concat(all_products_results, ignore_index=True)
+            unique_codes = temp_df['products'].unique()
+
+            # 检查是否为中国自选股
+            if sql_type == "china_self_selected":
+                logger.info("📊 检测到中国自选股，正在获取股票名称用于 PDF 图表...")
+                tuShareChinaStockBasicService = TuShareStockBasicService()
+                stock_name_map = tuShareChinaStockBasicService.get_stock_names(all_products_results)
+                logger.info(f"✅ 获取到 {len(stock_name_map)} 只股票名称")
+
+                # 替换所有 products 结果中的股票代码为"代码 - 名称"格式
+                for df in all_products_results:
+                    df['products'] = df['products'].apply(
+                        lambda code: f"{code} - {stock_name_map.get(code, '')}" if code in stock_name_map else code
+                    )
+                logger.info("✅ PDF 图表中的股票代码已替换为 '代码 - 名称' 格式")
 
         # 生成临时图表文件
         temp_files = []
 
-        # 生成图表1：策略对比
+        # 生成图表1：策略对比（使用全局配置的 chinese_font）
         chart1_path = None
         if all_metrics_results:
             final_metrics_df_plot = pd.concat(all_metrics_results, ignore_index=True)
@@ -954,7 +1029,7 @@ class PortfolioAnalysis(TuShareService):
         page_width = landscape(A4)[0] - 144  # 减去左右边距
         page_height = landscape(A4)[1] - 90  # 减去上下边距
 
-        # 样式
+        # 样式（确保使用已注册的字体名称）
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -962,7 +1037,7 @@ class PortfolioAnalysis(TuShareService):
             fontSize=24,
             leading=32,
             alignment=1,
-            fontName=chinese_font,
+            fontName=reportlab_font,
             spaceAfter=30
         )
         heading_style = ParagraphStyle(
@@ -970,7 +1045,7 @@ class PortfolioAnalysis(TuShareService):
             parent=styles['Heading2'],
             fontSize=16,
             leading=24,
-            fontName=chinese_font,
+            fontName=reportlab_font,
             spaceAfter=12,
             spaceBefore=12
         )
@@ -979,7 +1054,7 @@ class PortfolioAnalysis(TuShareService):
             parent=styles['Normal'],
             fontSize=10,
             leading=14,
-            fontName=chinese_font
+            fontName=reportlab_font
         )
 
         story = []
@@ -1050,11 +1125,11 @@ class PortfolioAnalysis(TuShareService):
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), chinese_font),
+                ('FONTNAME', (0, 0), (-1, 0), reportlab_font),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('FONTNAME', (0, 1), (-1, -1), chinese_font),
+                ('FONTNAME', (0, 1), (-1, -1), reportlab_font),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ]))
@@ -1082,11 +1157,11 @@ class PortfolioAnalysis(TuShareService):
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), chinese_font),
+                ('FONTNAME', (0, 0), (-1, 0), reportlab_font),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('FONTNAME', (0, 1), (-1, -1), chinese_font),
+                ('FONTNAME', (0, 1), (-1, -1), reportlab_font),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ]))
@@ -1104,3 +1179,5 @@ class PortfolioAnalysis(TuShareService):
 
         logger.info(f"✅ PDF 报告已生成: {pdf_path}")
         return pdf_path
+
+
