@@ -21,7 +21,8 @@ class TuShareUSStockDailyServiceTest(TuShareService):
             start_date = calenearService.calculate_T_minus_n_days( CommonParameters.today, days=31)
             end_date = CommonParameters.today
 
-            ts_code_list = ["C", "JPM", "AAPL","NVDA", "MSFT"]
+            #ts_code_list = ["SPY", "C", "JPM", "AAPL","NVDA", "MSFT"]
+            ts_code_list = ["C", "JPM", "AAPL", "NVDA", "MSFT"]
             ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
 
             # 循环调用
