@@ -75,6 +75,9 @@ class CommonParameters():
             {'ts_code': '688498.SH', 'name': '源杰科技'},
         ]
 
+    US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
+    #US_STOCK_LIST=["C", "JPM", "AAPL", "NVDA", "MSFT"]
+
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
 

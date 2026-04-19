@@ -87,6 +87,6 @@ data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name
     字段名参考接口中字段名()中的英文
 
 注意事项
-1. 需要考虑修改 import 的部分。需要把 from dataIntegrator.TuShareService.TuShareStockBasicService import TuShareStockBasicService 改成 from dataIntegrator.TuShareService.TuShareChinaStockBasicService import TuShareStockBasicService
+1. 需要考虑修改 import 的部分。需要把 from dataIntegrator.TuShareService.TuShareStockBasicService import TuShareStockBasicService 改成 from dataIntegrator.TuShareService.TuShareService import TuShareService
 2. 需要根据接口示例中的api调用说明，修改prepareDataFrame中的接口调用
 3. 注意 self.deleteAkDateFromClickHouse() 中传入的参数是根据上下文拼接的 del_sql
