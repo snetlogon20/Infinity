@@ -68,8 +68,15 @@ class CommonParameters():
             {'ts_code': '600490.SH', 'name': '鹏欣资源'},
             {'ts_code': '000902.SZ', 'name': '新洋丰'},
             {'ts_code': '601368.SH', 'name': '绿城水务'},
-            {'ts_code': '603839.SH', 'name': '安正时尚'}
+            {'ts_code': '603839.SH', 'name': '安正时尚'},
+            {'ts_code': '000546.SZ', 'name': '金圆股份'},
+            {'ts_code': '600470.SH', 'name': '六国化工'},
+            {'ts_code': '600519.SH', 'name': '贵州茅台'},
+            {'ts_code': '688498.SH', 'name': '源杰科技'},
         ]
+
+    US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
+    #US_STOCK_LIST=["C", "JPM", "AAPL", "NVDA", "MSFT"]
 
     def __init__(self, LogLib):
         print("CommonParameters init begin ")

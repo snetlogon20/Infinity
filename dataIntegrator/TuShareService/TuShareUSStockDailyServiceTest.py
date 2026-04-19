@@ -12,16 +12,13 @@ class TuShareUSStockDailyServiceTest(TuShareService):
     @classmethod
     def refresh_stocks(self):
 
-            # ts_code = 'C'
-            # start_date = '20250101'
-            # end_date = '20251231'
-
             calenearService = CalendarService()
-            # 获取31天前的日期，作为滚动扫描的start date
-            start_date = calenearService.calculate_T_minus_n_days( CommonParameters.today, days=31)
+            start_date = calenearService.calculate_T_minus_n_days( CommonParameters.today, days=600) # 获取31天前的日期，作为滚动扫描的start date
             end_date = CommonParameters.today
 
-            ts_code_list = ["C", "JPM", "AAPL","NVDA", "MSFT"]
+            ts_code_list = CommonParameters.US_STOCK_LIST
+            #ts_code_list = ["C", "JPM", "AAPL", "NVDA", "MSFT"]
+            ts_code_list = ["SPY"]
             ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
 
             # 循环调用
@@ -33,7 +30,7 @@ class TuShareUSStockDailyServiceTest(TuShareService):
                     dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
                     jsonString = tuShareService.convertDataFrame2JSON()
                     tuShareService.saveDateFrameToDisk(csvFilePath)
-                    tuShareService.deleteDateFromClickHouse(start_date, end_date)
+                    tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
                     tuShareService.saveDateToClickHouse()
 
                     logger.info(f"{key}: {ts_code} {start_date}-{end_date} 处理完成")

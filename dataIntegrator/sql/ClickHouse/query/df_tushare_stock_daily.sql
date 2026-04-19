@@ -1,3 +1,4 @@
+--×ÔÑ¡¹É
 select 
     ts_code as ts_code,
     trade_date as trade_date,
@@ -5,11 +6,12 @@ select
 from indexsysdb.df_tushare_stock_daily
 where ts_code in 
 (
-            '002093.SZ',
-            '600490.SH',
-            '000902.SZ',
-            '601368.SH', 
-            '603839.SH'
+        '688585.SH',
+        '605255.SH',
+        '300476.SZ',
+        '301232.SZ',
+        '603226.SH',
+        '600470.SH',
 )
 AND
         trade_date >= '20241001' AND 
