@@ -1,4 +1,4 @@
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.modelService.financialAnalysis.PortfolioAnalysis import PortfolioAnalysis
 
 
@@ -76,7 +76,11 @@ class PortfolioAnalysisTest():
                             '600490.SH',
                             '000902.SZ',
                             '601368.SH',
-                            '603839.SH'
+                            '603839.SH',
+                            --'000546.SZ',
+                            --'600470.SH',
+                            '600519.SH',
+                            '688498.SH',
                 )
                 AND
                         trade_date >= '20241001' AND
@@ -167,39 +171,39 @@ if __name__ == "__main__":
         测试案例：选定的美国股票
     """
     # end_date_start = '20260301'  # end_date 起始日期
-    # end_date_end = '20260331'  # end_date 结束日期（可根据需要调整）
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
     # interest_country = "US"  # US, CN
     # sql_type = "us_stocks"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
     """
         测试案例：选定的美国股票 + 黄金
     """
-    end_date_start = '20260301'  # end_date 起始日期
-    end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    interest_country = "US"  # US, CN
-    sql_type = "us_stocks_gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+    # end_date_start = '20260301'  # end_date 起始日期
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
+    # interest_country = "US"  # US, CN
+    # sql_type = "us_stocks_gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
     """
         测试案例：AI选定的中国股票
     """
     # end_date_start = '20251001'  # end_date 起始日期
-    # end_date_end = '20260331'  # end_date 结束日期（可根据需要调整）
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
     # interest_country = "CN"  # US, CN
     # sql_type = "ai_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
     """
         测试案例：人选定的中国股票
     """
-    # end_date_start = '20260301'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
-    # interest_country = "CN"  # US, CN
-    # sql_type = "china_self_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
+    end_date_start = '20260301'  # end_date 起始日期
+    end_date_end = CommonParameters.today  # end_date 结束日期（可根据需要调整）
+    interest_country = "CN"  # US, CN
+    sql_type = "china_self_selected"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
     """
         测试案例：美国大宗商品（包括黄金）
     """
     # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
     # interest_country = "US"  # US, CN
     # sql_type = "commodities-gold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
@@ -207,7 +211,7 @@ if __name__ == "__main__":
         测试案例：美国大宗商品（非黄金）
     """
     # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
     # interest_country = "US"  # US, CN
     # sql_type = "commodities-nongold"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities
 
@@ -215,7 +219,7 @@ if __name__ == "__main__":
         测试案例：外币
     """
     # end_date_start = '20260101'  # end_date 起始日期
-    # end_date_end = '20260411'  # end_date 结束日期（可根据需要调整）
+    # end_date_end = CommonParameters.today   # end_date 结束日期（可根据需要调整）
     # interest_country = "US"  # US, CN
     # sql_type = "fx"  # us_stocks, us_stocks_gold, china_self_selected, ai_selected, commodities, fx
 

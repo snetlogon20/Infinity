@@ -5,6 +5,7 @@ from dataIntegrator.AKShareService.AkShareMacroChinaNewHousePriceService import 
 from dataIntegrator.AKShareService.AkShareMacroChinaShrzgmService import AkShareMacroChinaShrzgmService
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
+from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
 from dataIntegrator.common.FileType import FileType
 
 logger = CommonLib.logger
@@ -128,20 +129,10 @@ class AkShareServiceManager():
 
             # 获取数据（传入城市参数）
             dataFrame = akShareService.prepareDataFrame(city_first=city_first, city_second=city_second)
-
-            # 保存到磁盘
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
-
-            # 从磁盘读取
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-
-            # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
             akShareService.deleteDateFromClickHouse()
-
-            # 转换数据格式
             dataFrame = akShareService.transformDataFrame(dataFrame)
-
-            # 保存到 ClickHouse
             akShareService.saveDateToClickHouse(dataFrame)
 
         except Exception as e:
@@ -150,6 +141,55 @@ class AkShareServiceManager():
 
         logger.info("callAkShareMacroChinaNewHousePriceService ended...")
 
+    @classmethod
+    def callAkShareStockUsDailyService(self, symbol='AAPL', adjust=''):
+        """
+        调用 AkShare 美股历史行情数据服务
+
+        Args:
+            symbol (str): 美股代码，如 'AAPL'(苹果), 'MSFT'(微软)等
+            adjust (str): 复权类型，'' 为未复权，'qfq' 为前复权，'qfq-factor' 为前复权因子
+        """
+        logger.info(f"callAkShareStockUsDailyService started... Symbol: {symbol}, Adjust: {adjust}")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, f'akshare_stock_us_daily_{symbol}_{adjust if adjust else "normal"}.xlsx')
+
+        try:
+            akShareService = AkShareStockUsDailyService()
+
+            dataFrame = akShareService.prepareDataFrame(symbol=symbol, adjust=adjust)
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse(symbol=symbol)
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+        except Exception as e:
+            logger.info('Exception: %s', e)
+            raise e
+
+        logger.info(f"callAkShareStockUsDailyService ended... Symbol: {symbol}, Adjust: {adjust}")
+
+    @classmethod
+    def callAllAkShareStockUsDailyService(self, adjust=''):
+        """
+        批量调用 AkShare 美股历史行情数据服务，处理 US_STOCK_LIST 中的所有股票
+
+        Args:
+            adjust (str): 复权类型，'' 为未复权，'qfq' 为前复权
+        """
+        logger.info(f"callAllAkShareStockUsDailyService started... Adjust: {adjust}")
+
+        for symbol in CommonParameters.US_STOCK_LIST:
+            try:
+                logger.info(f"========== 开始处理股票: {symbol} ==========")
+                self.callAkShareStockUsDailyService(symbol=symbol, adjust=adjust)
+                logger.info(f"========== 股票 {symbol} 处理完成 ==========\n")
+            except Exception as e:
+                logger.error(f"股票 {symbol} 处理失败，继续下一只: {e}")
+                continue
+
+        logger.info("callAllAkShareStockUsDailyService completed")
 
     @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
@@ -168,7 +208,7 @@ class AkShareServiceManager():
             self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
             self.callAkShareMacroChinaShrzgmService()
             self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
-
+            self.callAllAkShareStockUsDailyService(adjust='')
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)
