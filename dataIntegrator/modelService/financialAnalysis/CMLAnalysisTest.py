@@ -229,6 +229,14 @@ if __name__ == "__main__":
             "market_type": "US"
         },
         {
+            "name": "美国自定义组合",
+            "stock_type": "us_custom",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "US"
+        },
+        {
             "name": "中国蓝筹股组合",
             "stock_type": "cn_blue_chip",
             "start_date": CommonDataParameters.get_start_date(days=360),

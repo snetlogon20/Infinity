@@ -662,29 +662,59 @@ class CMLAnalysis:
         returns_df = self.calculate_daily_return(filtered_dfs)
         expected_returns, cov_matrix, volatilities = self.calculate_statistics(returns_df, trading_days)
 
-        logger.info("\n⚡ 步骤 4/6: 投资组合优化...")
-        max_sharpe_result = self.optimize_max_sharpe(expected_returns, cov_matrix, risk_free_rate_annual)
-        min_vol_result = self.optimize_min_variance(expected_returns, cov_matrix)
+        # 排除市场指数（如SPY、000001.SH等），避免干扰组合优化
+        # 市场指数作为基准参考，不应参与投资组合优化
+        optimization_stocks = [stock for stock in expected_returns.index if stock != market_symbol]
+        if market_symbol in expected_returns.index:
+            logger.info(f"\n⚠️  从投资组合优化中排除市场指数: {market_symbol}")
+            logger.info(f"   优化资产数量: {len(optimization_stocks)} (原始: {len(expected_returns)})")
+            
+            # 为优化创建不含市场指数的数据
+            expected_returns_opt = expected_returns.drop(market_symbol)
+            cov_matrix_opt = cov_matrix.drop(market_symbol).drop(market_symbol, axis=1)
+            volatilities_opt = volatilities.drop(market_symbol)
+        else:
+            logger.info(f"\n✅ 所有资产均参与优化 (数量: {len(optimization_stocks)})")
+            expected_returns_opt = expected_returns
+            cov_matrix_opt = cov_matrix
+            volatilities_opt = volatilities
 
+        logger.info("\n⚡ 步骤 4/6: 投资组合优化...")
+        max_sharpe_result = self.optimize_max_sharpe(expected_returns_opt, cov_matrix_opt, risk_free_rate_annual)
+        min_vol_result = self.optimize_min_variance(expected_returns_opt, cov_matrix_opt)
+
+        # 使用优化后的数据计算组合表现
         max_sharpe_return, max_sharpe_volatility = self.portfolio_performance(
-            max_sharpe_result.x, expected_returns.values, cov_matrix.values
+            max_sharpe_result.x, expected_returns_opt.values, cov_matrix_opt.values
         )
-        max_sharpe_weights = max_sharpe_result.x
+        
+        # 创建完整的权重数组（与原始expected_returns顺序一致，市场指数权重为0）
+        max_sharpe_weights = np.zeros(len(expected_returns))
+        for idx, stock in enumerate(expected_returns.index):
+            if stock != market_symbol and stock in expected_returns_opt.index:
+                opt_idx = list(expected_returns_opt.index).index(stock)
+                max_sharpe_weights[idx] = max_sharpe_result.x[opt_idx]
 
         min_vol_return, min_vol_volatility = self.portfolio_performance(
-            min_vol_result.x, expected_returns.values, cov_matrix.values
+            min_vol_result.x, expected_returns_opt.values, cov_matrix_opt.values
         )
-        min_vol_weights = min_vol_result.x
+        
+        # 创建完整的权重数组（与原始expected_returns顺序一致，市场指数权重为0）
+        min_vol_weights = np.zeros(len(expected_returns))
+        for idx, stock in enumerate(expected_returns.index):
+            if stock != market_symbol and stock in expected_returns_opt.index:
+                opt_idx = list(expected_returns_opt.index).index(stock)
+                min_vol_weights[idx] = min_vol_result.x[opt_idx]
 
-        logger.info("\n📐 步骤 5/6: 生成有效前沿...")
+        logger.info("\n 步骤 5/6: 生成有效前沿...")
         frontier_returns, frontier_volatilities = self.generate_efficient_frontier(
-            expected_returns, cov_matrix, min_vol_return, max_sharpe_return
+            expected_returns_opt, cov_matrix_opt, min_vol_return, max_sharpe_return
         )
 
         logger.info("\n🎲 步骤 6/6: 蒙特卡洛模拟和绘图...")
         n_portfolios = 10000
         mc_results, weights_record = self.monte_carlo_simulation(
-            expected_returns, cov_matrix, risk_free_rate_annual, n_portfolios
+            expected_returns_opt, cov_matrix_opt, risk_free_rate_annual, n_portfolios
         )
 
         max_sharpe_idx = np.argmax(mc_results[:, 2])

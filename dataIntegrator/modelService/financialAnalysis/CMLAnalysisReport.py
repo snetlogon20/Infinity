@@ -310,15 +310,22 @@ class CMLAnalysisReport:
             volatilities = result.get('volatilities', {})
             max_sharpe_weights = result.get('max_sharpe_weights', None)
             min_vol_weights = result.get('min_vol_weights', None)
+            market_symbol = result.get('market_symbol', None)
 
             if expected_returns:
                 # 获取股票代码列表（与权重数组顺序一致）
                 stock_list = list(expected_returns.keys())
                 
+                # 过滤掉市场指数（如SPY、000001.SH等）
+                filtered_stocks = [stock for stock in stock_list if stock != market_symbol]
+                
                 table_data = [['资产代码', '预期收益率 (%)', '波动率 (%)', '风险特征', 
                               '最小方差组合配置 (%)', '切点组合配置 (%)']]
 
-                sorted_assets = sorted(expected_returns.items(), key=lambda x: x[1], reverse=True)
+                # 只统计非市场指数的资产
+                sorted_assets = [(asset, exp_return) for asset, exp_return in expected_returns.items() 
+                                if asset != market_symbol]
+                sorted_assets.sort(key=lambda x: x[1], reverse=True)
 
                 for asset, exp_return in sorted_assets:
                     vol = volatilities.get(asset, 0) * 100
@@ -381,8 +388,12 @@ class CMLAnalysisReport:
 
             story.append(Paragraph(f'三.{idx}.3 投资建议', heading2_style))
             if expected_returns and volatilities:
-                low_risk_assets = [k for k, v in volatilities.items() if v < 0.15]
-                high_return_assets = [k for k, v in expected_returns.items() if v > 0.15]
+                # 过滤掉市场指数
+                filtered_volatilities = {k: v for k, v in volatilities.items() if k != market_symbol}
+                filtered_expected_returns = {k: v for k, v in expected_returns.items() if k != market_symbol}
+                
+                low_risk_assets = [k for k, v in filtered_volatilities.items() if v < 0.15]
+                high_return_assets = [k for k, v in filtered_expected_returns.items() if v > 0.15]
 
                 advice_text = f"""根据 CML 分析结果：
 
