@@ -19,6 +19,7 @@ from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFX
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
 logger = CommonLib.logger
@@ -34,27 +35,12 @@ class TuShareServiceManager():
     def callTuShareCNIndexDailyService(self, param_dict):
         logger.info("callTuShareService started...")
 
-        # ts_code = '000001.SH'
-        # start_date = '20220521'
-        # end_date = '20241218'
-        #ccsvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_cn_index_daily_20220507.csv")
-
-        ts_code = param_dict.get("ts_code")
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_cn_index_daily_20220507.csv")
-
-        try:
-            tuShareService = TuShareCNIndexDailyService()
-            dataFrame = tuShareService.prepareDataFrame(ts_code,start_date,end_date)
-            jsonString = tuShareService.convertDataFrame2JSON()
-            tuShareService.saveDateFrameToDisk(csvFilePath)
-            tuShareService.deleteDateFromClickHouse(ts_code,start_date,end_date)
-            tuShareService.saveDateToClickHouse()
-
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+        tuShareCNIndexDailyService = TuShareCNIndexDailyService()
+        index_list = CommonDataParameters.CN_INDEX_LIST
+        #start_date = '20240101'
+        end_date = CommonParameters.today
+        start_date = CommonDataParameters.get_start_date(days=360)
+        tuShareCNIndexDailyService.refresh_multiple_indexes(index_list, start_date, end_date)
 
         logger.info("callTuShareService ended...")
 
@@ -67,8 +53,10 @@ class TuShareServiceManager():
         stock_list = CommonParameters.STOCK_LIST
 
         # 设置日期范围
-        start_date = '20250101'
+        # start_date = '20250101'
+        # end_date = CommonParameters.today
         end_date = CommonParameters.today
+        start_date = CommonDataParameters.get_start_date(days=360)
 
         logger.info(f"开始批量处理 {len(stock_list)} 只股票...")
 
@@ -231,9 +219,11 @@ class TuShareServiceManager():
         logger.info("callTuShareUSStockDailyService started...")
 
         calenearService = CalendarService()
-        start_date = calenearService.calculate_T_minus_n_days(CommonParameters.today,
-                                                              days=31)  # 获取31天前的日期，作为滚动扫描的start date
+        # start_date = calenearService.calculate_T_minus_n_days(CommonParameters.today,
+        #                                                       days=31)  # 获取31天前的日期，作为滚动扫描的start date
+        # end_date = CommonParameters.today
         end_date = CommonParameters.today
+        start_date = CommonDataParameters.get_start_date(days=31)
 
         ts_code_list = CommonParameters.US_STOCK_LIST
         ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
@@ -252,9 +242,9 @@ class TuShareServiceManager():
                 tuShareService.saveDateToClickHouse()
 
                 logger.info(f"{key}: {ts_code} {start_date}-{end_date} 处理完成")
-                # Tushare 规定 1 分钟只能访问 2 次，这里循环休眠 31 秒
-                for i in range(1, 32):
-                    logger.info(f"Tushare 限流控制：第 {i}/31 秒...")
+                # Tushare 规定 1 分钟只能访问 2 次，这里循环休眠 45 秒
+                for i in range(1, 45):
+                    logger.info(f"Tushare 限流控制：第 {i}/45 秒...")
                     time.sleep(1)
 
             except Exception as e:

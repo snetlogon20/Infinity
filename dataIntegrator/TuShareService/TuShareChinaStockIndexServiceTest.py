@@ -96,5 +96,5 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tuShareChinaStockIndexServiceTest = TuShareChinaStockIndexServiceTest()
-    # tuShareChinaStockIndexServiceTest.refresh_shanghai_index()
-    tuShareChinaStockIndexServiceTest.refresh_any_china_stock_index()
+    tuShareChinaStockIndexServiceTest.refresh_shanghai_index()
+    # tuShareChinaStockIndexServiceTest.refresh_any_china_stock_index()

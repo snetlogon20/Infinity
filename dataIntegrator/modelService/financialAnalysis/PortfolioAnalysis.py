@@ -17,6 +17,8 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import rcParams
+
+from dataIntegrator.modelService.financialAnalysis.RiskFreeRateManager import RiskFreeRateManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
 logger = CommonLib.logger
@@ -480,32 +482,36 @@ class PortfolioAnalysis(TuShareService):
             logger.info(f"正在优化: {option}")
             logger.info(f"{'=' * 80}")
 
-            if interest_country == "US":
-                # 根据输入的起止日期计算使用的年化收益率
-                tushareUSTreasuryYieldCurveService = TushareUSTreasuryYieldCurveService()
-                avg_yield, earliest_yield, latest_yield, max_yield, min_yield = tushareUSTreasuryYieldCurveService.get_yield_for_term(
-                    start_date, end_date)
+            # if interest_country == "US":
+            #     # 根据输入的起止日期计算使用的年化收益率
+            #     tushareUSTreasuryYieldCurveService = TushareUSTreasuryYieldCurveService()
+            #     avg_yield, earliest_yield, latest_yield, max_yield, min_yield = tushareUSTreasuryYieldCurveService.get_yield_for_term(
+            #         start_date, end_date)
+            #
+            #     logger.info(f"平均收益率: {avg_yield:.4f}")
+            #     logger.info(f"最早日期收益率: {earliest_yield:.4f}")
+            #     logger.info(f"最晚日期收益率: {latest_yield:.4f}")
+            #     logger.info(f"最大收益率: {max_yield:.4f}")
+            #     logger.info(f"最小收益率: {min_yield:.4f}")
+            #
+            # else:
+            #     tushareShiborDailyService = TushareShiborDailyService()
+            #     avg_rate, earliest_rate, latest_rate, max_rate, min_rate = tushareShiborDailyService.get_rate_for_term(
+            #         start_date, end_date)
+            #
+            #     logger.info(f"平均收益率: {avg_rate:.4f}")
+            #     logger.info(f"最早日期收益率: {earliest_rate:.4f}")
+            #     logger.info(f"最晚日期收益率: {latest_rate:.4f}")
+            #     logger.info(f"最大收益率: {max_rate:.4f}")
+            #     logger.info(f"最小收益率: {min_rate:.4f}")
+            #
+            #     latest_yield = latest_rate
+            #
+            # logger.info(f"最终选取收益率: {latest_yield:.4f}")
 
-                logger.info(f"平均收益率: {avg_yield:.4f}")
-                logger.info(f"最早日期收益率: {earliest_yield:.4f}")
-                logger.info(f"最晚日期收益率: {latest_yield:.4f}")
-                logger.info(f"最大收益率: {max_yield:.4f}")
-                logger.info(f"最小收益率: {min_yield:.4f}")
+            riskFreeRateManager = RiskFreeRateManager()
+            latest_yield = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country)
 
-            else:
-                tushareShiborDailyService = TushareShiborDailyService()
-                avg_rate, earliest_rate, latest_rate, max_rate, min_rate = tushareShiborDailyService.get_rate_for_term(
-                    start_date, end_date)
-
-                logger.info(f"平均收益率: {avg_rate:.4f}")
-                logger.info(f"最早日期收益率: {earliest_rate:.4f}")
-                logger.info(f"最晚日期收益率: {latest_rate:.4f}")
-                logger.info(f"最大收益率: {max_rate:.4f}")
-                logger.info(f"最小收益率: {min_rate:.4f}")
-
-                latest_yield = latest_rate
-
-            logger.info(f"最终选取收益率: {latest_yield:.4f}")
             optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option,
                                                                       risk_free_rate=latest_yield)
 

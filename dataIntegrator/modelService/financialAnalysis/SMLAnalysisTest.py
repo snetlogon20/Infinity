@@ -1,4 +1,6 @@
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.modelService.financialAnalysis.RiskFreeRateManager import RiskFreeRateManager
 from dataIntegrator.modelService.financialAnalysis.SMLAnalysis import SMLAnalysis
 
 logger = CommonLib.logger
@@ -85,6 +87,7 @@ class SMLAnalysisTest:
 if __name__ == "__main__":
 
     smlAnalysisTest = SMLAnalysisTest()
+    riskFreeRateManager = RiskFreeRateManager()
 
     """
         测试案例1：美国科技股
@@ -92,7 +95,7 @@ if __name__ == "__main__":
     # stock_type = "us_tech"
     # start_date = "20250101"
     # end_date = None  # 使用今天
-    # risk_free_rate = 0.04
+    # risk_free_rate = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country="US")
 
     """
         测试案例2：美国金融股
@@ -100,23 +103,23 @@ if __name__ == "__main__":
     # stock_type = "us_finance"
     # start_date = "20250101"
     # end_date = None
-    # risk_free_rate = 0.04
+    # risk_free_rate = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country="US")
 
     """
         测试案例3：美国混合股票（推荐）
     """
     stock_type = "us_mixed"
-    start_date = "20250301"
-    end_date = None  # 使用今天
-    risk_free_rate = 0.04
+    start_date = CommonDataParameters.get_start_date(days=360)
+    end_date = CommonParameters.today
+    risk_free_rate = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country="US")
 
     """
         测试案例4：自定义股票列表
     """
     # stock_type = "custom"
-    # start_date = "20250101"
-    # end_date = None
-    # risk_free_rate = 0.04
+    # start_date = CommonDataParameters.get_start_date(days=360)
+    # end_date = CommonParameters.today
+    # risk_free_rate = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country="US")
 
     # 执行分析
     results = smlAnalysisTest.run_sml_analysis(
