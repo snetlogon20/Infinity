@@ -22,6 +22,15 @@ class CommonDataParameters():
         calendarService = CalendarService()
         return calendarService.calculate_T_minus_n_days(CommonParameters.today, days=days)
 
+    CN_INDEX_LIST = [
+        '000001.SH',  # 上证指数
+        '399001.SZ',  # 深证成指
+        '000300.SH',  # 沪深300
+        '000905.SH',  # 中证500
+        '000852.SH',  # 中证1000
+        '399006.SZ',  # 创业板指
+    ]
+
     # STOCK_LIST=[
     #         {'ts_code': '002093.SZ', 'name': '国脉科技'},
     #         {'ts_code': '600490.SH', 'name': '鹏欣资源'},
@@ -52,6 +61,15 @@ class CommonDataParameters():
         {'ts_code': '601888.SH', 'name': '中国中免'},
     ]
 
+    REFRESH_US_STOCK_LIST = [
+        "SPY", "C", "JPM", "AAPL", "NVDA", "GS", "MS", "GE",  # 你原有的代码
+        "MSFT", "AVGO", "ADBE", "UNH", "JNJ", "LLY", "PFE", "MRK", "AMZN",
+        "TSLA", "MCD", "NFLX", "HD", "GOOGL", "META", "DIS", "CMCSA", "T",
+        "CAT", "UPS", "BA", "HON", "PG", "KO", "PEP", "WMT", "COST", "XOM",
+        "CVX", "COP", "SLB", "EOG", "AMT", "PLD", "EQIX", "SPG", "O", "NEE",
+        "DUK", "SO", "D", "EXC", "LIN", "APD", "FCX", "NEM", "SHW"
+    ]
+
     #US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
     #US_STOCK_LIST=["C", "JPM", "AAPL", "NVDA", "MSFT"]
     US_STOCK_LIST = [
@@ -63,13 +81,5 @@ class CommonDataParameters():
         "DUK", "SO", "D", "EXC", "LIN", "APD", "FCX", "NEM", "SHW"
     ]
 
-    CN_INDEX_LIST = [
-        '000001.SH',  # 上证指数
-        '399001.SZ',  # 深证成指
-        '000300.SH',  # 沪深300
-        '000905.SH',  # 中证500
-        '000852.SH',  # 中证1000
-        '399006.SZ',  # 创业板指
-    ]
 
 

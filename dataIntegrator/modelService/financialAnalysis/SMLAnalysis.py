@@ -1,6 +1,5 @@
 import os
 import sys
-import tempfile
 from datetime import datetime
 import matplotlib.font_manager as fm
 import pandas as pd
@@ -11,7 +10,6 @@ import statsmodels.api as sm
 from matplotlib import rcParams
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.utility.FileUtility import FileUtility
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -64,6 +62,8 @@ class SMLAnalysis:
         print("%s.%s: %s" % (className, functionName, event))
         logger.info("%s.%s: %s" % (className, functionName, event))
 
+# ... existing code ...
+
     def fetch_stock_data(self, stocks, start_date, end_date, market_type="US", market_symbol=None):
         """
         从 ClickHouse 获取股票数据
@@ -76,7 +76,7 @@ class SMLAnalysis:
         - market_symbol: 市场指数符号（用于区分指数和股票）
 
         返回:
-        - dfs: 字典，key为股票代码（A股格式为 ts_code-name），value为DataFrame
+        - dfs: 字典，key为股票代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为DataFrame
         - stock_names: 字典，key为ts_code，value为股票名称
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
@@ -99,6 +99,21 @@ class SMLAnalysis:
                 if not name_df.empty:
                     for _, row in name_df.iterrows():
                         stock_names[row['ts_code']] = row['name']
+
+        elif market_type == "US":
+            us_stocks = [s for s in stocks if s != market_symbol]
+            if us_stocks:
+                clickhouseService = ClickhouseService()
+                stock_codes = "','".join(us_stocks)
+                name_sql = f"""
+                SELECT ts_code, enname
+                FROM indexsysdb.df_tushare_us_stock_basic
+                WHERE ts_code IN ('{stock_codes}')
+                """
+                name_df = clickhouseService.getDataFrameWithoutColumnsName(name_sql)
+                if not name_df.empty:
+                    for _, row in name_df.iterrows():
+                        stock_names[row['ts_code']] = row['enname']
 
         for stock in stocks:
             is_market_index = (stock == market_symbol)
@@ -176,6 +191,10 @@ class SMLAnalysis:
                 if stock in stock_names and stock_names[stock]:
                     display_name = f"{stock}-{stock_names[stock]}"
 
+            if market_type == "US" and not is_market_index:
+                if stock in stock_names and stock_names[stock]:
+                    display_name = f"{stock}-{stock_names[stock]}"
+
             dfs[display_name] = df
 
         logger.info(f"成功获取 {len(dfs)} 只股票的数据")
@@ -233,7 +252,7 @@ class SMLAnalysis:
         - market_type: 市场类型
 
         返回:
-        - betas: 字典，key为股票代码（A股格式为 ts_code-name），value为β值
+        - betas: 字典，key为股票代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为β值
         - market_return: 市场收益率序列
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
@@ -250,7 +269,14 @@ class SMLAnalysis:
                 betas[stock] = 1.0
             else:
                 display_stock = stock
+
                 if market_type == "CN":
+                    for key in dfs.keys():
+                        if key.startswith(stock + "-"):
+                            display_stock = key
+                            break
+
+                elif market_type == "US":
                     for key in dfs.keys():
                         if key.startswith(stock + "-"):
                             display_stock = key
@@ -316,14 +342,33 @@ class SMLAnalysis:
 
         Rf_annual = risk_free_rate_annual
 
-        plt.figure(figsize=(14, 9))
+        display_stocks = stocks if stocks else list(betas.keys())
+        num_stocks = len([s for s in display_stocks if s != 'SPY' and s in betas])
+
+        # 根据股票数量动态调整图表宽度和标注偏移
+        if num_stocks <= 5:
+            fig_width = 16
+            offset_x = 40
+        elif num_stocks <= 10:
+            fig_width = 20
+            offset_x = 50
+        elif num_stocks <= 20:
+            fig_width = 24
+            offset_x = 60
+        elif num_stocks <= 30:
+            fig_width = 28
+            offset_x = 70
+        else:
+            fig_width = 32
+            offset_x = 80
+
+        # 创建动态宽度的图表
+        plt.figure(figsize=(fig_width, 14))
 
         beta_range = np.linspace(0, 2, 100)
         sml_returns = Rf_annual + beta_range * (E_Rm - Rf_annual)
 
         plt.plot(beta_range, sml_returns, 'r-', linewidth=2, label='SML (CAPM)')
-
-        display_stocks = stocks if stocks else list(betas.keys())
 
         for idx, stock in enumerate(display_stocks):
             if stock not in betas:
@@ -332,41 +377,47 @@ class SMLAnalysis:
                 continue
             plt.scatter(betas[stock], expected_returns[stock], s=80, alpha=0.7, label=stock)
 
+            # 根据索引交替设置标注位置，避免重叠
             if idx % 2 == 0:
-                xytext = (40, -4)
+                xytext = (offset_x, 8)
             else:
-                xytext = (-40, -4)
+                xytext = (-offset_x, -12)
 
             plt.annotate(stock,
                          xy=(betas[stock], expected_returns[stock]),
                          xytext=xytext,
                          textcoords='offset points',
-                         fontsize=7,
+                         fontsize=8,
                          fontweight='normal',
-                         alpha=0.8)
+                         alpha=0.85,
+                         bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.6, edgecolor='none'))
 
-        plt.scatter(0, Rf_annual, color='black', label=f'无风险资产 (Rf={Rf_annual*100:.2f}%)', s=120, zorder=5)
-        plt.scatter(1, E_Rm, color='blue', label=f'市场组合 (SPY, E(Rm)={E_Rm*100:.2f}%)', s=120, zorder=5)
+        plt.scatter(0, Rf_annual, color='black', label=f'无风险资产 (Rf={Rf_annual * 100:.2f}%)', s=120, zorder=5)
+        plt.scatter(1, E_Rm, color='blue', label=f'市场组合 (SPY, E(Rm)={E_Rm * 100:.2f}%)', s=120, zorder=5)
 
-        plt.xlabel('系统性风险 (β)', fontsize=12, fontname=chinese_font)
-        plt.ylabel('预期收益率 (年化)', fontsize=12, fontname=chinese_font)
-        plt.title('证券市场线 (SML) 分析', fontsize=16, fontweight='bold', fontname=chinese_font)
+        plt.xlabel('系统性风险 (β)', fontsize=13, fontname=chinese_font, labelpad=10)
+        plt.ylabel('预期收益率 (年化)', fontsize=13, fontname=chinese_font, labelpad=10)
+        plt.title('证券市场线 (SML) 分析', fontsize=18, fontweight='bold', fontname=chinese_font, pad=15)
 
-        num_columns = min(len(display_stocks), 20)
+        # 调整图例布局：增加列数，减小字体，增加间距
+        num_columns = min(len(display_stocks), 30)
 
         plt.legend(loc='upper center',
-                   bbox_to_anchor=(0.5, -0.18),
+                   bbox_to_anchor=(0.5, -0.12),
                    ncol=num_columns,
-                   fontsize=6.5,
-                   markerscale=0.5,
-                   columnspacing=0.6,
-                   handlelength=0.8,
-                   handletextpad=0.3,
-                   framealpha=0.9,
-                   borderaxespad=0.8)
+                   fontsize=7,
+                   markerscale=0.6,
+                   columnspacing=0.8,
+                   handlelength=1.0,
+                   handletextpad=0.4,
+                   framealpha=0.95,
+                   borderaxespad=1.0)
 
         plt.grid(True, alpha=0.3)
+
+        # 使用 tight_layout 并增加边距，确保标注不被裁剪
         plt.tight_layout()
+        plt.subplots_adjust(left=0.06, right=0.97, top=0.92, bottom=0.15)
 
         if save_path is None:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
