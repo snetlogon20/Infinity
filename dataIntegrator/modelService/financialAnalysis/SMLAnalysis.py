@@ -64,7 +64,7 @@ class SMLAnalysis:
         print("%s.%s: %s" % (className, functionName, event))
         logger.info("%s.%s: %s" % (className, functionName, event))
 
-    def fetch_stock_data(self, stocks, start_date, end_date):
+    def fetch_stock_data(self, stocks, start_date, end_date, market_type="US", market_symbol=None):
         """
         从 ClickHouse 获取股票数据
 
@@ -72,37 +72,115 @@ class SMLAnalysis:
         - stocks: 股票代码列表
         - start_date: 开始日期 (格式: 'YYYYMMDD')
         - end_date: 结束日期 (格式: 'YYYYMMDD')
+        - market_type: 市场类型 ['US', 'CN']
+        - market_symbol: 市场指数符号（用于区分指数和股票）
 
         返回:
-        - dfs: 字典，key为股票代码，value为DataFrame
+        - dfs: 字典，key为股票代码（A股格式为 ts_code-name），value为DataFrame
+        - stock_names: 字典，key为ts_code，value为股票名称
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event=f"Fetching data for {len(stocks)} stocks from {start_date} to {end_date}")
+                          event=f"Fetching data for {len(stocks)} stocks from {start_date} to {end_date}, market={market_type}")
 
         dfs = {}
+        stock_names = {}
+
+        if market_type == "CN":
+            cn_stocks = [s for s in stocks if s != market_symbol]
+            if cn_stocks:
+                clickhouseService = ClickhouseService()
+                stock_codes = "','".join(cn_stocks)
+                name_sql = f"""
+                SELECT ts_code, name
+                FROM indexsysdb.df_tushare_stock_basic
+                WHERE ts_code IN ('{stock_codes}')
+                """
+                name_df = clickhouseService.getDataFrameWithoutColumnsName(name_sql)
+                if not name_df.empty:
+                    for _, row in name_df.iterrows():
+                        stock_names[row['ts_code']] = row['name']
+
         for stock in stocks:
-            sql = f"""
-            SELECT
-                date as trade_date,
-                close as close_point
-            FROM df_akshare_stock_us_daily
-            WHERE symbol = '{stock}'
-              AND date >= '{start_date}'
-              AND date <= '{end_date}'
-            ORDER BY date ASC
-            """
+            is_market_index = (stock == market_symbol)
+
+            if market_type == "US":
+                table_name = "df_akshare_stock_us_daily"
+                symbol_col = "symbol"
+                date_col = "date"
+                close_col = "close"
+
+                sql = f"""
+                SELECT
+                    {date_col} as trade_date,
+                    {close_col} as close_point
+                FROM {table_name}
+                WHERE {symbol_col} = '{stock}'
+                  AND {date_col} >= '{start_date}'
+                  AND {date_col} <= '{end_date}'
+                ORDER BY {date_col} ASC
+                """
+
+                display_name = stock
+
+            elif market_type == "CN":
+                if is_market_index:
+                    table_name = "df_tushare_cn_index_daily"
+                    symbol_col = "ts_code"
+                    date_col = "trade_date"
+                    close_col = "close"
+
+                    sql = f"""
+                    SELECT
+                        {date_col} as trade_date,
+                        {close_col} as close_point
+                    FROM {table_name}
+                    WHERE {symbol_col} = '{stock}'
+                      AND {date_col} >= '{start_date}'
+                      AND {date_col} <= '{end_date}'
+                    ORDER BY {date_col} ASC
+                    """
+
+                    display_name = stock
+                else:
+                    table_name = "df_tushare_stock_daily"
+                    symbol_col = "ts_code"
+                    date_col = "trade_date"
+                    close_col = "close"
+
+                    sql = f"""
+                    SELECT
+                        {date_col} as trade_date,
+                        {close_col} as close_point
+                    FROM {table_name}
+                    WHERE {symbol_col} = '{stock}'
+                      AND {date_col} >= '{start_date}'
+                      AND {date_col} <= '{end_date}'
+                    ORDER BY {date_col} ASC
+                    """
+
+                    display_name = stock
+
+            else:
+                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN']")
 
             clickhouseService = ClickhouseService()
             df = clickhouseService.getDataFrameWithoutColumnsName(sql)
             if df.empty:
                 logger.warning(f"警告: {stock} 在 {start_date} 到 {end_date} 期间没有数据")
                 continue
+
             df['trade_date'] = pd.to_datetime(df['trade_date'])
             df.set_index('trade_date', inplace=True)
-            dfs[stock] = df
+
+            if market_type == "CN" and not is_market_index:
+                if stock in stock_names and stock_names[stock]:
+                    display_name = f"{stock}-{stock_names[stock]}"
+
+            dfs[display_name] = df
 
         logger.info(f"成功获取 {len(dfs)} 只股票的数据")
         return dfs
+
 
     def calculate_daily_return(self, df):
         """
@@ -144,35 +222,47 @@ class SMLAnalysis:
         model = regression.linear_model.OLS(y, x).fit()
         return model.params[1]
 
-    def calculate_all_betas(self, dfs, stocks):
+    def calculate_all_betas(self, dfs, stocks, market_symbol='SPY', market_type="US"):
         """
         计算所有股票的β值
 
         参数:
         - dfs: 股票数据字典
         - stocks: 股票代码列表
+        - market_symbol: 市场指数符号（美股用 SPY，A股用 000001.SH 或 399001.SZ）
+        - market_type: 市场类型
 
         返回:
-        - betas: 字典，key为股票代码，value为β值
+        - betas: 字典，key为股票代码（A股格式为 ts_code-name），value为β值
         - market_return: 市场收益率序列
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event="Calculating betas for all stocks")
 
-        market_return = dfs['SPY']['daily_return']
+        if market_symbol not in dfs:
+            raise ValueError(f"市场指数 {market_symbol} 数据不存在，无法计算 β 值")
+
+        market_return = dfs[market_symbol]['daily_return']
         betas = {}
 
         for stock in stocks:
-            if stock == 'SPY':
+            if stock == market_symbol:
                 betas[stock] = 1.0
             else:
-                if stock not in dfs:
-                    logger.warning(f"跳过 {stock}：没有数据")
+                display_stock = stock
+                if market_type == "CN":
+                    for key in dfs.keys():
+                        if key.startswith(stock + "-"):
+                            display_stock = key
+                            break
+
+                if display_stock not in dfs:
+                    logger.warning(f"跳过 {display_stock}：没有数据")
                     continue
-                stock_return = dfs[stock]['daily_return']
+                stock_return = dfs[display_stock]['daily_return']
                 beta = self.calculate_beta(stock_return, market_return)
-                betas[stock] = beta
-                logger.info(f"{stock}: β = {beta:.4f}")
+                betas[display_stock] = beta
+                logger.info(f"{display_stock}: β = {beta:.4f}")
 
         return betas, market_return
 
@@ -205,7 +295,7 @@ class SMLAnalysis:
         return expected_returns, market_risk_premium, E_Rm
 
     def plot_sml(self, betas, expected_returns, E_Rm, risk_free_rate_annual=0.04,
-                 stocks=None, save_path=None):
+                 stocks=None, save_path=None, case_name=None):
         """
         绘制证券市场线(SML)图
 
@@ -216,6 +306,7 @@ class SMLAnalysis:
         - risk_free_rate_annual: 年化无风险利率
         - stocks: 股票代码列表（用于控制显示的股票）
         - save_path: 保存路径（可选）
+        - case_name: 测试案例名称（用于文件名区分）
 
         返回:
         - plot_path: 图表保存路径
@@ -279,8 +370,12 @@ class SMLAnalysis:
 
         if save_path is None:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            save_path = os.path.join(CommonParameters.outBoundPath,
-                                     f"sml_analysis_{timestamp}.png")
+            if case_name:
+                save_path = os.path.join(CommonParameters.outBoundPath,
+                                         f"sml_analysis_{case_name}_{timestamp}.png")
+            else:
+                save_path = os.path.join(CommonParameters.outBoundPath,
+                                         f"sml_analysis_{timestamp}.png")
 
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         logger.info(f"SML 图表已保存: {save_path}")
@@ -291,7 +386,7 @@ class SMLAnalysis:
 
 
     def generate_sml_report(self, stocks, start_date, end_date, risk_free_rate_annual=0.04,
-                           display_stocks=None):
+                           display_stocks=None, market_type="US", market_symbol=None, case_name=None):
         """
         生成完整的 SML 分析报告
 
@@ -301,6 +396,9 @@ class SMLAnalysis:
         - end_date: 结束日期 (格式: 'YYYYMMDD')
         - risk_free_rate_annual: 年化无风险利率
         - display_stocks: 要在图表中显示的股票列表（可选）
+        - market_type: 市场类型 ['US', 'CN']
+        - market_symbol: 市场指数符号（美股默认 SPY，A股默认 000001.SH）
+        - case_name: 测试案例名称（用于文件名区分）
 
         返回:
         - results: 包含所有分析结果的字典
@@ -308,38 +406,43 @@ class SMLAnalysis:
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event="Starting complete SML analysis")
 
+        if market_symbol is None:
+            if market_type == "US":
+                market_symbol = "SPY"
+            elif market_type == "CN":
+                market_symbol = "000001.SH"
+            else:
+                raise ValueError(f"不支持的市场类型: {market_type}")
+
         logger.info("=" * 80)
         logger.info("🚀 开始 SML 分析")
+        logger.info(f"   市场类型: {market_type}")
+        logger.info(f"   市场指数: {market_symbol}")
         logger.info(f"   股票数量: {len(stocks)}")
         logger.info(f"   日期范围: {start_date} 至 {end_date}")
         logger.info(f"   无风险利率: {risk_free_rate_annual*100:.2f}%")
         logger.info("=" * 80)
 
-        # 步骤1: 获取数据
         logger.info("\n📊 步骤 1/4: 获取股票数据...")
-        dfs = self.fetch_stock_data(stocks, start_date, end_date)
+        dfs = self.fetch_stock_data(stocks, start_date, end_date, market_type=market_type, market_symbol=market_symbol)
 
         if not dfs:
             raise ValueError("未能获取任何股票数据")
 
-        # 步骤2: 计算收益率
         logger.info("\n📈 步骤 2/4: 计算日收益率...")
-        for stock in stocks:
-            if stock in dfs:
-                dfs[stock] = self.calculate_daily_return(dfs[stock])
+        for display_stock in list(dfs.keys()):
+            dfs[display_stock] = self.calculate_daily_return(dfs[display_stock])
 
-        # 步骤3: 计算β和预期收益率
         logger.info("\n🔢 步骤 3/4: 计算β值和预期收益率...")
-        betas, market_return = self.calculate_all_betas(dfs, stocks)
+        betas, market_return = self.calculate_all_betas(dfs, stocks, market_symbol=market_symbol, market_type=market_type)
         expected_returns, market_risk_premium, E_Rm = self.calculate_expected_returns(
             betas, market_return, risk_free_rate_annual)
 
-        # 步骤4: 绘制SML图
-        logger.info("\n📉 步骤 4/4: 绘制SML图表...")
+        logger.info("\n 步骤 4/4: 绘制SML图表...")
+        display_stocks_list = list(betas.keys()) if display_stocks is None else display_stocks
         plot_path = self.plot_sml(betas, expected_returns, E_Rm, risk_free_rate_annual,
-                                  display_stocks if display_stocks else stocks)
+                                  display_stocks_list, case_name=case_name)
 
-        # 整理结果
         results = {
             'betas': betas,
             'expected_returns': expected_returns,
@@ -350,21 +453,24 @@ class SMLAnalysis:
             'plot_path': plot_path,
             'start_date': start_date,
             'end_date': end_date,
-            'stocks': stocks
+            'stocks': stocks,
+            'market_type': market_type,
+            'market_symbol': market_symbol
         }
 
-        # 打印总结
         logger.info("\n" + "=" * 80)
         logger.info("✅ SML 分析完成！")
+        logger.info(f"   市场类型: {market_type}")
+        logger.info(f"   市场指数: {market_symbol}")
         logger.info(f"   分析股票数: {len(betas)}")
         logger.info(f"   图表路径: {plot_path}")
         logger.info("=" * 80)
 
-        logger.info("\n📋 β值和预期收益率汇总:")
+        logger.info("\n β值和预期收益率汇总:")
         logger.info("-" * 80)
         for stock in sorted(betas.keys()):
-            if stock != 'SPY':
-                logger.info(f"{stock:8s}: β={betas[stock]:7.4f}, "
+            if stock != market_symbol:
+                logger.info(f"{stock:20s}: β={betas[stock]:7.4f}, "
                           f"E(R)={expected_returns[stock]*100:7.2f}%")
         logger.info("-" * 80)
 

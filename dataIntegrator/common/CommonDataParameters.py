@@ -22,17 +22,35 @@ class CommonDataParameters():
         calendarService = CalendarService()
         return calendarService.calculate_T_minus_n_days(CommonParameters.today, days=days)
 
-    STOCK_LIST=[
-            {'ts_code': '002093.SZ', 'name': '国脉科技'},
-            {'ts_code': '600490.SH', 'name': '鹏欣资源'},
-            {'ts_code': '000902.SZ', 'name': '新洋丰'},
-            {'ts_code': '601368.SH', 'name': '绿城水务'},
-            {'ts_code': '603839.SH', 'name': '安正时尚'},
-            {'ts_code': '000546.SZ', 'name': '金圆股份'},
-            {'ts_code': '600470.SH', 'name': '六国化工'},
-            {'ts_code': '600519.SH', 'name': '贵州茅台'},
-            {'ts_code': '688498.SH', 'name': '源杰科技'},
-        ]
+    # STOCK_LIST=[
+    #         {'ts_code': '002093.SZ', 'name': '国脉科技'},
+    #         {'ts_code': '600490.SH', 'name': '鹏欣资源'},
+    #         {'ts_code': '000902.SZ', 'name': '新洋丰'},
+    #         {'ts_code': '601368.SH', 'name': '绿城水务'},
+    #         {'ts_code': '603839.SH', 'name': '安正时尚'},
+    #         {'ts_code': '000546.SZ', 'name': '金圆股份'},
+    #         {'ts_code': '600470.SH', 'name': '六国化工'},
+    #         {'ts_code': '600519.SH', 'name': '贵州茅台'},
+    #         {'ts_code': '688498.SH', 'name': '源杰科技'},
+    #     ]
+    STOCK_LIST = [
+        {'ts_code': '002093.SZ', 'name': '国脉科技'},
+        {'ts_code': '600490.SH', 'name': '鹏欣资源'},
+        {'ts_code': '000902.SZ', 'name': '新洋丰'},
+        {'ts_code': '601368.SH', 'name': '绿城水务'},
+        {'ts_code': '603839.SH', 'name': '安正时尚'},
+        {'ts_code': '000546.SZ', 'name': '金圆股份'},
+        {'ts_code': '600470.SH', 'name': '六国化工'},
+        {'ts_code': '600519.SH', 'name': '贵州茅台'},
+        {'ts_code': '688498.SH', 'name': '源杰科技'},
+        {'ts_code': '601318.SH', 'name': '中国平安'},
+        {'ts_code': '600036.SH', 'name': '招商银行'},
+        {'ts_code': '601012.SH', 'name': '隆基绿能'},
+        {'ts_code': '000858.SZ', 'name': '五粮液'},
+        {'ts_code': '000333.SZ', 'name': '美的集团'},
+        {'ts_code': '600276.SH', 'name': '恒瑞医药'},
+        {'ts_code': '601888.SH', 'name': '中国中免'},
+    ]
 
     #US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
     #US_STOCK_LIST=["C", "JPM", "AAPL", "NVDA", "MSFT"]
