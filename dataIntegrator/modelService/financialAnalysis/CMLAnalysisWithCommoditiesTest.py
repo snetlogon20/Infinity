@@ -302,11 +302,29 @@ if __name__ == "__main__":
             "interest_country": "CN",
             "market_type": "CN",
             "commodities": {'Au99.99': '上海黄金'}
+        }, #以下部分是对自定义股票组合设置不同回看时间的配置，以提供不同时间段不同权重下的比较
+        {
+            "name": "中国自定义股票组合 + 上海黄金",
+            "stock_type": "cn_custom",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN",
+            "commodities": {'Au99.99': '上海黄金'}
         },
         {
             "name": "中国自定义股票组合 + 上海黄金",
             "stock_type": "cn_custom",
             "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN",
+            "commodities": {'Au99.99': '上海黄金'}
+        },
+        {
+            "name": "中国自定义股票组合 + 上海黄金",
+            "stock_type": "cn_custom",
+            "start_date": CommonDataParameters.get_start_date(days=100),
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN",
