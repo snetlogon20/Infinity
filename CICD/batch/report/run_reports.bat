@@ -19,6 +19,26 @@ REM Run CML Analysis With Commodities Report
 call .\run_CMLAnalysisWithCommoditiesReport.bat
 echo.
 
+REM Run SML Analysis Report
+call .\run_SMLAnalysisReport.bat
+echo.
+
+REM Run Information Ratio Analysis Report
+call .\run_InformationRatioAnalysisReport.bat
+echo.
+
+REM Run Portfolio Metrics Analysis Report
+call .\run_PortfolioMetricsAnalysisReport.bat
+echo.
+
+REM Run SOR Analysis Report
+call .\run_SORAnalysisReport.bat
+echo.
+
+REM Run Treynor Ratio Analysis Report
+call .\run_TreynorRatioAnalysisReport.bat
+echo.
+
 echo ========================================
 echo All Reports Execution Completed!
 echo Finished: %date% %time%
