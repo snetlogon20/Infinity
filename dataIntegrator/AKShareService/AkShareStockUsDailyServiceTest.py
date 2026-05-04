@@ -1,5 +1,6 @@
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.common.FileType import FileType
 import os
 
@@ -17,17 +18,9 @@ class AkShareStockUsDailyServiceTest:
 
             # 获取原始数据
             dataFrame = akShareService.prepareDataFrame(symbol=symbol, adjust=adjust)
-
-            # 保存到磁盘
             akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
-
-            # 从磁盘读取
             dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
-
-            # 删除 ClickHouse 中的旧数据
             akShareService.deleteDateFromClickHouse(symbol=symbol)
-
-            # 转换数据格式
             dataFrame = akShareService.transformDataFrame(dataFrame)
 
             # 保存到 ClickHouse
@@ -42,8 +35,8 @@ class AkShareStockUsDailyServiceTest:
 if __name__ == '__main__':
     akShareStockUsDailyServiceTest = AkShareStockUsDailyServiceTest()
 
-    #US_STOCK_LIST = CommonParameters.US_STOCK_LIST
-    US_STOCK_LIST = ["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
+    US_STOCK_LIST = CommonDataParameters.REFRESH_US_STOCK_LIST
+    #US_STOCK_LIST = ["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
 
     # 循环处理所有美股
     for symbol in CommonParameters.US_STOCK_LIST:

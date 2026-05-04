@@ -17,6 +17,8 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import rcParams
+
+from dataIntegrator.modelService.financialAnalysis.RiskFreeRateManager import RiskFreeRateManager
 from dataIntegrator.utility.FileUtility import FileUtility
 
 logger = CommonLib.logger
@@ -480,32 +482,36 @@ class PortfolioAnalysis(TuShareService):
             logger.info(f"正在优化: {option}")
             logger.info(f"{'=' * 80}")
 
-            if interest_country == "US":
-                # 根据输入的起止日期计算使用的年化收益率
-                tushareUSTreasuryYieldCurveService = TushareUSTreasuryYieldCurveService()
-                avg_yield, earliest_yield, latest_yield, max_yield, min_yield = tushareUSTreasuryYieldCurveService.get_yield_for_term(
-                    start_date, end_date)
+            # if interest_country == "US":
+            #     # 根据输入的起止日期计算使用的年化收益率
+            #     tushareUSTreasuryYieldCurveService = TushareUSTreasuryYieldCurveService()
+            #     avg_yield, earliest_yield, latest_yield, max_yield, min_yield = tushareUSTreasuryYieldCurveService.get_yield_for_term(
+            #         start_date, end_date)
+            #
+            #     logger.info(f"平均收益率: {avg_yield:.4f}")
+            #     logger.info(f"最早日期收益率: {earliest_yield:.4f}")
+            #     logger.info(f"最晚日期收益率: {latest_yield:.4f}")
+            #     logger.info(f"最大收益率: {max_yield:.4f}")
+            #     logger.info(f"最小收益率: {min_yield:.4f}")
+            #
+            # else:
+            #     tushareShiborDailyService = TushareShiborDailyService()
+            #     avg_rate, earliest_rate, latest_rate, max_rate, min_rate = tushareShiborDailyService.get_rate_for_term(
+            #         start_date, end_date)
+            #
+            #     logger.info(f"平均收益率: {avg_rate:.4f}")
+            #     logger.info(f"最早日期收益率: {earliest_rate:.4f}")
+            #     logger.info(f"最晚日期收益率: {latest_rate:.4f}")
+            #     logger.info(f"最大收益率: {max_rate:.4f}")
+            #     logger.info(f"最小收益率: {min_rate:.4f}")
+            #
+            #     latest_yield = latest_rate
+            #
+            # logger.info(f"最终选取收益率: {latest_yield:.4f}")
 
-                logger.info(f"平均收益率: {avg_yield:.4f}")
-                logger.info(f"最早日期收益率: {earliest_yield:.4f}")
-                logger.info(f"最晚日期收益率: {latest_yield:.4f}")
-                logger.info(f"最大收益率: {max_yield:.4f}")
-                logger.info(f"最小收益率: {min_yield:.4f}")
+            riskFreeRateManager = RiskFreeRateManager()
+            latest_yield = riskFreeRateManager.get_risk_free_rate(start_date, end_date, interest_country)
 
-            else:
-                tushareShiborDailyService = TushareShiborDailyService()
-                avg_rate, earliest_rate, latest_rate, max_rate, min_rate = tushareShiborDailyService.get_rate_for_term(
-                    start_date, end_date)
-
-                logger.info(f"平均收益率: {avg_rate:.4f}")
-                logger.info(f"最早日期收益率: {earliest_rate:.4f}")
-                logger.info(f"最晚日期收益率: {latest_rate:.4f}")
-                logger.info(f"最大收益率: {max_rate:.4f}")
-                logger.info(f"最小收益率: {min_rate:.4f}")
-
-                latest_yield = latest_rate
-
-            logger.info(f"最终选取收益率: {latest_yield:.4f}")
             optimal_weights, result = self.optimize_portfolio_weights(u, sigma, rho, option=option,
                                                                       risk_free_rate=latest_yield)
 
@@ -874,6 +880,7 @@ class PortfolioAnalysis(TuShareService):
         - end_date_end: 结束日期
         - sql_type: SQL 类型（用于区分不同报告）
         """
+
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -882,6 +889,11 @@ class PortfolioAnalysis(TuShareService):
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from datetime import datetime
+
+        # 确保 PortfolioAnalysis 目录存在
+        if not os.path.exists(CommonParameters.portfolioAnalysisReportPath):
+            os.makedirs(CommonParameters.portfolioAnalysisReportPath)
+            logger.info(f"✅ 创建 PortfolioAnalysis 目录: {CommonParameters.portfolioAnalysisReportPath}")
 
         # 注册中文字体（使用明确的映射关系）
         reportlab_font = 'Helvetica'
@@ -917,29 +929,37 @@ class PortfolioAnalysis(TuShareService):
 
             # 检查是否为中国自选股
             if sql_type == "china_self_selected":
-                logger.info("📊 检测到中国自选股，正在获取股票名称用于 PDF 图表...")
+                logger.info(" 检测到中国自选股，正在获取股票名称用于 PDF 图表...")
                 tuShareChinaStockBasicService = TuShareStockBasicService()
                 stock_name_map = tuShareChinaStockBasicService.get_stock_names(all_products_results)
                 logger.info(f"✅ 获取到 {len(stock_name_map)} 只股票名称")
 
-                # 替换所有 products 结果中的股票代码为"代码 - 名称"格式
-                for df in all_products_results:
+                # 深拷贝所有 products 结果，避免修改原始数据
+                import copy
+                all_products_results_copy = copy.deepcopy(all_products_results)
+
+                # 替换拷贝后的股票代码为"代码 - 名称"格式
+                for df in all_products_results_copy:
                     df['products'] = df['products'].apply(
                         lambda code: f"{code} - {stock_name_map.get(code, '')}" if code in stock_name_map else code
                     )
+
+                # 使用拷贝后的数据进行图表绘制
+                all_products_results = all_products_results_copy
                 logger.info("✅ PDF 图表中的股票代码已替换为 '代码 - 名称' 格式")
+
 
         # 生成临时图表文件
         temp_files = []
 
-        # 生成图表1：策略对比（使用全局配置的 chinese_font）
+        # 生成图表1：策略对比（与 PNG 完全一致，使用全局配置的 chinese_font）
         chart1_path = None
         if all_metrics_results:
             final_metrics_df_plot = pd.concat(all_metrics_results, ignore_index=True)
             final_metrics_df_plot['date'] = pd.to_datetime(final_metrics_df_plot['date'], format='%Y%m%d')
             final_metrics_df_plot = final_metrics_df_plot.sort_values('date')
 
-            fig, axes = plt.subplots(3, 1, figsize=(14, 12))
+            fig, axes = plt.subplots(3, 1, figsize=(14, 14))
             fig.suptitle('投资组合优化策略对比分析', fontsize=16, fontweight='bold', fontname=chinese_font)
 
             strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
@@ -952,6 +972,8 @@ class PortfolioAnalysis(TuShareService):
                 ('夏普比率', '夏普比率对比', '夏普比率')
             ]):
                 ax = axes[idx]
+
+                # 绘制三种策略的指标
                 for strategy, color, marker in zip(strategies, colors_list, markers):
                     strategy_data = final_metrics_df_plot[final_metrics_df_plot['优化目标'] == strategy]
                     if not strategy_data.empty:
@@ -959,10 +981,41 @@ class PortfolioAnalysis(TuShareService):
                                 label=strategy, color=color, marker=marker,
                                 linewidth=2, markersize=4, alpha=0.8)
 
+                # 添加无风险利率（仅在年化收益率图中显示）
+                if metric == '年化收益率' and '无风险利率' in final_metrics_df_plot.columns:
+                    ax2 = ax.twinx()
+
+                    # 获取无风险利率数据（去重）
+                    risk_free_data = final_metrics_df_plot[['date', '无风险利率']].drop_duplicates(subset=['date'])
+                    risk_free_data = risk_free_data.sort_values('date')
+
+                    # 转换为百分比并绘制
+                    ax2.plot(risk_free_data['date'], risk_free_data['无风险利率'] * 100,
+                             color='red', linestyle='--', linewidth=2.5, alpha=0.7,
+                             label='无风险利率', marker='s', markersize=5)
+
+                    # 设置右侧 Y 轴
+                    ax2.set_ylabel('无风险利率 (%)', fontsize=10, color='red', fontname=chinese_font)
+                    ax2.tick_params(axis='y', labelcolor='red')
+                    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.2f}'))
+
+                    # 动态调整右侧 Y 轴范围
+                    rf_min = risk_free_data['无风险利率'].min() * 100
+                    rf_max = risk_free_data['无风险利率'].max() * 100
+                    rf_padding = (rf_max - rf_min) * 0.2 if rf_max > rf_min else 0.5
+                    ax2.set_ylim(max(0, rf_min - rf_padding), rf_max + rf_padding)
+
+                    # 合并图例
+                    lines1, labels1 = ax.get_legend_handles_labels()
+                    lines2, labels2 = ax2.get_legend_handles_labels()
+                    ax.legend(lines1 + lines2, labels1 + labels2,
+                              loc='best', fontsize=9, framealpha=0.95, shadow=True, prop={'family': chinese_font})
+                else:
+                    ax.legend(loc='best', fontsize=9, prop={'family': chinese_font})
+
                 ax.set_title(title, fontsize=12, fontweight='bold', fontname=chinese_font)
                 ax.set_xlabel('日期', fontsize=10, fontname=chinese_font)
                 ax.set_ylabel(ylabel, fontsize=10, fontname=chinese_font)
-                ax.legend(loc='best', fontsize=9, prop={'family': chinese_font})
                 ax.grid(True, alpha=0.3, linestyle='--')
                 ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
                 ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
@@ -970,56 +1023,116 @@ class PortfolioAnalysis(TuShareService):
 
             plt.tight_layout()
             chart1_path = os.path.join(tempfile.gettempdir(), 'chart1.png')
-            plt.savefig(chart1_path, dpi=150, bbox_inches='tight')
+            plt.savefig(chart1_path, dpi=300, bbox_inches='tight')
             temp_files.append(chart1_path)
             plt.close()
 
-        # 生成图表2：产品权重
+        # 生成图表2：产品权重（与 PNG 完全一致，包含无风险利率）
         chart2_path = None
         if all_products_results:
             final_products_df_plot = pd.concat(all_products_results, ignore_index=True)
             final_products_df_plot['date'] = pd.to_datetime(final_products_df_plot['date'], format='%Y%m%d')
             final_products_df_plot = final_products_df_plot.sort_values('date')
 
-            fig, axes = plt.subplots(3, 1, figsize=(16, 12))
-            fig.suptitle('各策略下产品权重配置对比', fontsize=16, fontweight='bold', fontname=chinese_font)
+            # 数据验证：检查是否有多个时间点的数据
+            unique_dates = final_products_df_plot['date'].nunique()
+            logger.info(f"📊 PDF 图表2数据验证：共 {len(final_products_df_plot)} 条记录，{unique_dates} 个不同日期")
+
+            if unique_dates <= 1:
+                logger.warning("⚠️ 警告：产品权重数据只有1个或更少的日期点，图表将显示为直线！")
+                logger.warning(f"   日期范围：{final_products_df_plot['date'].min()} 到 {final_products_df_plot['date'].max()}")
+
+            fig, axes = plt.subplots(3, 1, figsize=(16, 14))
+            fig.suptitle('各策略下产品权重配置与无风险利率对比', fontsize=16, fontweight='bold', fontname=chinese_font)
 
             strategies = ['最大化夏普比率', '最大化收益率', '最小化波动率']
+
+            # 为每个产品分配不同的颜色
             products = final_products_df_plot['products'].unique()
             product_colors = plt.cm.tab10(np.linspace(0, 1, len(products)))
+            product_markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
 
             for idx, strategy in enumerate(strategies):
                 ax = axes[idx]
                 strategy_data = final_products_df_plot[final_products_df_plot['strategy'] == strategy]
 
                 if not strategy_data.empty:
+                    # 验证每个策略的数据点数量
+                    strategy_dates = strategy_data['date'].nunique()
+                    logger.info(f"   策略 [{strategy}]：{len(strategy_data)} 条记录，{strategy_dates} 个不同日期")
+
+                    # 创建右侧 Y 轴用于显示无风险利率
+                    ax2 = ax.twinx()
+
+                    # 绘制产品权重（左侧 Y 轴）
                     for prod_idx, product in enumerate(products):
                         product_data = strategy_data[strategy_data['products'] == product]
                         if not product_data.empty:
                             color = product_colors[prod_idx % len(product_colors)]
-                            ax.plot(product_data['date'], product_data['rate'] * 100,
-                                    label=product, color=color, linewidth=2, alpha=0.85)
+                            marker = product_markers[prod_idx % len(product_markers)]
 
-                    ax.set_title(strategy, fontsize=13, fontweight='bold', fontname=chinese_font, loc='left')
+                            ax.plot(product_data['date'], product_data['rate'] * 100,
+                                    label=product, color=color, marker=marker,
+                                    linewidth=2, markersize=4, alpha=0.85)
+
+                    # 绘制无风险利率（右侧 Y 轴）- 转换为百分比
+                    if 'risk_free_rate' in strategy_data.columns:
+                        risk_free_data = strategy_data[['date', 'risk_free_rate']].drop_duplicates(subset=['date'])
+                        risk_free_data = risk_free_data.sort_values('date')
+
+                        ax2.plot(risk_free_data['date'], risk_free_data['risk_free_rate'] * 100,
+                                 color='red', linestyle='--', linewidth=2.5, alpha=0.7,
+                                 label='无风险利率', marker='s', markersize=5)
+
+                        # 设置右侧 Y 轴
+                        ax2.set_ylabel('无风险利率 (%)', fontsize=11, color='red', fontname=chinese_font)
+                        ax2.tick_params(axis='y', labelcolor='red')
+                        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.2f}%'))
+
+                        # 动态调整右侧 Y 轴范围
+                        rf_min = risk_free_data['risk_free_rate'].min() * 100
+                        rf_max = risk_free_data['risk_free_rate'].max() * 100
+                        rf_padding = (rf_max - rf_min) * 0.2 if rf_max > rf_min else 0.5
+                        ax2.set_ylim(max(0, rf_min - rf_padding), rf_max + rf_padding)
+
+                    ax.set_title(f'{strategy}', fontsize=13, fontweight='bold',
+                                 loc='left', pad=10, fontname=chinese_font)
                     ax.set_xlabel('日期', fontsize=11, fontname=chinese_font)
                     ax.set_ylabel('权重 (%)', fontsize=11, fontname=chinese_font)
-                    ax.legend(loc='upper right', fontsize=9, prop={'family': chinese_font}, ncol=2)
-                    ax.grid(True, alpha=0.3, linestyle='--')
+
+                    # 合并两个轴的图例
+                    lines1, labels1 = ax.get_legend_handles_labels()
+                    lines2, labels2 = ax2.get_legend_handles_labels()
+                    ax.legend(lines1 + lines2, labels1 + labels2,
+                              loc='upper right', fontsize=9, ncol=2,
+                              framealpha=0.95, shadow=True, prop={'family': chinese_font})
+
+                    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
                     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
                     plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
 
+                    # 设置左侧 Y 轴范围动态调整
+                    y_min = strategy_data['rate'].min() * 100
+                    y_max = strategy_data['rate'].max() * 100
+                    y_padding = (y_max - y_min) * 0.1 if y_max > y_min else 10
+                    ax.set_ylim(max(0, y_min - y_padding), y_max + y_padding)
+
             plt.tight_layout()
             chart2_path = os.path.join(tempfile.gettempdir(), 'chart2.png')
-            plt.savefig(chart2_path, dpi=150, bbox_inches='tight')
+            plt.savefig(chart2_path, dpi=300, bbox_inches='tight')
             temp_files.append(chart2_path)
             plt.close()
 
-        # 创建 PDF - 文件名中包含 sql_type
+
+        # 创建 PDF - 文件名中包含 sql_type，输出到 PortfolioAnalysis 目录
         pdf_filename = FileUtility.generate_filename_by_timestamp(
             f"portfolio_report_{sql_type}_{end_date_start}_to_{end_date_end}", "pdf"
         )
-        pdf_path = os.path.join(CommonParameters.outBoundPath, pdf_filename)
+        pdf_path = os.path.join(CommonParameters.portfolioAnalysisReportPath, pdf_filename)
+
+        logger.info(f" PDF 报表将保存至: {pdf_path}")
+
 
         doc = SimpleDocTemplate(pdf_path, pagesize=landscape(A4),
                                 rightMargin=72, leftMargin=72,
@@ -1179,5 +1292,6 @@ class PortfolioAnalysis(TuShareService):
 
         logger.info(f"✅ PDF 报告已生成: {pdf_path}")
         return pdf_path
+
 
 

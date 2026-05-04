@@ -1,5 +1,8 @@
 import os
 import time
+import traceback
+from datetime import datetime
+import json
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareCNIndexDailyService import TuShareCNIndexDailyService
@@ -19,7 +22,9 @@ from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFX
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
+from dataIntegrator.TuShareService.TuShareJobLogger import TuShareJobLogger
 
 logger = CommonLib.logger
 
@@ -28,101 +33,105 @@ class TuShareServiceManager():
 
     def __init__(self):
         self.calendarService = CalendarService()
+        self.jobLogger = TuShareJobLogger()
         logger.info("__init__ started")
 
-    @classmethod
     def callTuShareCNIndexDailyService(self, param_dict):
-        logger.info("callTuShareService started...")
-
-        # ts_code = '000001.SH'
-        # start_date = '20220521'
-        # end_date = '20241218'
-        #ccsvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_cn_index_daily_20220507.csv")
-
-        ts_code = param_dict.get("ts_code")
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_cn_index_daily_20220507.csv")
-
+        self.jobLogger.start_job("callTuShareCNIndexDailyService", param_dict)
+        
         try:
-            tuShareService = TuShareCNIndexDailyService()
-            dataFrame = tuShareService.prepareDataFrame(ts_code,start_date,end_date)
-            jsonString = tuShareService.convertDataFrame2JSON()
-            tuShareService.saveDateFrameToDisk(csvFilePath)
-            tuShareService.deleteDateFromClickHouse(ts_code,start_date,end_date)
-            tuShareService.saveDateToClickHouse()
+            logger.info("callTuShareCNIndexDailyService started...")
 
+            tuShareCNIndexDailyService = TuShareCNIndexDailyService()
+            index_list = CommonDataParameters.CN_INDEX_LIST
+            end_date = CommonParameters.today
+            start_date = CommonDataParameters.get_start_date(days=360)
+            
+            records_count = tuShareCNIndexDailyService.refresh_multiple_indexes(index_list, start_date, end_date)
+
+            self.jobLogger.end_job_success(records_processed=records_count if records_count else len(index_list))
+            logger.info("callTuShareCNIndexDailyService ended...")
+            
         except Exception as e:
-            logger.info('Exception', e)
+            self.jobLogger.end_job_failed(str(e), traceback.format_exc())
             raise e
 
-        logger.info("callTuShareService ended...")
-
-    @classmethod
     def callTuShareChinaStockIndexService(self, param_dict):
-        logger.info("callTuShareService started...")
-
-        """批量处理多个股票"""
-        # 定义股票列表
-        stock_list = CommonParameters.STOCK_LIST
-
-        # 设置日期范围
-        start_date = '20250101'
-        end_date = CommonParameters.today
-
-        logger.info(f"开始批量处理 {len(stock_list)} 只股票...")
-
-        for stock in stock_list:
-            ts_code = stock['ts_code']
-            name = stock['name']
-
-            try:
-                logger.info(f"\n{'=' * 60}")
-                logger.info(f"正在处理：{name} ({ts_code})")
-                logger.info(f"{'=' * 60}")
-
-                csvFilePath = os.path.join(CommonParameters.outBoundPath,
-                                           f"df_tushare_{ts_code.replace('.', '_')}_{start_date[:4]}.csv")
-
-                tuShareService = TuShareChinaStockIndexService()
-                dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
-
-                if dataFrame.empty:
-                    logger.warning(f"{name} ({ts_code}) 没有获取到数据，跳过...")
-                    continue
-
-                logger.info(f"转换数据为 JSON...")
-                jsonString = tuShareService.convertDataFrame2JSON()
-                logger.info(f"保存到：{csvFilePath}")
-                tuShareService.saveDateFrameToDisk(csvFilePath)
-                tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-                tuShareService.saveDateToClickHouse()
-
-                logger.info(f"✅ {name} ({ts_code}) 处理完成！")
-
-            except Exception as e:
-                logger.error(f"❌ {name} ({ts_code}) 处理失败：{str(e)}")
-                import traceback
-                logger.error(traceback.format_exc())
-                continue
-
-        logger.info(f"\n{'=' * 60}")
-        logger.info(f"批量处理完成！共处理 {len(stock_list)} 只股票")
-        logger.info(f"{'=' * 60}")
-
-        logger.info("callTuShareService ended...")
-
-    @classmethod
-    def callTuShareShiborDailyService(self, param_dict):
-        logger.info("callTuShareShiborDailyService started...")
-
-        # start_date = '20220101'
-        # end_date = '20250521'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_daily_20220507.csv")
-
+        self.jobLogger.start_job("callTuShareChinaStockIndexService", param_dict)
+            
         try:
+            logger.info("callTuShareChinaStockIndexService started...")
+    
+            """"批量处理多个股票"""
+            stock_list = CommonParameters.STOCK_LIST
+    
+            end_date = CommonParameters.today
+            start_date = CommonDataParameters.get_start_date(days=360)
+    
+            logger.info(f"开始批量处理 {len(stock_list)} 只股票...")
+                
+            total_records = 0
+            success_count = 0
+            failed_count = 0
+    
+            for stock in stock_list:
+                ts_code = stock['ts_code']
+                name = stock['name']
+    
+                try:
+                    logger.info(f"\n{'=' * 60}")
+                    logger.info(f"正在处理：{name} ({ts_code})")
+                    logger.info(f"{'=' * 60}")
+    
+                    csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                               f"df_tushare_{ts_code.replace('.', '_')}_{start_date[:4]}.csv")
+    
+                    tuShareService = TuShareChinaStockIndexService()
+                    dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
+    
+                    if dataFrame.empty:
+                        logger.warning(f"{name} ({ts_code}) 没有获取到数据，跳过...")
+                        continue
+    
+                    logger.info(f"转换数据为 JSON...")
+                    jsonString = tuShareService.convertDataFrame2JSON()
+                    logger.info(f"保存到：{csvFilePath}")
+                    tuShareService.saveDateFrameToDisk(csvFilePath)
+                    tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
+                    tuShareService.saveDateToClickHouse()
+    
+                    total_records += len(dataFrame)
+                    success_count += 1
+                    logger.info(f"✅ {name} ({ts_code}) 处理完成！")
+    
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f" {name} ({ts_code}) 处理失败：{str(e)}")
+                    logger.error(traceback.format_exc())
+                    continue
+    
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"批量处理完成！共处理 {len(stock_list)} 只股票")
+            logger.info(f"成功: {success_count}, 失败: {failed_count}, 总记录数: {total_records}")
+            logger.info(f"{'=' * 60}")
+    
+            self.jobLogger.end_job_success(records_processed=total_records)
+            logger.info("callTuShareChinaStockIndexService ended...")
+                
+        except Exception as e:
+            self.jobLogger.end_job_failed(str(e), traceback.format_exc())
+            raise e
+
+    def callTuShareShiborDailyService(self, param_dict):
+        self.jobLogger.start_job("callTuShareShiborDailyService", param_dict)
+        
+        try:
+            logger.info("callTuShareShiborDailyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_daily_20220507.csv")
+
             tuShareService = TushareShiborDailyService()
             dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -130,21 +139,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date,end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            self.jobLogger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTuShareShiborDailyService ended...")
 
-        logger.info("callTuShareShiborDailyService ended...")
+        except Exception as e:
+            self.jobLogger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareShiborLPRDailyService(self, param_dict):
-        logger.info("callTuShareShiborDailyService started...")
-
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_lpr_daily_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareShiborLPRDailyService", param_dict)
+        
         try:
+            logger.info("callTushareShiborLPRDailyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_shibor_lpr_daily_20220507.csv")
+
             tuShareService = TushareShiborLPRDailyService()
             dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -152,23 +165,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareShiborLPRDailyService ended...")
 
-        logger.info("callTuShareShiborDailyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareCNGDPService(self, param_dict):
-        logger.info("callTushareCNGDPService started...")
-
-        # start_date = '2018Q1'
-        # end_date = '2022Q1'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNGDP_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareCNGDPService", param_dict)
+        
         try:
+            logger.info("callTushareCNGDPService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNGDP_20220507.csv")
+
             tuShareService = TushareCNGDPService()
             dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -176,21 +191,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date,end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareCNGDPService ended...")
 
-        logger.info("callTushareCNGDPService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareCNMondySupplyService(self, param_dict):
-        logger.info("callTushareCNMondySupplyService started...")
-
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNMondySupply_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareCNMondySupplyService", param_dict)
+        
         try:
+            logger.info("callTushareCNMondySupplyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNMondySupply_20220507.csv")
+
             tuShareService = TushareCNMondySupplyService()
             dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -198,21 +217,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date,end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareCNMondySupplyService ended...")
 
-        logger.info("callTushareCNMondySupplyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareCNCPIService(self, param_dict):
-        logger.info("callTushareCNCPIService started...")
-
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNCPI_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareCNCPIService", param_dict)
+        
         try:
+            logger.info("callTushareCNCPIService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNCPI_20220507.csv")
+
             tuShareService = TushareCNCPIService()
             dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -220,61 +243,79 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date,end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareCNCPIService ended...")
 
-        logger.info("callTushareCNCPIService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuShareUSStockDailyService(self, param_dict):
-        logger.info("callTuShareUSStockDailyService started...")
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareUSStockDailyService", param_dict)
+        
+        try:
+            logger.info("callTuShareUSStockDailyService started...")
 
-        calenearService = CalendarService()
-        start_date = calenearService.calculate_T_minus_n_days(CommonParameters.today,
-                                                              days=31)  # 获取31天前的日期，作为滚动扫描的start date
-        end_date = CommonParameters.today
+            calenearService = CalendarService()
+            end_date = CommonParameters.today
+            start_date = CommonDataParameters.get_start_date(days=31)
 
-        ts_code_list = CommonParameters.US_STOCK_LIST
-        ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
+            ts_code_list = CommonParameters.US_STOCK_LIST
+            ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
 
-        # 循环调用
-        for key, ts_code in ts_code_dict.items():
-            try:
-                csvFilePath = os.path.join(CommonParameters.outBoundPath,
-                                           rf"df_tushare_df_tushare_USStockBasic_{ts_code}{start_date}-{end_date}.csv")
+            total_records = 0
+            success_count = 0
+            failed_count = 0
 
-                tuShareService = TuShareUSStockDailyService()
-                dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
-                jsonString = tuShareService.convertDataFrame2JSON()
-                tuShareService.saveDateFrameToDisk(csvFilePath)
-                tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-                tuShareService.saveDateToClickHouse()
+            # 循环调用
+            for key, ts_code in ts_code_dict.items():
+                try:
+                    csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                               rf"df_tushare_df_tushare_USStockBasic_{ts_code}{start_date}-{end_date}.csv")
 
-                logger.info(f"{key}: {ts_code} {start_date}-{end_date} 处理完成")
-                # Tushare 规定 1 分钟只能访问 2 次，这里循环休眠 31 秒
-                for i in range(1, 32):
-                    logger.info(f"Tushare 限流控制：第 {i}/31 秒...")
-                    time.sleep(1)
+                    tuShareService = TuShareUSStockDailyService()
+                    dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
+                    jsonString = tuShareService.convertDataFrame2JSON()
+                    tuShareService.saveDateFrameToDisk(csvFilePath)
+                    tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
+                    tuShareService.saveDateToClickHouse()
 
-            except Exception as e:
-                logger.error(f"{key}: {ts_code} 处理失败：{str(e)}")
+                    total_records += len(dataFrame)
+                    success_count += 1
+                    logger.info(f"{key}: {ts_code} {start_date}-{end_date} 处理完成")
+                    
+                    # Tushare 规定 1 分钟只能访问 2 次，这里循环休眠 45 秒
+                    for i in range(1, 45):
+                        logger.info(f"Tushare 限流控制：第 {i}/45 秒...")
+                        time.sleep(1)
 
-        logger.info("callTuShareUSStockDailyService ended...")
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"{key}: {ts_code} 处理失败：{str(e)}")
+
+            logger.info(f"美股日线处理完成：成功 {success_count} 个，失败 {failed_count} 个，总记录数 {total_records}")
+            job_logger.end_job_success(records_processed=total_records)
+            logger.info("callTuShareUSStockDailyService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuFutureBasicInformationService(self, param_dict):
-        logger.info("callTuShareFutureBasicInformationService started...")
-
-        # exchange = 'DCE'
-        # fut_type = '1'
-        # fields = 'ts_code,symbol,name,list_date,delist_date,quote_unit'
-        exchange = param_dict.get("exchange")
-        fut_type = param_dict.get("fut_type")
-        fields = param_dict.get("fields")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FutureBasicInformation_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuFutureBasicInformationService", param_dict)
+        
         try:
+            logger.info("callTuFutureBasicInformationService started...")
+
+            exchange = param_dict.get("exchange")
+            fut_type = param_dict.get("fut_type")
+            fields = param_dict.get("fields")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FutureBasicInformation_20220507.csv")
+
             tuShareService = TuShareFutureBasicInformationService()
             dataFrame = tuShareService.prepareDataFrame(exchange, fut_type, fields)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -282,25 +323,26 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse()
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTuFutureBasicInformationService ended...")
 
-        logger.info("callTuShareFutureBasicInformationService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuShareFutureDailyService(self, param_dict):
-        logger.info("callTuShareFutureDailyService started...")
-
-        # ts_code = 'JM2304.DCE'
-        # start_date = '20180101'
-        # end_date = '20220501'
-        ts_code = param_dict.get("ts_code")
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FutureDaily_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareFutureDailyService", param_dict)
+        
         try:
+            logger.info("callTuShareFutureDailyService started...")
+
+            ts_code = param_dict.get("ts_code")
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FutureDaily_20220507.csv")
+
             tuShareService = TuShareFutureDailyService()
             dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -308,23 +350,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTuShareFutureDailyService ended...")
 
-        logger.info("callTuShareFutureDailyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareUSStockBasicService(self, param_dict):
-        logger.info("callTushareUSStockBasicService started...")
-
-        # start_date = '20180101'
-        # end_date = '20250501'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_USStockBasic_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareUSStockBasicService", param_dict)
+        
         try:
+            logger.info("callTushareUSStockBasicService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_USStockBasic_20220507.csv")
+
             tuShareService = TushareUSStockBasicService()
             dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -332,25 +376,26 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareUSStockBasicService ended...")
 
-        logger.info("callTushareUSStockBasicService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuShareHKStockDailyService(self, param_dict):
-        logger.info("callTuShareHKStockDailyService started...")
-
-        # ts_code = '00001.HK'
-        # start_date = '20220101'
-        # end_date = '20220521'
-        ts_code = param_dict.get("ts_code")
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_HKStockDaily_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareHKStockDailyService", param_dict)
+        
         try:
+            logger.info("callTuShareHKStockDailyService started...")
+
+            ts_code = param_dict.get("ts_code")
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_HKStockDaily_20220507.csv")
+
             tuShareService = TuShareHKStockDailyService()
             dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -358,24 +403,26 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTuShareHKStockDailyService ended...")
 
-        logger.info("callTuShareHKStockDailyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuShareFXOffsoreBasicService(self, param_dict):
-        logger.info("callTuShareFXOffsoreBasicService started...")
-
-        # exchange = 'FXCM'
-        # classify = 'INDEX'
-        exchange = param_dict.get("exchange")
-        classify = param_dict.get("classify")
-
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareFXOffsoreBasicService", param_dict)
+        
         try:
+            logger.info("callTuShareFXOffsoreBasicService started...")
+
+            exchange = param_dict.get("exchange")
+            classify = param_dict.get("classify")
+
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.csv")
+
             tuShareService = TuShareFXOffsoreBasicService()
             dataFrame = tuShareService.prepareDataFrame(exchange, classify)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -383,78 +430,71 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse()
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTuShareFXOffsoreBasicService ended...")
 
-        logger.info("callTuShareFXOffsoreBasicService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTuShareFXDailyService(self, param_dict):
-        logger.info("callTuShareFXDailyService started...")
-
-        # ts_code = 'US30.FXCM'
-        # start_date = '20220101'
-        # end_date = '20220521'
-        # ts_code = param_dict.get("ts_code")
-        # start_date = param_dict.get("start_date")
-        # end_date = param_dict.get("end_date")
-        # csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.txt")
-        #
-        # try:
-        #     tuShareService = TuShareFXDailyService()
-        #     dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
-        #     jsonString = tuShareService.convertDataFrame2JSON()
-        #     tuShareService.saveDateFrameToDisk(csvFilePath)
-        #     tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-        #     tuShareService.saveDateToClickHouse()
-        #
-        # except Exception as e:
-        #     logger.info('Exception', e)
-        #     raise e
-        #
-        # logger.info("callTuShareFXDailyService ended...")
-
-        ts_code = "nothing"
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        calendar = CalendarService()
-        date_range = calendar.generate_date_range(start_date, end_date)
-
-        for i, (current_start, current_end) in enumerate(date_range, 1):
-            try:
-                csvFilePath = os.path.join(CommonParameters.outBoundPath,
-                                           "df_tushare_fx_%s-%s.csv" % (start_date, start_date))
-
-                tuShareService = TuShareFXDailyService()
-                dataFrame = tuShareService.prepareDataFrame(ts_code, current_start, current_start)
-                jsonString = tuShareService.convertDataFrame2JSON()
-                tuShareService.saveDateFrameToDisk(csvFilePath)
-                tuShareService.deleteDateFromClickHouse(ts_code, current_start, current_start)
-                tuShareService.saveDateToClickHouse()
-
-                logger.info(f"✅ {current_start} - {current_end} 刷新成功，共 {len(dataFrame)} 条数据")
-
-            except Exception as e:
-                logger.error(f"❌ {current_start} - {current_end} - 刷新失败：{e}")
-                continue
-
-    logger.info("\n" + "=" * 60)
-    logger.info("所有外汇对刷新完成")
-    logger.info("=" * 60)
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareFXDailyService", param_dict)
+            
+        try:
+            logger.info("callTuShareFXDailyService started...")
+    
+            ts_code = "nothing"
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            calendar = CalendarService()
+            date_range = calendar.generate_date_range(start_date, end_date)
+    
+            total_records = 0
+            for i, (current_start, current_end) in enumerate(date_range, 1):
+                try:
+                    csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                               "df_tushare_fx_%s-%s.csv" % (start_date, start_date))
+    
+                    tuShareService = TuShareFXDailyService()
+                    dataFrame = tuShareService.prepareDataFrame(ts_code, current_start, current_start)
+                    jsonString = tuShareService.convertDataFrame2JSON()
+                    tuShareService.saveDateFrameToDisk(csvFilePath)
+                    tuShareService.deleteDateFromClickHouse(ts_code, current_start, current_start)
+                    tuShareService.saveDateToClickHouse()
+    
+                    total_records += len(dataFrame)
+                    logger.info(f"✅ {current_start} - {current_end} 刷新成功，共 {len(dataFrame)} 条数据")
+    
+                except Exception as e:
+                    logger.error(f" {current_start} - {current_end} - 刷新失败：{e}")
+                    continue
+    
+            logger.info("\n" + "=" * 60)
+            logger.info("所有外汇对刷新完成")
+            logger.info("=" * 60)
+    
+            job_logger.end_job_success(records_processed=total_records)
+            logger.info("callTuShareFXDailyService ended...")
+    
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     # 美元指数
     def callUSDIndexDailyService(self, param_dict):
-        logger.info("callUSDIndexDailyService started...")
-
-        # start_date = '20260301'
-        # end_date = '20260315'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_usd_index_%s-%s.csv" % (start_date, end_date))
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callUSDIndexDailyService", param_dict)
+        
         try:
+            logger.info("callUSDIndexDailyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_usd_index_%s-%s.csv" % (start_date, end_date))
+
             tuShareService = TuShareUSDIndexDailyService()
             dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -462,23 +502,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callUSDIndexDailyService ended...")
 
-        logger.info("callUSDIndexDailyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareSGEDailyService(self, param_dict):
-        logger.info("callTushareSGEDailyService started...")
-
-        # start_date = '20220531'
-        # end_date = '20220531'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareSGEDailyService", param_dict)
+        
         try:
+            logger.info("callTushareSGEDailyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_FX_Offsore_basic_20220507.csv")
+
             tuShareService = TuShareSGEDailyService()
             dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -486,23 +528,25 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareSGEDailyService ended...")
 
-        logger.info("callTushareSGEDailyService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     @classmethod
     def callTushareUSTreasuryYieldCurveService(self, param_dict):
-        logger.info("callTushareUSTreasuryYieldCurveService started...")
-
-        # start_date = '20220101'
-        # end_date = '20241231'
-        start_date = param_dict.get("start_date")
-        end_date = param_dict.get("end_date")
-        csvFilePath = os.path.join(CommonParameters.outBoundPath,"ddf_tushare_us_treasury_yield_cruve_20241201.csv")
-
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareUSTreasuryYieldCurveService", param_dict)
+        
         try:
+            logger.info("callTushareUSTreasuryYieldCurveService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"ddf_tushare_us_treasury_yield_cruve_20241201.csv")
+
             tuShareService = TushareUSTreasuryYieldCurveService()
             dataFrame = tuShareService.prepareDataFrame(start_date, end_date)
             jsonString = tuShareService.convertDataFrame2JSON()
@@ -510,11 +554,12 @@ class TuShareServiceManager():
             tuShareService.deleteDateFromClickHouse(start_date, end_date)
             tuShareService.saveDateToClickHouse()
 
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareUSTreasuryYieldCurveService ended...")
 
-        logger.info("callTushareUSTreasuryYieldCurveService ended...")
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
 
     #@classmethod
     def callTuShareService(self, start_date = "20260101", end_date = CommonParameters.today):

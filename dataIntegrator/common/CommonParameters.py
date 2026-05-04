@@ -2,12 +2,12 @@ import os
 import datetime
 from dataIntegrator.common.MyTokens import MyTokens
 
-
 class CommonParameters():
 
     application_name = "infinity_grid"
     default_time_zone = 'Asia/Shanghai'
     today = datetime.date.today().strftime('%Y%m%d')
+
 
     basePath = r"D:\workspace_python\infinity\dataIntegrator"
     rag_configuration_path = os.path.join(basePath, 'LLMSuport', 'RAGFactory', 'configurations')
@@ -19,6 +19,9 @@ class CommonParameters():
     outBoundPath = os.path.join(dataPath,'outbound')
     logPath = os.path.join(dataPath,'log')
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
+    reportPath = os.path.join(outBoundPath, 'report')
+    portfolioAnalysisReportPath = os.path.join(reportPath, 'PortfolioAnalysis')
+
 
     tuShareToken = MyTokens.tuShareToken
 
@@ -75,8 +78,16 @@ class CommonParameters():
             {'ts_code': '688498.SH', 'name': '源杰科技'},
         ]
 
-    US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
+    #US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]
     #US_STOCK_LIST=["C", "JPM", "AAPL", "NVDA", "MSFT"]
+    US_STOCK_LIST = [
+        "SPY", "C", "JPM", "AAPL", "NVDA", "GS", "MS", "GE",  # 你原有的代码
+        "MSFT", "AVGO", "ADBE", "UNH", "JNJ", "LLY", "PFE", "MRK", "AMZN",
+        "TSLA", "MCD", "NFLX", "HD", "GOOGL", "META", "DIS", "CMCSA", "T",
+        "CAT", "UPS", "BA", "HON", "PG", "KO", "PEP", "WMT", "COST", "XOM",
+        "CVX", "COP", "SLB", "EOG", "AMT", "PLD", "EQIX", "SPG", "O", "NEE",
+        "DUK", "SO", "D", "EXC", "LIN", "APD", "FCX", "NEM", "SHW"
+    ]
 
     def __init__(self, LogLib):
         print("CommonParameters init begin ")
