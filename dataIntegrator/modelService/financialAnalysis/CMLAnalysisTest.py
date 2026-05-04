@@ -223,7 +223,23 @@ if __name__ == "__main__":
         {
             "name": "美国混合股票",
             "stock_type": "us_mixed",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "US"
+        },
+        {
+            "name": "美国混合股票",
+            "stock_type": "us_mixed",
             "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "US"
+        },
+        {
+            "name": "美国混合股票",
+            "stock_type": "us_mixed",
+            "start_date": CommonDataParameters.get_start_date(days=60),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "US"
@@ -271,7 +287,31 @@ if __name__ == "__main__":
         {
             "name": "中国能源与制造业组合",
             "stock_type": "cn_energy",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN"
+        },
+        {
+            "name": "中国能源与制造业组合",
+            "stock_type": "cn_energy",
             "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN"
+        },
+        {
+            "name": "中国能源与制造业组合",
+            "stock_type": "cn_energy",
+            "start_date": CommonDataParameters.get_start_date(days=60),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN"
+        },
+        {
+            "name": "中国自定义股票组合",
+            "stock_type": "cn_custom",
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN"
@@ -280,6 +320,14 @@ if __name__ == "__main__":
             "name": "中国自定义股票组合",
             "stock_type": "cn_custom",
             "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN"
+        },
+        {
+            "name": "中国自定义股票组合",
+            "stock_type": "cn_custom",
+            "start_date": CommonDataParameters.get_start_date(days=60),
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN"
