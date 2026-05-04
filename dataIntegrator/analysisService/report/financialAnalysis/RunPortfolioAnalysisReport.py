@@ -5,7 +5,7 @@ from dataIntegrator.modelService.financialAnalysis.PortfolioAnalysis import Port
 logger = CommonLib.logger
 commonLib = CommonLib()
 
-class PortfolioAnalysisReport():
+class RunPortfolioAnalysisReport():
 
     def prepare_sql(self, start_date=None, end_date=None, sql_type="us_stocks"):
         """
@@ -160,7 +160,7 @@ class PortfolioAnalysisReport():
 
 if __name__ == "__main__":
 
-    portfolioAnalysisTest = PortfolioAnalysisReport()
+    portfolioAnalysisTest = RunPortfolioAnalysisReport()
     portfolioAnalysis = PortfolioAnalysis()
 
     # 定义所有报表配置参数列表

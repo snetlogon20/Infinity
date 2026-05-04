@@ -4,29 +4,11 @@ from dataIntegrator import CommonLib
 import os
 from dataIntegrator import CommonParameters
 from dataIntegrator.TuShareService.TuShareChinaStockIndexService import TuShareChinaStockIndexService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 
 logger = CommonLib.logger
 
 class TuShareChinaStockIndexServiceTest(TuShareService):
-    @classmethod
-    def refresh_shanghai_index(self):
-        try:
-            ts_code = '000001.SH'  # 上证指数
-            start_date = '20240101'
-            end_date = '20261231'
-
-            csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_china_stock_index_2025.csv")
-
-            tuShareService = TuShareChinaStockIndexService()
-            dataFrame = tuShareService.prepareDataFrame(ts_code, start_date, end_date)
-            jsonString = tuShareService.convertDataFrame2JSON()
-            tuShareService.saveDateFrameToDisk(csvFilePath)
-            tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-            tuShareService.saveDateToClickHouse()
-
-        except Exception as e:
-            logger.info('Exception', e)
-            raise e
 
     @classmethod
     def refresh_any_china_stock_index(self):
@@ -41,13 +23,15 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
         # ]
 
         # AI 推荐
-        stock_list = [
-            {'ts_code': '688585.SH', 'name': '上纬新材'},
-            {'ts_code': '605255.SH', 'name': '天普股份'},
-            {'ts_code': '300476.SZ', 'name': '胜宏科技'},
-            {'ts_code': '301232.SZ', 'name': '飞沃科技'},
-            {'ts_code': '603226.SH', 'name': '菲林格尔'}
-        ]
+        # stock_list = [
+        #     {'ts_code': '688585.SH', 'name': '上纬新材'},
+        #     {'ts_code': '605255.SH', 'name': '天普股份'},
+        #     {'ts_code': '300476.SZ', 'name': '胜宏科技'},
+        #     {'ts_code': '301232.SZ', 'name': '飞沃科技'},
+        #     {'ts_code': '603226.SH', 'name': '菲林格尔'}
+        # ]
+
+        stock_list = CommonDataParameters.STOCK_LIST
 
         # 设置日期范围
         start_date = '20250101'
@@ -96,5 +80,4 @@ class TuShareChinaStockIndexServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tuShareChinaStockIndexServiceTest = TuShareChinaStockIndexServiceTest()
-    # tuShareChinaStockIndexServiceTest.refresh_shanghai_index()
     tuShareChinaStockIndexServiceTest.refresh_any_china_stock_index()

@@ -6,6 +6,7 @@ from dataIntegrator.AKShareService.AkShareMacroChinaShrzgmService import AkShare
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
 from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
+from dataIntegrator.AKShareService.AkShareJobLogger import AkShareJobLogger
 from dataIntegrator.common.FileType import FileType
 
 logger = CommonLib.logger
@@ -19,9 +20,16 @@ class AkShareServiceManager():
     def callAkShareSpotHistSGEService(self, start_date = '20240101', end_date = CommonParameters.today):
         logger.info("callAkShareSpotHistSGEServicee started...")
 
-        file_path = os.path.join(CommonParameters.outBoundPath,'sakshare_spot_hist_sge_dg.xlsx')
-
+        file_path = os.path.join(CommonParameters.outBoundPath,'akshare_spot_hist_sge_dg.xlsx')
+        job_logger = AkShareJobLogger()
+        
         try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareSpotHistSGEService', {
+                'start_date': start_date,
+                'end_date': end_date
+            })
+            
             akShareService = AkShareSpotHistSGEService()
 
             dataFrame = akShareService.prepareDataFrame(start_date, end_date)
@@ -33,12 +41,18 @@ class AkShareServiceManager():
 
             dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
 
         except Exception as e:
-            logger.info('Exception: %s', e)
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
             raise e
 
-        logger.info("callTushareSGEDailyService ended...")
+        logger.info("callAkShareSpotHistSGEService ended...")
 
     @classmethod
     def callAkShareFuturesForeignHistService(self, symbol='=', file_suffix='='):
@@ -52,8 +66,15 @@ class AkShareServiceManager():
         logger.info(f"callAkShareFuturesForeignHistService started... Symbol: {symbol}")
 
         file_path = os.path.join(CommonParameters.outBoundPath, f'akshare_futures_foreign_hist_{file_suffix}.xlsx')
+        job_logger = AkShareJobLogger()
 
         try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareFuturesForeignHistService', {
+                'symbol': symbol,
+                'file_suffix': file_suffix
+            })
+            
             akShareService = AkShareFuturesForeignHistService()
 
             # 获取原始数据
@@ -63,9 +84,15 @@ class AkShareServiceManager():
             akShareService.deleteDateFromClickHouse(symbol=symbol)
             transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(transformed_dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(transformed_dataFrame) if transformed_dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
 
         except Exception as e:
-            logger.info('Exception: %s', e)
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
             raise e
 
         logger.info(f"callAkShareFuturesForeignHistService ended... Symbol: {symbol}")
@@ -79,8 +106,12 @@ class AkShareServiceManager():
 
         # 社会融资规模数据不需要日期范围，获取全部历史数据
         file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_shrzgm.xlsx')
+        job_logger = AkShareJobLogger()
 
         try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaShrzgmService')
+            
             akShareService = AkShareMacroChinaShrzgmService()
 
             # 获取数据（不需要日期参数）
@@ -103,12 +134,18 @@ class AkShareServiceManager():
 
             # 保存到 ClickHouse
             akShareService.saveDateToClickHouse(dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
 
         except Exception as e:
-            logger.info('Exception: %s', e)
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
             raise e
 
-        logger.info(f"callAkShareFuturesForeignHistService ended...")
+        logger.info("callAkShareMacroChinaShrzgmService ended...")
 
     @classmethod
     def callAkShareMacroChinaNewHousePriceService(self, city_first="北京", city_second="上海"):
@@ -123,8 +160,15 @@ class AkShareServiceManager():
 
         # 新建商品住宅价格指数数据不需要日期范围，获取全部历史数据
         file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_new_house_price.xlsx')
+        job_logger = AkShareJobLogger()
 
         try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaNewHousePriceService', {
+                'city_first': city_first,
+                'city_second': city_second
+            })
+            
             akShareService = AkShareMacroChinaNewHousePriceService()
 
             # 获取数据（传入城市参数）
@@ -134,9 +178,15 @@ class AkShareServiceManager():
             akShareService.deleteDateFromClickHouse()
             dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
 
         except Exception as e:
-            logger.info('Exception: %s', e)
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
             raise e
 
         logger.info("callAkShareMacroChinaNewHousePriceService ended...")
@@ -153,8 +203,15 @@ class AkShareServiceManager():
         logger.info(f"callAkShareStockUsDailyService started... Symbol: {symbol}, Adjust: {adjust}")
 
         file_path = os.path.join(CommonParameters.outBoundPath, f'akshare_stock_us_daily_{symbol}_{adjust if adjust else "normal"}.xlsx')
+        job_logger = AkShareJobLogger()
 
         try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareStockUsDailyService', {
+                'symbol': symbol,
+                'adjust': adjust
+            })
+            
             akShareService = AkShareStockUsDailyService()
 
             dataFrame = akShareService.prepareDataFrame(symbol=symbol, adjust=adjust)
@@ -163,9 +220,15 @@ class AkShareServiceManager():
             akShareService.deleteDateFromClickHouse(symbol=symbol)
             dataFrame = akShareService.transformDataFrame(dataFrame)
             akShareService.saveDateToClickHouse(dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
 
         except Exception as e:
-            logger.info('Exception: %s', e)
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
             raise e
 
         logger.info(f"callAkShareStockUsDailyService ended... Symbol: {symbol}, Adjust: {adjust}")
