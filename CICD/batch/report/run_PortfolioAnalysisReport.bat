@@ -45,5 +45,3 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 echo.
-REM Keep window open
-pause
