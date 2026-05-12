@@ -180,28 +180,30 @@ class PortfolioMetricsAnalysis:
         for stock in stocks:
             is_market_index = (stock == self.market_symbol)
             
-            if is_market_index:
-                sql = f"""
-                SELECT
-                    trade_date as trade_date,
-                    close as close_point
-                FROM df_tushare_cn_index_daily
-                WHERE ts_code = '{stock}'
-                  AND trade_date >= '{start_date}'
-                  AND trade_date <= '{end_date}'
-                ORDER BY trade_date ASC
-                """
+            # 根据市场类型和是否为指数选择正确的表和字段
+            if self.market_symbol in ['SPY']:
+                # 美国市场统一使用 df_tushare_us_stock_daily 表，字段为 close_point
+                table_name = 'df_tushare_us_stock_daily'
+                close_field = 'close_point'
+            elif is_market_index:
+                # 中国市场指数使用 df_tushare_cn_index_daily 表，字段为 close
+                table_name = 'df_tushare_cn_index_daily'
+                close_field = 'close'
             else:
-                sql = f"""
-                SELECT
-                    trade_date as trade_date,
-                    close as close_point
-                FROM df_tushare_stock_daily
-                WHERE ts_code = '{stock}'
-                  AND trade_date >= '{start_date}'
-                  AND trade_date <= '{end_date}'
-                ORDER BY trade_date ASC
-                """
+                # 中国市场个股使用 df_tushare_stock_daily 表，字段为 close
+                table_name = 'df_tushare_stock_daily'
+                close_field = 'close'
+            
+            sql = f"""
+            SELECT
+                trade_date as trade_date,
+                {close_field} as close_point
+            FROM {table_name}
+            WHERE ts_code = '{stock}'
+              AND trade_date >= '{start_date}'
+              AND trade_date <= '{end_date}'
+            ORDER BY trade_date ASC
+            """
             
             from dataIntegrator.dataService.ClickhouseService import ClickhouseService
             clickhouseService = ClickhouseService()
@@ -360,24 +362,50 @@ class PortfolioMetricsAnalysis:
         return downside_deviation
 
     def get_stock_name(self, ts_code):
-        """获取股票名称"""
-        if ts_code == self.market_symbol:
-            return "上证指数"
+        """获取股票名称（按照 ts_code - name - enname 格式）"""
+        # 根据市场类型返回默认名称
+        if self.market_symbol in ['SPY']:
+            # 美国市场
+            if ts_code == self.market_symbol:
+                return f"{ts_code} - S&P 500 ETF - SPDR S&P 500 ETF Trust"
+        else:
+            # 中国市场
+            if ts_code == self.market_symbol:
+                return f"{ts_code} - 上证指数 - SSE Composite Index"
         
         try:
             from dataIntegrator.dataService.ClickhouseService import ClickhouseService
             clickhouseService = ClickhouseService()
+            
+            # 根据市场类型选择不同的表
+            if self.market_symbol in ['SPY']:
+                # 美国市场使用 df_tushare_us_stock_basic 表
+                table_name = 'df_tushare_us_stock_basic'
+            else:
+                # 中国市场使用 df_tushare_stock_basic 表
+                table_name = 'df_tushare_stock_basic'
+            
             sql = f"""
-            SELECT name
-            FROM df_tushare_stock_basic
+            SELECT name, enname
+            FROM {table_name}
             WHERE ts_code = '{ts_code}'
             LIMIT 1
             """
             df = clickhouseService.getDataFrameWithoutColumnsName(sql)
             
             if not df.empty:
-                return df.iloc[0]['name']
+                name = df.iloc[0].get('name', '')
+                enname = df.iloc[0].get('enname', '')
+                
+                # 按照规范格式：ts_code - name - enname
+                if name and enname:
+                    return f"{ts_code} - {name} - {enname}"
+                elif name:
+                    return f"{ts_code} - {name}"
+                else:
+                    return ts_code
             else:
+                logger.warning(f"警告: 未找到股票 {ts_code} 的基本信息")
                 return ts_code
         except Exception as e:
             logger.warning(f"获取股票名称失败 {ts_code}: {e}")
@@ -492,9 +520,18 @@ class PortfolioMetricsAnalysis:
         
         # 获取市场指数的交易日历
         clickhouseService = ClickhouseService()
+        
+        # 根据市场类型选择正确的表
+        if self.market_symbol in ['SPY']:
+            # 美国市场使用 df_tushare_us_stock_daily 表
+            table_name = 'df_tushare_us_stock_daily'
+        else:
+            # 中国市场使用 df_tushare_cn_index_daily 表
+            table_name = 'df_tushare_cn_index_daily'
+        
         sql = f"""
         SELECT DISTINCT trade_date
-        FROM df_tushare_cn_index_daily
+        FROM {table_name}
         WHERE ts_code = '{self.market_symbol}'
           AND trade_date >= '{start_date}'
           AND trade_date <= '{end_date}'
@@ -544,11 +581,13 @@ class PortfolioMetricsAnalysis:
         返回:
         - results_df: 分析结果 DataFrame
         """
-        # 获取无风险利率
+        # 获取无风险利率（根据市场类型自动选择）
         if risk_free_rate is None:
             riskFreeRateManager = RiskFreeRateManager()
+            # 根据市场类型选择国家代码
+            interest_country = 'US' if self.market_symbol in ['SPY'] else 'CN'
             risk_free_rate = riskFreeRateManager.get_risk_free_rate(
-                start_date, end_date, interest_country='CN'
+                start_date, end_date, interest_country=interest_country
             )
         
         # Step 1: 获取数据
@@ -623,6 +662,9 @@ class PortfolioMetricsAnalysis:
             # 获取 CML 权重
             cml_weight = cml_weights.get(stock, np.nan) if stock in available_stocks else np.nan
             
+            # 根据市场类型确定相关系数列名
+            correlation_col_name = '与SPY相关系数' if self.market_symbol in ['SPY'] else '与上证相关系数'
+            
             results.append({
                 '股票号': stock,
                 '股票名': stock_name,
@@ -630,7 +672,7 @@ class PortfolioMetricsAnalysis:
                 'Skewness': skewness,
                 'Kurtosis': kurtosis,
                 'Sigma (%)': sigma_annual * 100,
-                '与上证相关系数': correlation,
+                correlation_col_name: correlation,
                 'Beta': beta,
                 'Treynor Ratio': treynor_ratio,
                 'Sharpe Ratio': sharpe_ratio,
@@ -685,13 +727,22 @@ class PortfolioMetricsAnalysis:
         # 导出到 Excel
         logger.info(f"\n📄 导出到 Excel: {filepath}")
         
+        # 根据 results_df 中实际存在的列名确定相关系数列
+        if '与SPY相关系数' in results_df.columns:
+            correlation_col_name = '与SPY相关系数'
+        elif '与上证相关系数' in results_df.columns:
+            correlation_col_name = '与上证相关系数'
+        else:
+            # 如果都没有，尝试从 market_symbol 推断
+            correlation_col_name = '与SPY相关系数' if self.market_symbol in ['SPY'] else '与上证相关系数'
+        
         # 定义需要生成 Pivot 表的指标列表
         pivot_metrics = [
             ('均数 (%)', '均数Pivot表'),
             ('Skewness', 'Skewness Pivot表'),
             ('Kurtosis', 'Kurtosis Pivot表'),
             ('Sigma (%)', 'Sigma Pivot表'),
-            ('与上证相关系数', '相关系数Pivot表'),
+            (correlation_col_name, '相关系数Pivot表'),
             ('Beta', 'Beta Pivot表'),
             ('Treynor Ratio', 'Treynor Ratio Pivot表'),
             ('Sharpe Ratio', 'Sharpe Ratio Pivot表'),

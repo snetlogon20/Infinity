@@ -1,0 +1,43 @@
+--drop table indexsysdb.df_tushare_cb_basic
+CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_cb_basic
+(
+    `ts_code` String COMMENT '转债代码',
+    `bond_full_name` String COMMENT '转债名称',
+    `bond_short_name` String COMMENT '转债简称',
+    `cb_code` String COMMENT '转股申报代码',
+    `cb_type` String COMMENT '转债类型: CB-可转债,EB-可交换债',
+    `stk_code` String COMMENT '正股代码',
+    `stk_short_name` String COMMENT '正股简称',
+    `maturity` Float64 COMMENT '发行期限（年）',
+    `par` Float64 COMMENT '面值',
+    `issue_price` Float64 COMMENT '发行价格',
+    `issue_size` Float64 COMMENT '发行总额（元）',
+    `remain_size` Float64 COMMENT '债券余额（元）',
+    `value_date` String COMMENT '起息日期',
+    `maturity_date` String COMMENT '到期日期',
+    `rate_type` String COMMENT '利率类型',
+    `coupon_rate` Float64 COMMENT '票面利率（%）',
+    `add_rate` Float64 COMMENT '补偿利率（%）',
+    `pay_per_year` Int64 COMMENT '年付息次数',
+    `list_date` String COMMENT '上市日期',
+    `delist_date` String COMMENT '摘牌日',
+    `exchange` String COMMENT '上市交易所',
+    `conv_start_date` String COMMENT '转股起始日',
+    `conv_end_date` String COMMENT '转股截止日',
+    `conv_stop_date` String COMMENT '停止转股日(提前到期)',
+    `first_conv_price` Float64 COMMENT '初始转股价',
+    `conv_price` Float64 COMMENT '最新转股价',
+    `rate_clause` String COMMENT '利率说明',
+    `put_clause` String COMMENT '回售条款',
+    `maturity_call_price` String COMMENT '到期赎回价格(含税)',
+    `call_clause` String COMMENT '赎回条款',
+    `reset_clause` String COMMENT '特别向下修正条款',
+    `conv_clause` String COMMENT '转股条款',
+    `guarantor` String COMMENT '担保人',
+    `guarantee_type` String COMMENT '担保方式',
+    `issue_rating` String COMMENT '发行信用等级',
+    `newest_rating` String COMMENT '最新信用等级',
+    `rating_comp` String COMMENT '最新评级机构'
+) ENGINE = MergeTree
+ORDER BY (ts_code, list_date)
+SETTINGS index_granularity = 8192;
