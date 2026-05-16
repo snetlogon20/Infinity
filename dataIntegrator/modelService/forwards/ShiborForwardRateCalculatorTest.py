@@ -44,7 +44,7 @@ def test_full_workflow():
             if file.endswith('.pdf'):
                 icon = '📄'
             elif file.endswith('.png'):
-                icon = ''
+                icon = '📊'
             elif file.endswith('.csv'):
                 icon = '📋'
             else:

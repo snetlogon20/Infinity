@@ -223,20 +223,19 @@ class ShiborForwardRateCalculator:
             # 为不同图表添加专业解析
             if idx == 1:
                 analysis_text = """图表说明：
-本图展示了远期利率与即期利率的历史对比走势。虚线表示即期利率，
-实线表示远期利率。通过对比可以看出远期利率与即期利率的偏离程度，
-反映市场对未来利率走势的预期。
+本图展示了SHIBOR即期利率的历史走势。即期利率是SHIBOR的基础数据，
+反映了不同期限银行间同业拆借在当前时点的利率水平。
 
 观察要点：
-• 远期利率高于即期利率：市场预期未来利率上升
-• 远期利率低于即期利率：市场预期未来利率下降
-• 期限利差扩大：市场波动性增加
-• 期限利差收窄：市场趋于稳定"""
+• 短期利率（如O/N、1W）对货币政策变化更敏感
+• 长期利率（如9M、1Y）反映市场对未来经济的预期
+• 利率曲线形态：向上倾斜（正常）、平坦或倒挂
+• 期限利差变化：反映市场对未来利率走势的预期"""
                 story.append(Paragraph(analysis_text, normal_style))
             
             elif idx == 2:
                 analysis_text = """图表说明：
-本图仅展示远期利率的历史走势，便于观察不同期限组合的远期利率变化趋势。
+本图展示了SHIBOR远期利率的历史走势，便于观察不同期限组合的远期利率变化趋势。
 
 观察要点：
 • 短期远期利率（如 F(O/N,1W)）波动性通常较大
@@ -246,13 +245,14 @@ class ShiborForwardRateCalculator:
             
             elif idx == 3:
                 analysis_text = """图表说明：
-本图展示了最新交易日的远期利率期限结构。
+本图展示了SHIBOR远期利率与即期利率的历史对比走势。通过对比可以看出
+远期利率与即期利率的偏离程度，反映市场对未来利率走势的预期。
 
 观察要点：
-• 向上倾斜的曲线：正常收益率曲线，预期未来利率上升
-• 向下倾斜的曲线：倒挂收益率曲线，预期未来利率下降
-• 平坦的曲线：市场预期利率将保持稳定
-• 曲线形态变化：反映货币政策预期和市场流动性状况"""
+• 远期利率高于即期利率：市场预期未来利率上升
+• 远期利率低于即期利率：市场预期未来利率下降
+• 期限利差扩大：市场波动性增加
+• 期限利差收窄：市场趋于稳定"""
                 story.append(Paragraph(analysis_text, normal_style))
 
             if idx < len(chart_paths):
@@ -443,6 +443,210 @@ class ShiborForwardRateCalculator:
         logger.info(f"远期利率计算完成，共 {len(forward_rates_df.columns) - 1} 个期限组合")
         return forward_rates_df
     
+    def plot_spot_rates(self, spot_df, save_path=None, figsize=(14, 8)):
+        """
+        绘制即期利率曲线
+        
+        参数:
+        - spot_df: 即期利率DataFrame
+        - save_path: 保存路径（如果为None，则显示图形）
+        - figsize: 图形大小
+        """
+        logger.info("开始绘制即期利率曲线...")
+        
+        import matplotlib.dates as mdates
+        
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 获取即期利率列
+        spot_columns = [col for col in self.tenor_config.keys() if col in spot_df.columns]
+        
+        if not spot_columns:
+            raise ValueError("没有即期利率数据可供绘制")
+        
+        # 转换日期为 datetime 对象（创建副本避免修改原始数据）
+        spot_df_copy = spot_df.copy()
+        spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 使用 viridis 颜色映射，与远期利率图表保持一致
+        spot_colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(spot_columns)))
+        
+        for idx, col in enumerate(spot_columns):
+            # 从期限配置中提取期限名称
+            tenor_name = self.tenor_names[col]
+            label = f"S({tenor_name})"
+            ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
+                   linewidth=1.5, label=label, color=spot_colors[idx], alpha=0.9)
+        
+        # 设置图形属性
+        ax.set_xlabel('交易日期', fontsize=12)
+        ax.set_ylabel('利率 (%)', fontsize=12)
+        ax.set_title('SHIBOR 即期利率历史走势', fontsize=14, fontweight='bold')
+        
+        # 添加图例（分两列显示）
+        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
+        ax.grid(True, alpha=0.3)
+        
+        # 优化日期显示：只显示月份，自动调整间隔
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
+        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
+        
+        # 设置标签格式
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
+        
+        # ========== 在每条线的末端添加清晰标注 ==========
+        if len(spot_df_copy) > 0:
+            # 找到最后一个有效数据点的日期
+            last_date = spot_df_copy['trade_date_dt'].iloc[-1]
+            
+            # 即期利率标注
+            spot_labels = []
+            for idx, col in enumerate(spot_columns):
+                # 获取最后一行的值
+                last_value = spot_df_copy[col].iloc[-1]
+                if pd.notna(last_value):
+                    spot_labels.append((self.tenor_names[col], last_value, spot_colors[idx]))
+            
+            # 按数值从大到小排序，从上到下标注
+            spot_labels.sort(key=lambda x: x[1], reverse=True)
+            
+            # 添加即期利率标注
+            for idx, (label, value, color) in enumerate(spot_labels):
+                # 标注位置：直接在最后数据点处
+                x_label_pos = last_date
+                # y轴位置：使用实际数据值
+                y_label_pos = value
+                
+                # 添加标注文字（去掉边框，紧贴线条）
+                ax.text(x_label_pos, y_label_pos, f'  S({label})', 
+                       fontsize=9, fontweight='bold', color=color,
+                       verticalalignment='center',
+                       horizontalalignment='left')
+        
+        # 调整布局，右侧留出标注空间
+        fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
+        plt.tight_layout()
+        # 调整右侧边距，为标注留出空间
+        fig.subplots_adjust(right=0.85)
+        
+        # 保存或显示
+        if save_path:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            logger.info(f"SHIBOR即期利率曲线已保存至: {save_path}")
+        else:
+            plt.show()
+        
+        plt.close()
+    
+    def plot_spot_rates(self, spot_df, save_path=None, figsize=(14, 8)):
+        """
+        绘制即期利率曲线
+        
+        参数:
+        - spot_df: 即期利率DataFrame
+        - save_path: 保存路径（如果为None，则显示图形）
+        - figsize: 图形大小
+        """
+        logger.info("开始绘制即期利率曲线...")
+        
+        import matplotlib.dates as mdates
+        
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 获取即期利率列
+        spot_columns = [col for col in self.tenor_config.keys() if col in spot_df.columns]
+        
+        if not spot_columns:
+            raise ValueError("没有即期利率数据可供绘制")
+        
+        # 转换日期为 datetime 对象（创建副本避免修改原始数据）
+        spot_df_copy = spot_df.copy()
+        spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 使用 viridis 颜色映射，与远期利率图表保持一致
+        spot_colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(spot_columns)))
+        
+        for idx, col in enumerate(spot_columns):
+            # 从期限配置中提取期限名称
+            tenor_name = self.tenor_names[col]
+            label = f"S({tenor_name})"
+            ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
+                   linewidth=1.5, label=label, color=spot_colors[idx], alpha=0.9)
+        
+        # 设置图形属性
+        ax.set_xlabel('交易日期', fontsize=12)
+        ax.set_ylabel('利率 (%)', fontsize=12)
+        ax.set_title('SHIBOR 即期利率历史走势', fontsize=14, fontweight='bold')
+        
+        # 添加图例（分两列显示）
+        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
+        ax.grid(True, alpha=0.3)
+        
+        # 优化日期显示：只显示月份，自动调整间隔
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
+        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
+        
+        # 设置标签格式
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
+        
+        # ========== 在每条线的末端添加清晰标注 ==========
+        if len(spot_df_copy) > 0:
+            # 找到最后一个有效数据点的日期
+            last_date = spot_df_copy['trade_date_dt'].iloc[-1]
+            
+            # 即期利率标注
+            spot_labels = []
+            for idx, col in enumerate(spot_columns):
+                # 获取最后一行的值
+                last_value = spot_df_copy[col].iloc[-1]
+                if pd.notna(last_value):
+                    spot_labels.append((self.tenor_names[col], last_value, spot_colors[idx]))
+            
+            # 按数值从大到小排序，从上到下标注
+            spot_labels.sort(key=lambda x: x[1], reverse=True)
+            
+            # 添加即期利率标注
+            for idx, (label, value, color) in enumerate(spot_labels):
+                # 标注位置：直接在最后数据点处
+                x_label_pos = last_date
+                # y轴位置：使用实际数据值
+                y_label_pos = value
+                
+                # 添加标注文字（去掉边框，紧贴线条）
+                ax.text(x_label_pos, y_label_pos, f'  S({label})', 
+                       fontsize=9, fontweight='bold', color=color,
+                       verticalalignment='center',
+                       horizontalalignment='left')
+        
+        # 调整布局，右侧留出标注空间
+        fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
+        plt.tight_layout()
+        # 调整右侧边距，为标注留出空间
+        fig.subplots_adjust(right=0.85)
+        
+        # 保存或显示
+        if save_path:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            logger.info(f"SHIBOR即期利率曲线已保存至: {save_path}")
+        else:
+            plt.show()
+        
+        plt.close()
+    
     def plot_forward_rates(self, forward_rates_df, original_spot_df=None, save_path=None, figsize=(14, 8)):
         """
         绘制远期利率曲线（同时显示即期利率作为对比）
@@ -628,13 +832,17 @@ class ShiborForwardRateCalculator:
         # 生成时间戳
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        # 4. 绘制时间序列图（包含即期利率对比）
-        time_series_path = os.path.join(output_dir, f'shibor_forward_rates_timeseries_{timestamp}.png')
-        self.plot_forward_rates(forward_rates_df, original_spot_df=shibor_df, save_path=time_series_path)
+        # 4. 绘制即期利率时间序列图
+        spot_only_path = os.path.join(output_dir, f'shibor_spot_rates_{timestamp}.png')
+        self.plot_spot_rates(shibor_df, save_path=spot_only_path)
         
         # 4.1 绘制纯远期利率时间序列图（不包含即期利率）
         forward_only_path = os.path.join(output_dir, f'shibor_forward_rates_{timestamp}.png')
         self.plot_forward_rates(forward_rates_df, original_spot_df=None, save_path=forward_only_path)
+        
+        # 4.2 绘制时间序列图（包含即期利率对比）
+        time_series_path = os.path.join(output_dir, f'shibor_forward_rates_timeseries_{timestamp}.png')
+        self.plot_forward_rates(forward_rates_df, original_spot_df=shibor_df, save_path=time_series_path)
         
         # 5. 绘制最新远期利率曲线
         latest_curve_path = os.path.join(output_dir, f'shibor_forward_rates_latest_{timestamp}.png')
@@ -643,9 +851,9 @@ class ShiborForwardRateCalculator:
         # 6. 生成 PDF 报告
         logger.info("📊 开始生成 PDF 报告...")
         chart_paths = [
-            (time_series_path, '远期利率与即期利率历史对比走势'),
-            (forward_only_path, '远期利率历史走势'),
-            (latest_curve_path, '最新远期利率曲线'),
+            (spot_only_path, 'SHIBOR即期利率历史走势'),
+            (forward_only_path, 'SHIBOR远期利率历史走势'),
+            (time_series_path, 'SHIBOR远期利率与即期利率历史对比走势'),
         ]
         pdf_path = self._generate_forward_rate_pdf(
             chart_paths=chart_paths,
