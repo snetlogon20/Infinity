@@ -204,25 +204,32 @@ class CMLAnalysis:
 
     def _fetch_commodities_data(self, commodities, start_date, end_date, market_type="US"):
         """
-        获取商品数据（支持 UNION 多商品一次性查询）
+        获取商品/外汇数据（支持 UNION 多资产一次性查询）
         
         参数:
-        - commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'} 或 {'Au99.99': '上海黄金'}
+        - commodities: 资产配置字典，例如 {'GC': '黄金', 'CL': '原油'} 或 {'EURUSD.FXCM': '欧元/美元'}
         - start_date: 开始日期 (格式: 'YYYYMMDD')
         - end_date: 结束日期 (格式: 'YYYYMMDD')
         - market_type: 市场类型 ('US' 使用国外期货表, 'CN' 使用国内SGE表)
         
         返回:
-        - dfs: 商品数据字典
+        - dfs: 资产数据字典
         """
         if not commodities:
             return {}
 
-        logger.info(f"🔍 开始获取商品数据，市场类型: {market_type}, 商品列表: {list(commodities.keys())}")
+        logger.info(f"🔍 开始获取资产数据，市场类型: {market_type}, 资产列表: {list(commodities.keys())}")
 
         # 格式化日期（YYYYMMDD -> YYYY-MM-DD）
         start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
         end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+
+        # 检测是否包含外汇货币对
+        has_forex = any('.FXCM' in str(symbol) for symbol in commodities.keys())
+        
+        if has_forex:
+            # 外汇货币对：使用 df_tushare_fx_daily 表
+            return self._fetch_forex_data(commodities, start_date_formatted, end_date_formatted)
 
         # 根据市场类型选择数据表
         if market_type == "CN":
@@ -298,6 +305,75 @@ class CMLAnalysis:
             display_name = f"{symbol}-{commodities.get(symbol, '')}"
             dfs[display_name] = commodity_df
             logger.info(f"   {display_name}: {len(commodity_df)} 条数据, 日期范围: {commodity_df.index.min()} 至 {commodity_df.index.max()}")
+
+        return dfs
+
+    def _fetch_forex_data(self, forex_pairs, start_date_formatted, end_date_formatted):
+        """
+        获取外汇货币对数据（使用 IN 子句一次性查询）
+        
+        参数:
+        - forex_pairs: 外汇配置字典，例如 {'EURUSD.FXCM': '欧元/美元', 'GBPUSD.FXCM': '英镑/美元'}
+        - start_date_formatted: 开始日期 (格式: 'YYYY-MM-DD')
+        - end_date_formatted: 结束日期 (格式: 'YYYY-MM-DD')
+        
+        返回:
+        - dfs: 外汇数据字典
+        """
+        logger.info(f"💱 使用外汇数据表: indexsysdb.df_tushare_fx_daily")
+        logger.info(f"   日期范围: {start_date_formatted} 至 {end_date_formatted}")
+        logger.info(f"   货币对数量: {len(forex_pairs)}")
+
+        table_name = "indexsysdb.df_tushare_fx_daily"
+        
+        # 将日期格式从 'YYYY-MM-DD' 转换为 'YYYYMMDD'（ClickHouse 要求）
+        start_date_clickhouse = start_date_formatted.replace('-', '')
+        end_date_clickhouse = end_date_formatted.replace('-', '')
+        
+        # 构建 ts_code 列表
+        ts_codes = "','".join(forex_pairs.keys())
+        
+        # 构建 SQL 查询（使用 IN 子句）
+        sql = f"""
+        SELECT
+            ts_code,
+            trade_date,
+            bid_close AS close_point
+        FROM {table_name}
+        WHERE ts_code IN ('{ts_codes}')
+          AND trade_date >= '{start_date_clickhouse}'
+          AND trade_date <= '{end_date_clickhouse}'
+          AND bid_close > 0
+        ORDER BY trade_date, ts_code
+        """
+        
+        logger.info(f"📝 执行外汇数据查询 SQL:\n{sql}")
+
+        clickhouseService = ClickhouseService()
+        df = clickhouseService.getDataFrameWithoutColumnsName(sql)
+
+        if df.empty:
+            logger.warning(f"⚠️ 警告: 未获取到任何外汇数据 (货币对: {list(forex_pairs.keys())})")
+            logger.warning(f"   请检查:")
+            logger.warning(f"   1. 表 {table_name} 中是否有数据")
+            logger.warning(f"   2. 日期范围 {start_date_clickhouse} 至 {end_date_clickhouse} 是否正确")
+            logger.warning(f"   3. 货币对代码 {list(forex_pairs.keys())} 是否存在于表中")
+            return {}
+
+        logger.info(f"✅ 成功获取外汇原始数据: {len(df)} 条记录")
+        logger.info(f"   包含货币对: {df['ts_code'].unique().tolist()}")
+
+        # 按货币对分组
+        dfs = {}
+        for symbol in df['ts_code'].unique():
+            forex_df = df[df['ts_code'] == symbol][['trade_date', 'close_point']].copy()
+            # trade_date 是 'YYYYMMDD' 格式，需要转换为 datetime
+            forex_df['trade_date'] = pd.to_datetime(forex_df['trade_date'], format='%Y%m%d')
+            forex_df.set_index('trade_date', inplace=True)
+            
+            display_name = f"{symbol}-{forex_pairs.get(symbol, '')}"
+            dfs[display_name] = forex_df
+            logger.info(f"   {display_name}: {len(forex_df)} 条数据, 日期范围: {forex_df.index.min()} 至 {forex_df.index.max()}")
 
         return dfs
 

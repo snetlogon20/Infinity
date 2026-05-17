@@ -544,6 +544,11 @@ class PortfolioMetricsAnalysis:
             table_name = 'df_akshare_spot_hist_sge'
             date_field = 'date'
             symbol_field = None  # 该表没有 symbol 字段
+        elif '.FXCM' in str(self.market_symbol):
+            # 外汇货币对使用 df_tushare_fx_daily 表
+            table_name = 'df_tushare_fx_daily'
+            date_field = 'trade_date'
+            symbol_field = 'ts_code'
         else:
             # 中国市场使用 df_tushare_cn_index_daily 表
             table_name = 'df_tushare_cn_index_daily'
@@ -1509,10 +1514,22 @@ class PortfolioMetricsAnalysis:
             ax.set_xlabel('回测日期', fontsize=11)
             ax.set_ylabel(metric_col, fontsize=11)
             
-            # 设置X轴刻度（只显示部分日期标签）
+            # 设置X轴刻度（只显示部分日期标签，包含年份）
             step = max(1, len(dates) // 10)
             tick_positions = range(0, len(dates), step)
-            tick_labels = [str(d)[4:] if isinstance(d, str) else str(d)[-6:] for d in dates]
+            
+            # 格式化日期标签为 'YYYY-MM-DD' 或 'MM-DD' 格式
+            def format_date_label(d):
+                """格式化日期标签，包含年份信息"""
+                date_str = str(d)
+                if len(date_str) == 8:  # 'YYYYMMDD' 格式
+                    return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+                elif len(date_str) >= 10:  # 'YYYY-MM-DD' 或更长
+                    return date_str[:10]
+                else:  # 其他格式，保持原样
+                    return date_str
+            
+            tick_labels = [format_date_label(d) for d in dates]
             ax.set_xticks(tick_positions)
             ax.set_xticklabels([tick_labels[i] if i < len(tick_labels) else '' for i in tick_positions], 
                              rotation=45, ha='right', fontsize=8)
