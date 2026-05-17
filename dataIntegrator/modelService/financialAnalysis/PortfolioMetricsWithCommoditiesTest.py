@@ -401,7 +401,7 @@ if __name__ == "__main__":
             "stock_type": "forex_major",
             # "start_date": CommonDataParameters.get_start_date(days=30),
             # "end_date": CommonParameters.today,
-            "start_date": "20240101",
+            "start_date": "20180101",
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "US",
