@@ -64,9 +64,9 @@ class SMLAnalysis:
 
 # ... existing code ...
 
-    def fetch_stock_data(self, stocks, start_date, end_date, market_type="US", market_symbol=None):
+    def fetch_stock_data(self, stocks, start_date, end_date, market_type="US", market_symbol=None, include_commodities=None):
         """
-        从 ClickHouse 获取股票数据
+        从 ClickHouse 获取股票数据（支持多数据源：股票 + 商品）
 
         参数:
         - stocks: 股票代码列表
@@ -74,17 +74,22 @@ class SMLAnalysis:
         - end_date: 结束日期 (格式: 'YYYYMMDD')
         - market_type: 市场类型 ['US', 'CN']
         - market_symbol: 市场指数符号（用于区分指数和股票）
+        - include_commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'}
 
         返回:
-        - dfs: 字典，key为股票代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为DataFrame
-        - stock_names: 字典，key为ts_code，value为股票名称
+        - dfs: 字典，key为资产代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为DataFrame
+        - stock_names: 字典，key为ts_code，value为资产名称
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event=f"Fetching data for {len(stocks)} stocks from {start_date} to {end_date}, market={market_type}")
 
+        if include_commodities:
+            logger.info(f" 同时获取 {len(include_commodities)} 种商品数据: {list(include_commodities.keys())}")
+
         dfs = {}
         stock_names = {}
 
+        # Step 1: 获取股票名称
         if market_type == "CN":
             cn_stocks = [s for s in stocks if s != market_symbol]
             if cn_stocks:
@@ -115,64 +120,20 @@ class SMLAnalysis:
                     for _, row in name_df.iterrows():
                         stock_names[row['ts_code']] = row['enname']
 
+        # Step 2: 获取股票数据
         for stock in stocks:
             is_market_index = (stock == market_symbol)
 
             if market_type == "US":
-                table_name = "df_akshare_stock_us_daily"
-                symbol_col = "symbol"
-                date_col = "date"
-                close_col = "close"
-
-                sql = f"""
-                SELECT
-                    {date_col} as trade_date,
-                    {close_col} as close_point
-                FROM {table_name}
-                WHERE {symbol_col} = '{stock}'
-                  AND {date_col} >= '{start_date}'
-                  AND {date_col} <= '{end_date}'
-                ORDER BY {date_col} ASC
-                """
-
+                sql = self._build_us_stock_sql(stock, start_date, end_date)
                 display_name = stock
 
             elif market_type == "CN":
                 if is_market_index:
-                    table_name = "df_tushare_cn_index_daily"
-                    symbol_col = "ts_code"
-                    date_col = "trade_date"
-                    close_col = "close"
-
-                    sql = f"""
-                    SELECT
-                        {date_col} as trade_date,
-                        {close_col} as close_point
-                    FROM {table_name}
-                    WHERE {symbol_col} = '{stock}'
-                      AND {date_col} >= '{start_date}'
-                      AND {date_col} <= '{end_date}'
-                    ORDER BY {date_col} ASC
-                    """
-
+                    sql = self._build_cn_index_sql(stock, start_date, end_date)
                     display_name = stock
                 else:
-                    table_name = "df_tushare_stock_daily"
-                    symbol_col = "ts_code"
-                    date_col = "trade_date"
-                    close_col = "close"
-
-                    sql = f"""
-                    SELECT
-                        {date_col} as trade_date,
-                        {close_col} as close_point
-                    FROM {table_name}
-                    WHERE {symbol_col} = '{stock}'
-                      AND {date_col} >= '{start_date}'
-                      AND {date_col} <= '{end_date}'
-                    ORDER BY {date_col} ASC
-                    """
-
+                    sql = self._build_cn_stock_sql(stock, start_date, end_date)
                     display_name = stock
 
             else:
@@ -197,7 +158,144 @@ class SMLAnalysis:
 
             dfs[display_name] = df
 
-        logger.info(f"成功获取 {len(dfs)} 只股票的数据")
+        # Step 3: 获取商品数据（如果有配置）
+        if include_commodities:
+            commodity_dfs = self._fetch_commodities_data(include_commodities, start_date, end_date, market_type)
+            dfs.update(commodity_dfs)
+
+        logger.info(f"成功获取 {len(dfs)} 个资产的数据")
+        return dfs
+
+    def _build_us_stock_sql(self, stock, start_date, end_date):
+        """构建美股查询SQL"""
+        return f"""
+        SELECT
+            date as trade_date,
+            close as close_point
+        FROM df_akshare_stock_us_daily
+        WHERE symbol = '{stock}'
+          AND date >= '{start_date}'
+          AND date <= '{end_date}'
+        ORDER BY date ASC
+        """
+
+    def _build_cn_stock_sql(self, stock, start_date, end_date):
+        """构建A股查询SQL"""
+        return f"""
+        SELECT
+            trade_date as trade_date,
+            close as close_point
+        FROM df_tushare_stock_daily
+        WHERE ts_code = '{stock}'
+          AND trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date ASC
+        """
+
+    def _build_cn_index_sql(self, stock, start_date, end_date):
+        """构建中国指数查询SQL"""
+        return f"""
+        SELECT
+            trade_date as trade_date,
+            close as close_point
+        FROM df_tushare_cn_index_daily
+        WHERE ts_code = '{stock}'
+          AND trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date ASC
+        """
+
+    def _fetch_commodities_data(self, commodities, start_date, end_date, market_type="US"):
+        """
+        获取商品数据（支持 UNION 多商品一次性查询）
+        
+        参数:
+        - commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'} 或 {'Au99.99': '上海黄金'}
+        - start_date: 开始日期 (格式: 'YYYYMMDD')
+        - end_date: 结束日期 (格式: 'YYYYMMDD')
+        - market_type: 市场类型 ('US' 使用国外期货表, 'CN' 使用国内SGE表)
+        
+        返回:
+        - dfs: 商品数据字典
+        """
+        if not commodities:
+            return {}
+
+        logger.info(f"🔍 开始获取商品数据，市场类型: {market_type}, 商品列表: {list(commodities.keys())}")
+
+        # 格式化日期（YYYYMMDD -> YYYY-MM-DD）
+        start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
+        end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+
+        # 根据市场类型选择数据表
+        if market_type == "CN":
+            # 中国资产：使用上海黄金交易所数据
+            table_name = "indexsysdb.df_akshare_spot_hist_sge"
+            has_symbol_field = False  # 该表没有 symbol 字段
+            logger.info(f"🇨🇳 使用国内黄金数据表: {table_name}")
+            logger.info(f"   日期范围: {start_date_formatted} 至 {end_date_formatted}")
+            logger.info(f"   ⚠️ 注意: 该表只包含上海黄金(Au99.99)数据，不支持多商品查询")
+        else:
+            # 美国/国际资产：使用外盘期货数据
+            table_name = "indexsysdb.df_akshare_futures_foreign_hist"
+            has_symbol_field = True  # 该表有 symbol 字段
+            logger.info(f"🇺🇸 使用国外期货数据表: {table_name}")
+            logger.info(f"   日期范围: {start_date_formatted} 至 {end_date_formatted}")
+
+        # 构建 UNION ALL 查询
+        union_queries = []
+        for symbol, name in commodities.items():
+            if market_type == "CN":
+                # 中国资产：不使用 symbol 过滤（表中只有上海黄金数据）
+                union_queries.append(f"""
+                    SELECT
+                        '{symbol}' AS ts_code,
+                        replaceAll(toString(date), '-', '') AS trade_date,
+                        close AS close_point
+                    FROM {table_name}
+                    WHERE date >= '{start_date_formatted}'
+                      AND date <= '{end_date_formatted}'
+                      AND close > 0
+                """)
+            else:
+                # 美国/国际资产：使用 symbol 过滤
+                union_queries.append(f"""
+                    SELECT
+                        '{symbol}' AS ts_code,
+                        replaceAll(toString(date), '-', '') AS trade_date,
+                        close AS close_point
+                    FROM {table_name}
+                    WHERE symbol = '{symbol}'
+                      AND date >= '{start_date_formatted}'
+                      AND date <= '{end_date_formatted}'
+                      AND close > 0
+                """)
+
+        # 合并为完整 SQL
+        combined_sql = " UNION ALL ".join(union_queries) + " ORDER BY trade_date, ts_code"
+        logger.info(f"📝 执行商品数据查询 SQL")
+
+        clickhouseService = ClickhouseService()
+        df = clickhouseService.getDataFrameWithoutColumnsName(combined_sql)
+
+        if df.empty:
+            logger.warning(f"⚠️ 警告: 未获取到任何商品数据 (市场类型: {market_type}, 商品: {list(commodities.keys())})")
+            return {}
+
+        logger.info(f"✅ 成功获取商品原始数据: {len(df)} 条记录")
+        logger.info(f"   包含商品: {df['ts_code'].unique().tolist()}")
+
+        # 按商品分组
+        dfs = {}
+        for symbol in df['ts_code'].unique():
+            commodity_df = df[df['ts_code'] == symbol][['trade_date', 'close_point']].copy()
+            commodity_df['trade_date'] = pd.to_datetime(commodity_df['trade_date'])
+            commodity_df.set_index('trade_date', inplace=True)
+            
+            display_name = f"{symbol}-{commodities.get(symbol, '')}"
+            dfs[display_name] = commodity_df
+            logger.info(f"   {display_name}: {len(commodity_df)} 条数据")
+
         return dfs
 
 
@@ -243,20 +341,20 @@ class SMLAnalysis:
 
     def calculate_all_betas(self, dfs, stocks, market_symbol='SPY', market_type="US"):
         """
-        计算所有股票的β值
+        计算所有资产的β值（股票 + 商品）
 
         参数:
-        - dfs: 股票数据字典
+        - dfs: 资产数据字典（包含股票和商品）
         - stocks: 股票代码列表
         - market_symbol: 市场指数符号（美股用 SPY，A股用 000001.SH 或 399001.SZ）
         - market_type: 市场类型
 
         返回:
-        - betas: 字典，key为股票代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为β值
+        - betas: 字典，key为资产代码，value为β值
         - market_return: 市场收益率序列
         """
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event="Calculating betas for all stocks")
+                          event="Calculating betas for all assets")
 
         if market_symbol not in dfs:
             raise ValueError(f"市场指数 {market_symbol} 数据不存在，无法计算 β 值")
@@ -264,31 +362,54 @@ class SMLAnalysis:
         market_return = dfs[market_symbol]['daily_return']
         betas = {}
 
+        # Step 1: 处理市场指数本身
+        betas[market_symbol] = 1.0
+        logger.info(f"{market_symbol}: β = 1.0 (市场基准)")
+
+        # Step 2: 处理股票资产
         for stock in stocks:
             if stock == market_symbol:
-                betas[stock] = 1.0
-            else:
-                display_stock = stock
+                continue  # 市场指数已在Step 1处理
+            
+            display_stock = stock
 
-                if market_type == "CN":
-                    for key in dfs.keys():
-                        if key.startswith(stock + "-"):
-                            display_stock = key
-                            break
+            if market_type == "CN":
+                for key in dfs.keys():
+                    if key.startswith(stock + "-"):
+                        display_stock = key
+                        break
 
-                elif market_type == "US":
-                    for key in dfs.keys():
-                        if key.startswith(stock + "-"):
-                            display_stock = key
-                            break
+            elif market_type == "US":
+                for key in dfs.keys():
+                    if key.startswith(stock + "-"):
+                        display_stock = key
+                        break
 
-                if display_stock not in dfs:
-                    logger.warning(f"跳过 {display_stock}：没有数据")
-                    continue
-                stock_return = dfs[display_stock]['daily_return']
-                beta = self.calculate_beta(stock_return, market_return)
-                betas[display_stock] = beta
-                logger.info(f"{display_stock}: β = {beta:.4f}")
+            if display_stock not in dfs:
+                logger.warning(f"跳过 {display_stock}：没有数据")
+                continue
+            stock_return = dfs[display_stock]['daily_return']
+            beta = self.calculate_beta(stock_return, market_return)
+            betas[display_stock] = beta
+            logger.info(f"{display_stock}: β = {beta:.4f}")
+
+        # Step 3: 处理商品资产（关键修复！）
+        commodity_count = 0
+        for asset_key in dfs.keys():
+            # 跳过股票和市场指数
+            is_stock = any(asset_key == stock or asset_key.startswith(stock + "-") for stock in stocks)
+            is_market = asset_key == market_symbol
+            
+            if not is_stock and not is_market:
+                # 这是商品资产
+                commodity_return = dfs[asset_key]['daily_return']
+                beta = self.calculate_beta(commodity_return, market_return)
+                betas[asset_key] = beta
+                commodity_count += 1
+                logger.info(f"📦 {asset_key}: β = {beta:.4f} (商品)")
+        
+        if commodity_count > 0:
+            logger.info(f"✅ 成功计算 {commodity_count} 个商品的β值")
 
         return betas, market_return
 
@@ -437,9 +558,10 @@ class SMLAnalysis:
 
 
     def generate_sml_report(self, stocks, start_date, end_date, risk_free_rate_annual=0.04,
-                           display_stocks=None, market_type="US", market_symbol=None, case_name=None):
+                           display_stocks=None, market_type="US", market_symbol=None, case_name=None,
+                           include_commodities=None):
         """
-        生成完整的 SML 分析报告
+        生成完整的 SML 分析报告（支持股票 + 商品混合分析）
 
         参数:
         - stocks: 股票代码列表
@@ -450,6 +572,7 @@ class SMLAnalysis:
         - market_type: 市场类型 ['US', 'CN']
         - market_symbol: 市场指数符号（美股默认 SPY，A股默认 000001.SH）
         - case_name: 测试案例名称（用于文件名区分）
+        - include_commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'}
 
         返回:
         - results: 包含所有分析结果的字典
@@ -466,16 +589,21 @@ class SMLAnalysis:
                 raise ValueError(f"不支持的市场类型: {market_type}")
 
         logger.info("=" * 80)
-        logger.info("🚀 开始 SML 分析")
+        logger.info("🚀 开始 SML 分析（支持商品）")
         logger.info(f"   市场类型: {market_type}")
         logger.info(f"   市场指数: {market_symbol}")
         logger.info(f"   股票数量: {len(stocks)}")
+        if include_commodities:
+            logger.info(f"   商品数量: {len(include_commodities)} - {list(include_commodities.keys())}")
         logger.info(f"   日期范围: {start_date} 至 {end_date}")
         logger.info(f"   无风险利率: {risk_free_rate_annual*100:.2f}%")
         logger.info("=" * 80)
 
-        logger.info("\n📊 步骤 1/4: 获取股票数据...")
-        dfs = self.fetch_stock_data(stocks, start_date, end_date, market_type=market_type, market_symbol=market_symbol)
+        logger.info("\n📊 步骤 1/4: 获取资产数据（股票 + 商品）...")
+        dfs = self.fetch_stock_data(stocks, start_date, end_date, 
+                                   market_type=market_type, 
+                                   market_symbol=market_symbol,
+                                   include_commodities=include_commodities)
 
         if not dfs:
             raise ValueError("未能获取任何股票数据")

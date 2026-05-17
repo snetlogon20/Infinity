@@ -4,7 +4,7 @@ from dataIntegrator import CommonLib
 
 logger = CommonLib.logger
 
-class TuShareYcCbService(TuShareService):
+class TuShareYieldCurveConvertableBondService(TuShareService):
 
     @classmethod
     def prepareDataFrame(self, ts_code, start_date, end_date):
