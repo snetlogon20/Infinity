@@ -528,28 +528,62 @@ class PortfolioMetricsAnalysis:
         # 获取市场指数的交易日历
         clickhouseService = ClickhouseService()
         
-        # 根据市场类型选择正确的表
+        # 根据市场类型和资产类型选择正确的表
         if self.market_symbol in ['SPY']:
             # 美国市场使用 df_tushare_us_stock_daily 表
             table_name = 'df_tushare_us_stock_daily'
+            date_field = 'date'
+            symbol_field = 'symbol'
+        elif self.market_symbol in ['GC', 'XAG', 'XAU', 'CL', 'OIL', 'NG']:
+            # 美国/国际商品使用 df_akshare_futures_foreign_hist 表
+            table_name = 'df_akshare_futures_foreign_hist'
+            date_field = 'date'
+            symbol_field = 'symbol'
+        elif self.market_symbol == 'Au99.99':
+            # 中国商品使用 df_akshare_spot_hist_sge 表
+            table_name = 'df_akshare_spot_hist_sge'
+            date_field = 'date'
+            symbol_field = None  # 该表没有 symbol 字段
         else:
             # 中国市场使用 df_tushare_cn_index_daily 表
             table_name = 'df_tushare_cn_index_daily'
+            date_field = 'trade_date'
+            symbol_field = 'ts_code'
         
-        sql = f"""
-        SELECT DISTINCT trade_date
-        FROM {table_name}
-        WHERE ts_code = '{self.market_symbol}'
-          AND trade_date >= '{start_date}'
-          AND trade_date <= '{end_date}'
-        ORDER BY trade_date ASC
-        """
+        # 构建 SQL 查询
+        if symbol_field:
+            sql = f"""
+            SELECT DISTINCT {date_field} as trade_date
+            FROM {table_name}
+            WHERE {symbol_field} = '{self.market_symbol}'
+              AND {date_field} >= '{start_date}'
+              AND {date_field} <= '{end_date}'
+            ORDER BY {date_field} ASC
+            """
+        else:
+            # Au99.99 不需要 symbol 过滤
+            sql = f"""
+            SELECT DISTINCT {date_field} as trade_date
+            FROM {table_name}
+            WHERE {date_field} >= '{start_date}'
+              AND {date_field} <= '{end_date}'
+            ORDER BY {date_field} ASC
+            """
         df = clickhouseService.getDataFrameWithoutColumnsName(sql)
         
         if df.empty:
             raise ValueError(f"在 {start_date} 至 {end_date} 期间没有找到交易日")
         
-        dates = df['trade_date'].tolist()
+        # 统一转换为 'YYYYMMDD' 格式
+        dates = []
+        for date_str in df['trade_date'].tolist():
+            # 如果日期格式是 'YYYY-MM-DD'，转换为 'YYYYMMDD'
+            if '-' in str(date_str):
+                date_formatted = str(date_str).replace('-', '')
+            else:
+                date_formatted = str(date_str)
+            dates.append(date_formatted)
+        
         logger.info(f"找到 {len(dates)} 个交易日用于滚动回测")
         
         return dates
@@ -852,7 +886,17 @@ class PortfolioMetricsAnalysis:
         returns_df = cmlAnalysis.calculate_daily_return(filtered_dfs)
         
         # Step 4: 计算 CML 最优权重
-        market_returns = returns_df[market_symbol]
+        # 找到 market_symbol 对应的实际列名（可能是格式化后的名称）
+        actual_market_key = None
+        for key in returns_df.columns:
+            if key == market_symbol or key.startswith(f"{market_symbol}-"):
+                actual_market_key = key
+                break
+        
+        if actual_market_key is None:
+            raise ValueError(f"找不到市场指数 {market_symbol} 对应的数据列")
+        
+        market_returns = returns_df[actual_market_key]
         # 只使用在收益率数据框中存在的资产来计算CML权重
         available_assets = [asset for asset in list(dfs.keys()) if asset in returns_df.columns]
         cml_weights = self.calculate_cml_optimal_weights(available_assets, returns_df, risk_free_rate)
@@ -873,10 +917,16 @@ class PortfolioMetricsAnalysis:
             sigma_annual = asset_returns.std() * np.sqrt(self.trading_days)
             
             # 与市场的相关系数
-            correlation = asset_returns.corr(market_returns) if asset_key != market_symbol else 1.0
-            
+            if asset_key == actual_market_key:
+                correlation = 1.0
+            else:
+                correlation = asset_returns.corr(market_returns)
+                        
             # Beta 系数
-            beta = self.calculate_beta(asset_returns, market_returns) if asset_key != market_symbol else 1.0
+            if asset_key == actual_market_key:
+                beta = 1.0
+            else:
+                beta = self.calculate_beta(asset_returns, market_returns)
             
             # Treynor Ratio
             if beta != 0 and not np.isnan(beta):

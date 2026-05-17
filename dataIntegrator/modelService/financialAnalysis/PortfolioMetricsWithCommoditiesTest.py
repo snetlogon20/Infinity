@@ -91,14 +91,23 @@ class PortfolioMetricsWithCommoditiesTest:
         - stock_type: 股票类型
                       美股: ['us_tech', 'us_finance', 'us_mixed', 'us_custom']
                       A股: ['cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']
+                      纯商品: ['commodities_us']
 
         返回:
-        - stocks: 股票代码列表
+        - stocks: 股票代码列表（纯商品场景返回空列表）
         - market_type: 市场类型 ('US' 或 'CN')
-        - market_symbol: 市场指数符号
+        - market_symbol: 市场指数符号（纯商品场景使用主要商品作为基准）
         """
+        # 纯大宗商品组合（美国市场）
+        if stock_type == "commodities_us":
+            # 美国/国际大宗商品组合（从 df_akshare_futures_foreign_hist 表获取）
+            # 包含: XAG(白银), GC(COMEX黄金), XAU(伦敦金), CL(WTI原油), OIL(布伦特原油), NG(天然气)
+            stocks = []  # 纯商品场景不需要股票
+            market_type = "US"
+            market_symbol = "GC"  # 以 COMEX 黄金作为基准
+
         # 美国股票组合
-        if stock_type == "us_tech":
+        elif stock_type == "us_tech":
             stocks = ["SPY", "AAPL", "MSFT", "NVDA", "GOOGL", "META", "TSLA", "AVGO", "ADBE"]
             market_type = "US"
             market_symbol = "SPY"
@@ -212,7 +221,8 @@ class PortfolioMetricsWithCommoditiesTest:
             raise ValueError(
                 f"不支持的股票类型: {stock_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
-                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']")
+                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', "
+                f"'commodities_us']")
 
         return stocks, market_type, market_symbol
 
@@ -246,114 +256,133 @@ if __name__ == "__main__":
     # 配置测试案例（股票 + 商品组合）
     # ========================================
     report_configs = [
+        # {
+        #     "name": "美国科技股 + COMEX黄金",
+        #     "stock_type": "us_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US",
+        #     "commodities": {'GC': 'COMEX黄金'}
+        # },
+        # {
+        #     "name": "美国金融股 + 多种国际商品",
+        #     "stock_type": "us_finance",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US",
+        #     "commodities": {'GC': 'COMEX黄金', 'CL': 'WTI原油', 'XAU': '伦敦金'}
+        # },
+        # {
+        #     "name": "美国混合股票 + COMEX黄金",
+        #     "stock_type": "us_mixed",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US",
+        #     "commodities": {'GC': 'COMEX黄金'}
+        # },
+        # {
+        #     "name": "美国自定义组合 + COMEX黄金",
+        #     "stock_type": "us_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=360),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US",
+        #     "commodities": {'GC': 'COMEX黄金'}
+        # },
+        # {
+        #     "name": "中国蓝筹股组合 + 上海黄金",
+        #     "stock_type": "cn_blue_chip",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国科技股组合 + 上海黄金",
+        #     "stock_type": "cn_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国大消费组合 + 上海黄金",
+        #     "stock_type": "cn_consumer",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国金融股组合 + 上海黄金",
+        #     "stock_type": "cn_financial",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国能源与制造业组合 + 上海黄金",
+        #     "stock_type": "cn_energy",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # # 以下部分是对自定义股票组合设置不同回看时间的配置，以提供不同时间段不同权重下的比较
+        # {
+        #     "name": "中国自定义股票组合 + 上海黄金",
+        #     "stock_type": "cn_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国自定义股票组合 + 上海黄金",
+        #     "stock_type": "cn_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=360),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # {
+        #     "name": "中国自定义股票组合 + 上海黄金",
+        #     "stock_type": "cn_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=100),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN",
+        #     "commodities": {'Au99.99': '上海黄金'}
+        # },
+        # ========================================
+        # 纯大宗商品分析（新增）
+        # ========================================
         {
-            "name": "美国科技股 + COMEX黄金",
-            "stock_type": "us_tech",
+            "name": "纯美国大宗商品组合",
+            "stock_type": "commodities_us",
             "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "US",
-            "commodities": {'GC': 'COMEX黄金'}
-        },
-        {
-            "name": "美国金融股 + 多种国际商品",
-            "stock_type": "us_finance",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US",
-            "commodities": {'GC': 'COMEX黄金', 'CL': 'WTI原油', 'XAU': '伦敦金'}
-        },
-        {
-            "name": "美国混合股票 + COMEX黄金",
-            "stock_type": "us_mixed",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US",
-            "commodities": {'GC': 'COMEX黄金'}
-        },
-        {
-            "name": "美国自定义组合 + COMEX黄金",
-            "stock_type": "us_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US",
-            "commodities": {'GC': 'COMEX黄金'}
-        },
-        {
-            "name": "中国蓝筹股组合 + 上海黄金",
-            "stock_type": "cn_blue_chip",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国科技股组合 + 上海黄金",
-            "stock_type": "cn_tech",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国大消费组合 + 上海黄金",
-            "stock_type": "cn_consumer",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国金融股组合 + 上海黄金",
-            "stock_type": "cn_financial",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国能源与制造业组合 + 上海黄金",
-            "stock_type": "cn_energy",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        # 以下部分是对自定义股票组合设置不同回看时间的配置，以提供不同时间段不同权重下的比较
-        {
-            "name": "中国自定义股票组合 + 上海黄金",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国自定义股票组合 + 上海黄金",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
-        },
-        {
-            "name": "中国自定义股票组合 + 上海黄金",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=100),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN",
-            "commodities": {'Au99.99': '上海黄金'}
+            "commodities": {
+                'XAG': '白银',
+                'GC': 'COMEX黄金',
+                'XAU': '伦敦金',
+                'CL': 'WTI原油',
+                'OIL': '布伦特原油',
+                'NG': '天然气'
+            }
         }
     ]
 
