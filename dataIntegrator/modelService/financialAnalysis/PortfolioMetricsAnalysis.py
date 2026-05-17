@@ -397,6 +397,13 @@ class PortfolioMetricsAnalysis:
                 name = df.iloc[0].get('name', '')
                 enname = df.iloc[0].get('enname', '')
                 
+                # 处理 NaN 值
+                import numpy as np
+                if isinstance(name, float) and np.isnan(name):
+                    name = ''
+                if isinstance(enname, float) and np.isnan(enname):
+                    enname = ''
+                
                 # 按照规范格式：ts_code - name - enname
                 if name and enname:
                     return f"{ts_code} - {name} - {enname}"
@@ -521,28 +528,62 @@ class PortfolioMetricsAnalysis:
         # 获取市场指数的交易日历
         clickhouseService = ClickhouseService()
         
-        # 根据市场类型选择正确的表
+        # 根据市场类型和资产类型选择正确的表
         if self.market_symbol in ['SPY']:
             # 美国市场使用 df_tushare_us_stock_daily 表
             table_name = 'df_tushare_us_stock_daily'
+            date_field = 'date'
+            symbol_field = 'symbol'
+        elif self.market_symbol in ['GC', 'XAG', 'XAU', 'CL', 'OIL', 'NG']:
+            # 美国/国际商品使用 df_akshare_futures_foreign_hist 表
+            table_name = 'df_akshare_futures_foreign_hist'
+            date_field = 'date'
+            symbol_field = 'symbol'
+        elif self.market_symbol == 'Au99.99':
+            # 中国商品使用 df_akshare_spot_hist_sge 表
+            table_name = 'df_akshare_spot_hist_sge'
+            date_field = 'date'
+            symbol_field = None  # 该表没有 symbol 字段
         else:
             # 中国市场使用 df_tushare_cn_index_daily 表
             table_name = 'df_tushare_cn_index_daily'
+            date_field = 'trade_date'
+            symbol_field = 'ts_code'
         
-        sql = f"""
-        SELECT DISTINCT trade_date
-        FROM {table_name}
-        WHERE ts_code = '{self.market_symbol}'
-          AND trade_date >= '{start_date}'
-          AND trade_date <= '{end_date}'
-        ORDER BY trade_date ASC
-        """
+        # 构建 SQL 查询
+        if symbol_field:
+            sql = f"""
+            SELECT DISTINCT {date_field} as trade_date
+            FROM {table_name}
+            WHERE {symbol_field} = '{self.market_symbol}'
+              AND {date_field} >= '{start_date}'
+              AND {date_field} <= '{end_date}'
+            ORDER BY {date_field} ASC
+            """
+        else:
+            # Au99.99 不需要 symbol 过滤
+            sql = f"""
+            SELECT DISTINCT {date_field} as trade_date
+            FROM {table_name}
+            WHERE {date_field} >= '{start_date}'
+              AND {date_field} <= '{end_date}'
+            ORDER BY {date_field} ASC
+            """
         df = clickhouseService.getDataFrameWithoutColumnsName(sql)
         
         if df.empty:
             raise ValueError(f"在 {start_date} 至 {end_date} 期间没有找到交易日")
         
-        dates = df['trade_date'].tolist()
+        # 统一转换为 'YYYYMMDD' 格式
+        dates = []
+        for date_str in df['trade_date'].tolist():
+            # 如果日期格式是 'YYYY-MM-DD'，转换为 'YYYYMMDD'
+            if '-' in str(date_str):
+                date_formatted = str(date_str).replace('-', '')
+            else:
+                date_formatted = str(date_str)
+            dates.append(date_formatted)
+        
         logger.info(f"找到 {len(dates)} 个交易日用于滚动回测")
         
         return dates
@@ -668,6 +709,264 @@ class PortfolioMetricsAnalysis:
             results.append({
                 '股票号': stock,
                 '股票名': stock_name,
+                '均数 (%)': mean_annual * 100,
+                'Skewness': skewness,
+                'Kurtosis': kurtosis,
+                'Sigma (%)': sigma_annual * 100,
+                correlation_col_name: correlation,
+                'Beta': beta,
+                'Treynor Ratio': treynor_ratio,
+                'Sharpe Ratio': sharpe_ratio,
+                'Information Ratio': information_ratio,
+                'SOR Ratio': sortino_ratio,
+                'CML Weight': cml_weight
+            })
+        
+        return pd.DataFrame(results)
+
+    def analyze_stocks_rolling_with_commodities(self, stocks, start_date_fixed=None, end_date_start=None, 
+                                end_date_end=None, window_days=360, risk_free_rate=None,
+                                market_type="CN", market_symbol=None, include_commodities=None):
+        """
+        执行滚动回测分析（支持股票 + 商品混合）
+        
+        参数:
+        - stocks: 股票代码列表
+        - start_date_fixed: 固定的开始日期 (格式: 'YYYYMMDD')，窗口起始点
+        - end_date_start: 滚动结束日期的起点 (格式: 'YYYYMMDD')
+        - end_date_end: 滚动结束日期的终点 (格式: 'YYYYMMDD')，默认为今天
+        - window_days: 回看窗口天数（默认360天）
+        - risk_free_rate: 年化无风险利率（如果为None，则自动获取）
+        - market_type: 市场类型 ('US' 或 'CN')
+        - market_symbol: 市场指数符号
+        - include_commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'}
+        
+        返回:
+        - all_results_df: 包含所有滚动窗口的结果 DataFrame
+        """
+        # 设置默认日期
+        if start_date_fixed is None:
+            start_date_fixed = CommonDataParameters.get_start_date(days=window_days + 360)
+        if end_date_start is None:
+            end_date_start = '20251201'
+        if end_date_end is None:
+            end_date_end = CommonParameters.today
+        
+        # 设置默认市场指数
+        if market_symbol is None:
+            if market_type == "US":
+                market_symbol = "SPY"
+            elif market_type == "CN":
+                market_symbol = "000001.SH"
+            else:
+                raise ValueError(f"不支持的市场类型: {market_type}")
+        
+        # 更新市场指数
+        self.market_symbol = market_symbol
+        
+        logger.info("=" * 80)
+        logger.info("🚀 开始滚动回测分析（支持商品）")
+        logger.info(f"   市场类型: {market_type}")
+        logger.info(f"   市场指数: {market_symbol}")
+        logger.info(f"   固定起始日期: {start_date_fixed}")
+        logger.info(f"   滚动结束日期范围: {end_date_start} 至 {end_date_end}")
+        logger.info(f"   回看窗口: {window_days} 天")
+        logger.info(f"   股票数量: {len(stocks)}")
+        if include_commodities:
+            logger.info(f"   包含商品: {include_commodities}")
+        logger.info("=" * 80)
+        
+        # 生成滚动日期序列（只取交易日）
+        rolling_dates = self._generate_rolling_dates(end_date_start, end_date_end)
+        logger.info(f"滚动窗口数量: {len(rolling_dates)}")
+        
+        all_results = []
+        
+        for idx, current_end_date in enumerate(rolling_dates, 1):
+            # 计算当前窗口的起始日期
+            current_start_date = self._calculate_window_start(current_end_date, window_days)
+            
+            logger.info(f"\n{'='*60}")
+            logger.info(f" 滚动窗口 {idx}/{len(rolling_dates)}")
+            logger.info(f"   窗口范围: {current_start_date} 至 {current_end_date}")
+            logger.info(f"{'='*60}")
+            
+            try:
+                # 执行单次分析（带商品）
+                results_df = self._analyze_single_window_with_commodities(
+                    stocks, current_start_date, current_end_date, risk_free_rate,
+                    market_type, market_symbol, include_commodities
+                )
+                
+                # 添加回测日期列（放在第一列）
+                results_df.insert(0, '回测日期', current_end_date)
+                
+                all_results.append(results_df)
+                
+                logger.info(f"✅ 窗口 {idx} 完成，分析了 {len(results_df)} 个资产")
+                
+            except Exception as e:
+                logger.error(f"❌ 窗口 {idx} ({current_end_date}) 分析失败: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                continue
+        
+        # 合并所有结果
+        if all_results:
+            all_results_df = pd.concat(all_results, ignore_index=True)
+            
+            # 排序：日期正序、Sharpe Ratio 倒序、CML Weight 倒序
+            all_results_df = all_results_df.sort_values(
+                by=['回测日期', 'Sharpe Ratio', 'CML Weight'],
+                ascending=[True, False, False]
+            ).reset_index(drop=True)
+            
+            logger.info(f"\n{'='*80}")
+            logger.info("✅ 滚动回测完成！")
+            logger.info(f"   总窗口数: {len(rolling_dates)}")
+            logger.info(f"   总记录数: {len(all_results_df)}")
+            logger.info(f"{'='*80}")
+            return all_results_df
+        else:
+            raise ValueError("没有成功的滚动窗口分析结果")
+
+    def _analyze_single_window_with_commodities(self, stocks, start_date, end_date, risk_free_rate=None,
+                                                  market_type="CN", market_symbol=None, include_commodities=None):
+        """
+        执行单个窗口的分析（支持股票 + 商品混合）
+        
+        参数:
+        - stocks: 股票列表
+        - start_date: 开始日期
+        - end_date: 结束日期
+        - risk_free_rate: 无风险利率
+        - market_type: 市场类型
+        - market_symbol: 市场指数符号
+        - include_commodities: 商品配置字典
+        
+        返回:
+        - results_df: 分析结果 DataFrame
+        """
+        from dataIntegrator.modelService.financialAnalysis.CMLAnalysis import CMLAnalysis
+        
+        # 获取无风险利率（根据市场类型自动选择）
+        if risk_free_rate is None:
+            riskFreeRateManager = RiskFreeRateManager()
+            interest_country = 'US' if market_type == 'US' else 'CN'
+            risk_free_rate = riskFreeRateManager.get_risk_free_rate(
+                start_date, end_date, interest_country=interest_country
+            )
+        
+        # Step 1: 使用 CMLAnalysis 获取数据（支持商品）
+        cmlAnalysis = CMLAnalysis()
+        dfs = cmlAnalysis.fetch_stock_data(
+            stocks, start_date, end_date, 
+            market_type=market_type, 
+            market_symbol=market_symbol,
+            include_commodities=include_commodities
+        )
+        
+        if not dfs:
+            raise ValueError("未能获取任何资产数据")
+        
+        # Step 2: 过滤共同日期
+        filtered_dfs, common_dates = cmlAnalysis.filter_common_dates(dfs)
+        
+        # Step 3: 检查并去除重复日期索引
+        logger.info("检查并清理重复日期索引...")
+        for asset_key in list(filtered_dfs.keys()):
+            df = filtered_dfs[asset_key]
+            if df.index.duplicated().any():
+                duplicate_count = df.index.duplicated().sum()
+                logger.warning(f"⚠️ {asset_key} 存在 {duplicate_count} 个重复日期，将保留第一条记录")
+                # 保留每个日期的第一条记录
+                filtered_dfs[asset_key] = df[~df.index.duplicated(keep='first')]
+        
+        # Step 4: 计算收益率
+        returns_df = cmlAnalysis.calculate_daily_return(filtered_dfs)
+        
+        # Step 4: 计算 CML 最优权重
+        # 找到 market_symbol 对应的实际列名（可能是格式化后的名称）
+        actual_market_key = None
+        for key in returns_df.columns:
+            if key == market_symbol or key.startswith(f"{market_symbol}-"):
+                actual_market_key = key
+                break
+        
+        if actual_market_key is None:
+            raise ValueError(f"找不到市场指数 {market_symbol} 对应的数据列")
+        
+        market_returns = returns_df[actual_market_key]
+        # 只使用在收益率数据框中存在的资产来计算CML权重
+        available_assets = [asset for asset in list(dfs.keys()) if asset in returns_df.columns]
+        cml_weights = self.calculate_cml_optimal_weights(available_assets, returns_df, risk_free_rate)
+        
+        # Step 5: 计算各项指标
+        results = []
+        
+        for asset_key in list(dfs.keys()):
+            if asset_key not in returns_df.columns:
+                continue
+            
+            asset_returns = returns_df[asset_key]
+            
+            # 基本统计量
+            mean_annual = asset_returns.mean() * self.trading_days
+            skewness = asset_returns.skew()
+            kurtosis = asset_returns.kurtosis()
+            sigma_annual = asset_returns.std() * np.sqrt(self.trading_days)
+            
+            # 与市场的相关系数
+            if asset_key == actual_market_key:
+                correlation = 1.0
+            else:
+                correlation = asset_returns.corr(market_returns)
+                        
+            # Beta 系数
+            if asset_key == actual_market_key:
+                beta = 1.0
+            else:
+                beta = self.calculate_beta(asset_returns, market_returns)
+            
+            # Treynor Ratio
+            if beta != 0 and not np.isnan(beta):
+                treynor_ratio = (mean_annual - risk_free_rate) / beta
+            else:
+                treynor_ratio = np.nan
+            
+            # Sharpe Ratio
+            if sigma_annual != 0:
+                sharpe_ratio = (mean_annual - risk_free_rate) / sigma_annual
+            else:
+                sharpe_ratio = np.nan
+            
+            # Information Ratio
+            tracking_error = self.calculate_tracking_error(asset_returns, market_returns)
+            if tracking_error != 0:
+                excess_return = mean_annual - (market_returns.mean() * self.trading_days)
+                information_ratio = excess_return / tracking_error
+            else:
+                information_ratio = np.nan
+            
+            # Sortino Ratio (SOR)
+            downside_dev = self.calculate_downside_deviation(asset_returns, target_return=0)
+            if downside_dev != 0:
+                sortino_ratio = (mean_annual - risk_free_rate) / downside_dev
+            else:
+                sortino_ratio = np.nan
+            
+            # 获取资产名称（已经是格式化后的名称）
+            asset_name = asset_key
+            
+            # 获取 CML 权重
+            cml_weight = cml_weights.get(asset_key, np.nan) if asset_key in available_assets else np.nan
+            
+            # 根据市场类型确定相关系数列名
+            correlation_col_name = '与SPY相关系数' if market_type == 'US' else '与上证相关系数'
+            
+            results.append({
+                '股票号': asset_key,
+                '股票名': asset_name,
                 '均数 (%)': mean_annual * 100,
                 'Skewness': skewness,
                 'Kurtosis': kurtosis,

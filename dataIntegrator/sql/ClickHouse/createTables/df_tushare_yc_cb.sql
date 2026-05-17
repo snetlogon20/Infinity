@@ -1,3 +1,4 @@
+--国债收益曲线
 --drop table indexsysdb.df_tushare_yc_cb;
 CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_yc_cb
 (

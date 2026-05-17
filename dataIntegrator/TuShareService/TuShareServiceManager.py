@@ -21,6 +21,8 @@ from dataIntegrator.TuShareService.TuShareHKStockDailyService import TuShareHKSt
 from dataIntegrator.TuShareService.TuShareFXOffsoreBasicService import TuShareFXOffsoreBasicService
 from dataIntegrator.TuShareService.TuShareFXDailyService import TuShareFXDailyService
 from dataIntegrator.TuShareService.TuShareSGEDailyService import TuShareSGEDailyService
+from dataIntegrator.TuShareService.TuShareYieldCurveConvertableBondService import TuShareYieldCurveConvertableBondService
+from dataIntegrator.TuShareService.TuShareConvertBondBasicService import TuShareConvertBondBasicService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
@@ -543,7 +545,10 @@ class TuShareServiceManager():
         try:
             logger.info("callTushareUSTreasuryYieldCurveService started...")
 
-            start_date = param_dict.get("start_date")
+            #start_date = param_dict.get("start_date")
+            #债券信息在更新时有数据条数显示，故改成10天内刷新
+            calendarService = CalendarService()
+            start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=10)
             end_date = param_dict.get("end_date")
             csvFilePath = os.path.join(CommonParameters.outBoundPath,"ddf_tushare_us_treasury_yield_cruve_20241201.csv")
 
@@ -559,6 +564,42 @@ class TuShareServiceManager():
 
         except Exception as e:
             job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
+
+    @classmethod
+    def callTuShareConvertBondBasicService(self, param_dict):
+        """
+        刷新可转债基础信息数据
+        参考 TuShareConvertBondBasicServiceTest.refresh_cb_basic
+        由于 cb_basic 是全量数据，不需要日期范围
+        """
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareConvertBondBasicService", param_dict)
+        
+        try:
+            logger.info("callTuShareConvertBondBasicService started...")
+
+            csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_cb_basic.csv")
+
+            tuShareService = TuShareConvertBondBasicService()
+            dataFrame = tuShareService.prepareDataFrame()
+
+            logger.info(f"获取到 {len(dataFrame)} 条可转债基础信息记录")
+
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+
+            # 先删除旧数据，再插入新数据
+            tuShareService.deleteDateFromClickHouse()
+            tuShareService.saveDateToClickHouse()
+
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("✅ 可转债基础信息处理完成")
+            logger.info("callTuShareConvertBondBasicService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            logger.error(f"❌ 可转债基础信息处理失败：{str(e)}")
             raise e
 
     #@classmethod
@@ -589,8 +630,9 @@ class TuShareServiceManager():
                 "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
                 "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
                 "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
-
-                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date}
+                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},
+                # 可转债基础信息（全量数据，不需要日期范围）
+                "callTuShareConvertBondBasicService": {}
             }
 
             # 按顺序调用方法

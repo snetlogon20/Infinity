@@ -42,6 +42,14 @@ REM Run Treynor Ratio Analysis Report
 call "%SCRIPT_DIR%\run_TreynorRatioAnalysisReport.bat"
 echo.
 
+REM Run China Treasury Forward Rate Analysis Report
+call "%SCRIPT_DIR%\run_ChinaTreasuryForwardRateReport.bat"
+echo.
+
+REM Run SHIBOR Forward Rate Analysis Report
+call "%SCRIPT_DIR%\run_ShiborForwardRateReport.bat"
+echo.
+
 echo ========================================
 echo All Reports Execution Completed!
 echo Finished: %date% %time%
