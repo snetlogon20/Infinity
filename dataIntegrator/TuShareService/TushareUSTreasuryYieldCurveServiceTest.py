@@ -19,6 +19,9 @@ class TushareUSTreasuryYieldCurveServiceTest(TuShareService):
         start_date = calenearService.calculate_T_minus_n_days(CommonParameters.today, days=300)
         end_date = CommonParameters.today
 
+        start_date = "20150101"
+        end_date = "20200705"
+
         try:
             csvFilePath = os.path.join(CommonParameters.outBoundPath, rf"df_tushare_US_Treasury_Yield_Curve_{start_date}-{end_date}.csv")
 
@@ -52,7 +55,7 @@ class TushareUSTreasuryYieldCurveServiceTest(TuShareService):
 
 if __name__ == '__main__':
     tushareUSTreasuryYieldCurveServiceTest = TushareUSTreasuryYieldCurveServiceTest()
-    #tushareUSTreasuryYieldCurveServiceTest.refresh_us_treasury_yield_curve()
+    tushareUSTreasuryYieldCurveServiceTest.refresh_us_treasury_yield_curve()
 
-    tushareUSTreasuryYieldCurveServiceTest.get_yield_for_term()
+    # tushareUSTreasuryYieldCurveServiceTest.get_yield_for_term()
 
