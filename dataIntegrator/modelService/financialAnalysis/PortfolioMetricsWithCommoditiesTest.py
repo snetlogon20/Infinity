@@ -265,15 +265,15 @@ if __name__ == "__main__":
     # 配置测试案例（股票 + 商品组合）
     # ========================================
     report_configs = [
-        # {
-        #     "name": "美国科技股 + COMEX黄金",
-        #     "stock_type": "us_tech",
-        #     "start_date": CommonDataParameters.get_start_date(days=720),
-        #     "end_date": CommonParameters.today,
-        #     "interest_country": "US",
-        #     "market_type": "US",
-        #     "commodities": {'GC': 'COMEX黄金'}
-        # },
+        {
+            "name": "美国科技股 + COMEX黄金",
+            "stock_type": "us_tech",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "US",
+            "commodities": {'GC': 'COMEX黄金'}
+        },
         # {
         #     "name": "美国金融股 + 多种国际商品",
         #     "stock_type": "us_finance",
@@ -401,7 +401,7 @@ if __name__ == "__main__":
             "stock_type": "forex_major",
             # "start_date": CommonDataParameters.get_start_date(days=30),
             # "end_date": CommonParameters.today,
-            "start_date": "20180101",
+            "start_date": "20250101",
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "US",
@@ -482,18 +482,10 @@ if __name__ == "__main__":
 
     if all_results:
         logger.info("\n" + "=" * 80)
-        logger.info(" 开始生成投资组合指标综合分析研究报告（含商品资产）")
-        logger.info("=" * 80)
-
-        comprehensive_pdf_path = portfolioMetricsAnalysisReport.generate_comprehensive_pdf(
-            all_results=all_results,
-            report_title="投资组合指标综合分析研究报告（含商品资产）"
-        )
-
-        logger.info(f"\n✅ 综合分析报告生成成功: {comprehensive_pdf_path}")
-        logger.info(f" 包含 {len(all_results)} 个测试案例")
+        logger.info("✅ 投资组合指标分析完成（含商品资产）")
+        logger.info(f"📊 包含 {len(all_results)} 个测试案例")
     else:
-        logger.warning("⚠️ 没有成功的测试案例，无法生成综合报告")
+        logger.warning("⚠️ 没有成功的测试案例")
 
     logger.info("\n" + "=" * 80)
     logger.info(" 所有投资组合指标分析任务完成！")

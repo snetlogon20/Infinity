@@ -532,8 +532,8 @@ class PortfolioMetricsAnalysis:
         if self.market_symbol in ['SPY']:
             # 美国市场使用 df_tushare_us_stock_daily 表
             table_name = 'df_tushare_us_stock_daily'
-            date_field = 'date'
-            symbol_field = 'symbol'
+            date_field = 'trade_date'
+            symbol_field = 'ts_code'
         elif self.market_symbol in ['GC', 'XAG', 'XAU', 'CL', 'OIL', 'NG']:
             # 美国/国际商品使用 df_akshare_futures_foreign_hist 表
             table_name = 'df_akshare_futures_foreign_hist'
@@ -1354,7 +1354,7 @@ class PortfolioMetricsAnalysis:
                 }
                 name_prefix = name_map.get(stock_type, stock_type)
             
-            pdf_filename = f"股票指标Pivot分析_{name_prefix}_{timestamp}.pdf"
+            pdf_filename = f"投资组合指标综合分析研究报告_{name_prefix}_{timestamp}.pdf"
             pdf_filepath = os.path.join(output_dir, pdf_filename)
             
             logger.info(f"\n📄 开始生成 PDF: {pdf_filepath}")
@@ -1469,7 +1469,7 @@ class PortfolioMetricsAnalysis:
     
     def _generate_chart_image(self, pivot_df, metric_col, sheet_name):
         """
-        生成图表图片（内存中的 PNG）
+        生成图表图片（内存中的 PNG）- 在折线图尾部标注股票名称
         
         参数:
         - pivot_df: Pivot 数据 DataFrame
@@ -1480,10 +1480,11 @@ class PortfolioMetricsAnalysis:
         - image_bytes: 图片字节流
         """
         import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
         
         try:
             # 设置中文字体
-            plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+            plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']  # 用来正常显示中文标签
             plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
             
             # 准备数据
@@ -1493,55 +1494,108 @@ class PortfolioMetricsAnalysis:
             if len(numeric_cols) == 0 or len(dates) == 0:
                 return None
             
+            # 转换日期为 datetime 对象
+            date_objects = []
+            for d in dates:
+                date_str = str(d)
+                if len(date_str) == 8:  # 'YYYYMMDD' 格式
+                    date_objects.append(datetime.strptime(date_str, '%Y%m%d'))
+                elif '-' in date_str:  # 'YYYY-MM-DD' 格式
+                    date_objects.append(datetime.strptime(date_str[:10], '%Y-%m-%d'))
+                else:
+                    date_objects.append(datetime.strptime(date_str, '%Y%m%d'))
+            
             # 创建图表
             fig, ax = plt.subplots(figsize=(14, 7))
             
             # 根据指标类型选择图表类型
             if metric_col == 'CML Weight':
                 # CML Weight 使用堆积面积图
-                ax.stackplot(range(len(dates)), 
+                ax.stackplot(date_objects, 
                            [pivot_df[col].fillna(0).values for col in numeric_cols],
                            labels=numeric_cols,
                            alpha=0.7)
             else:
-                # 其他指标使用折线图
+                # 其他指标使用折线图 - 使用 matplotlib 默认颜色循环
                 for col in numeric_cols:
                     values = pivot_df[col].values
-                    ax.plot(range(len(dates)), values, label=col, linewidth=1.5)
+                    ax.plot(date_objects, values, label=col, linewidth=1.5, alpha=0.9)
             
             # 设置标题和标签
             ax.set_title(f"{metric_col} 趋势图", fontsize=14, fontweight='bold')
             ax.set_xlabel('回测日期', fontsize=11)
             ax.set_ylabel(metric_col, fontsize=11)
             
-            # 设置X轴刻度（只显示部分日期标签，包含年份）
-            step = max(1, len(dates) // 10)
-            tick_positions = range(0, len(dates), step)
+            # 优化日期显示：只显示月份，自动调整间隔
+            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
+            ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
             
-            # 格式化日期标签为 'YYYY-MM-DD' 或 'MM-DD' 格式
-            def format_date_label(d):
-                """格式化日期标签，包含年份信息"""
-                date_str = str(d)
-                if len(date_str) == 8:  # 'YYYYMMDD' 格式
-                    return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
-                elif len(date_str) >= 10:  # 'YYYY-MM-DD' 或更长
-                    return date_str[:10]
-                else:  # 其他格式，保持原样
-                    return date_str
+            # 设置标签格式
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
             
-            tick_labels = [format_date_label(d) for d in dates]
-            ax.set_xticks(tick_positions)
-            ax.set_xticklabels([tick_labels[i] if i < len(tick_labels) else '' for i in tick_positions], 
-                             rotation=45, ha='right', fontsize=8)
+            # ========== 在每条线的末端添加股票标签 ==========
+            if len(pivot_df) > 0 and metric_col != 'CML Weight':
+                # 找到最后一个有效数据点的日期
+                last_date = date_objects[-1]
+                
+                # 为每条线添加标签
+                for col in numeric_cols:
+                    last_value = pivot_df[col].iloc[-1]
+                    if pd.notna(last_value):
+                        # 在线的右端添加标签
+                        ax.text(last_date, last_value, f'  {col}', 
+                               fontsize=8, fontweight='normal',
+                               verticalalignment='center',
+                               horizontalalignment='left')
             
-            # 添加图例（右侧）
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8, framealpha=0.9)
+            # ========== 在堆积图的右侧添加股票标签 ==========
+            if len(pivot_df) > 0 and metric_col == 'CML Weight':
+                # 找到最后一个有效数据点的日期
+                last_date = date_objects[-1]
+                
+                # 为每个堆积层添加标签
+                for col_idx, col in enumerate(numeric_cols):
+                    # 计算累积高度(当前层及以下的总和)
+                    cumulative_height = sum([pivot_df[numeric_cols[i]].fillna(0).iloc[-1] 
+                                            for i in range(col_idx + 1)])
+                    
+                    if cumulative_height > 0:
+                        # 在堆积层的右侧添加标签
+                        ax.text(last_date, cumulative_height, f'  {col}', 
+                               fontsize=8, fontweight='normal',
+                               verticalalignment='center',
+                               horizontalalignment='left')
             
             # 添加网格线
             ax.grid(True, linestyle='--', alpha=0.5)
             
-            # 调整布局
-            plt.tight_layout()
+            # ========== 在图表底部添加图例标签（平铺显示） ==========
+            if len(numeric_cols) > 0:
+                # 计算需要的列数（根据资产数量动态调整）
+                num_assets = len(numeric_cols)
+                if num_assets <= 10:
+                    ncol = num_assets  # 资产少时，每行显示所有
+                elif num_assets <= 20:
+                    ncol = 10  # 中等数量，每行10个
+                else:
+                    ncol = 15  # 大量资产，每行15个
+                
+                # 在图表底部添加图例（平铺显示，带颜色线条）
+                ax.legend(loc='upper center', 
+                         bbox_to_anchor=(0.5, -0.15),  # 位置在图表底部
+                         ncol=ncol,  # 列数
+                         fontsize=7,  # 字体大小
+                         markerscale=0.8,  # 标记大小
+                         columnspacing=0.8,  # 列间距
+                         handlelength=1.5,  # 线条长度
+                         handletextpad=0.4,  # 线条和文字间距
+                         framealpha=0.9,  # 透明度
+                         borderaxespad=0.5)  # 边框间距
+            
+            # 调整布局，为底部图例留出足够空间
+            fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
+            plt.tight_layout(rect=[0, 0.12, 1, 1])  # 调整布局，为底部图例留出12%的空间
             
             # 保存到内存缓冲区
             buf = BytesIO()
@@ -1553,6 +1607,8 @@ class PortfolioMetricsAnalysis:
         
         except Exception as e:
             logger.warning(f"图表生成异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def generate_professional_comment(self, metric_col, pivot_df):
