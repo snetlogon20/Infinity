@@ -6,17 +6,17 @@
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
-from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsAnalysisTest import PortfolioMetricsAnalysisTest
+from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsWithCommoditiesTest import PortfolioMetricsWithCommoditiesTest
 from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsAnalysisReport import PortfolioMetricsAnalysisReport
 
 logger = CommonLib.logger
 
 
 class RunPortfolioMetricsAnalysisReport:
-    """投资组合指标分析报告生成器"""
+    """投资组合指标分析报告生成器（支持股票、商品、外汇）"""
 
     def __init__(self):
-        self.portfolioMetricsAnalysisTest = PortfolioMetricsAnalysisTest()
+        self.portfolioMetricsTest = PortfolioMetricsWithCommoditiesTest()
         self.portfolioMetricsAnalysisReport = PortfolioMetricsAnalysisReport()
 
     def generate_report(self, stock_type="cn_blue_chip", start_date=None, end_date=None,
@@ -103,18 +103,10 @@ class RunPortfolioMetricsAnalysisReport:
         # 生成综合报告
         if all_results:
             logger.info("\n" + "=" * 80)
-            logger.info(" 开始生成投资组合指标综合分析研究报告")
-            logger.info("=" * 80)
-
-            comprehensive_pdf_path = self.portfolioMetricsAnalysisReport.generate_comprehensive_pdf(
-                all_results=all_results,
-                report_title="投资组合指标综合分析研究报告"
-            )
-
-            logger.info(f"\n✅ 综合分析报告生成成功: {comprehensive_pdf_path}")
+            logger.info("✅ 投资组合指标分析完成")
             logger.info(f"📊 包含 {len(all_results)} 个测试案例")
         else:
-            logger.warning("⚠️ 没有成功的测试案例，无法生成综合报告")
+            logger.warning("⚠️ 没有成功的测试案例")
 
         logger.info("\n" + "=" * 80)
         logger.info("🎉 所有投资组合指标分析任务完成！")
