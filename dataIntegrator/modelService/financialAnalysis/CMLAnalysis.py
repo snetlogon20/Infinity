@@ -69,7 +69,7 @@ class CMLAnalysis:
         - stocks: 股票代码列表
         - start_date: 开始日期 (格式: 'YYYYMMDD')
         - end_date: 结束日期 (格式: 'YYYYMMDD')
-        - market_type: 市场类型 ['US', 'CN']
+        - market_type: 市场类型 ['US', 'CN', 'GLOBAL']
         - market_symbol: 市场指数符号（用于区分指数和股票）
         - include_commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'}
 
@@ -117,6 +117,11 @@ class CMLAnalysis:
                     for _, row in name_df.iterrows():
                         stock_names[row['ts_code']] = row['enname']
 
+        elif market_type == "GLOBAL":
+            # 全球指数表(df_tushare_index_global)没有name字段，直接使用ts_code
+            logger.info(f"🌍 全球指数数据源不包含名称信息，将使用指数代码作为显示名称")
+            pass
+
         # Step 2: 获取股票数据
         for stock in stocks:
             is_market_index = (stock == market_symbol)
@@ -133,8 +138,16 @@ class CMLAnalysis:
                     sql = self._build_cn_stock_sql(stock, start_date, end_date)
                     display_name = stock
 
+            elif market_type == "GLOBAL":
+                if is_market_index:
+                    sql = self._build_global_index_sql(stock, start_date, end_date)
+                    display_name = stock
+                else:
+                    sql = self._build_global_index_sql(stock, start_date, end_date)
+                    display_name = stock
+
             else:
-                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN']")
+                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN', 'GLOBAL']")
 
             clickhouseService = ClickhouseService()
             df = clickhouseService.getDataFrameWithoutColumnsName(sql)
@@ -150,6 +163,10 @@ class CMLAnalysis:
                     display_name = f"{stock}-{stock_names[stock]}"
 
             if market_type == "US" and not is_market_index:
+                if stock in stock_names and stock_names[stock]:
+                    display_name = f"{stock}-{stock_names[stock]}"
+
+            if market_type == "GLOBAL" and not is_market_index:
                 if stock in stock_names and stock_names[stock]:
                     display_name = f"{stock}-{stock_names[stock]}"
 
@@ -196,6 +213,19 @@ class CMLAnalysis:
             trade_date as trade_date,
             close as close_point
         FROM df_tushare_cn_index_daily
+        WHERE ts_code = '{stock}'
+          AND trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date ASC
+        """
+
+    def _build_global_index_sql(self, stock, start_date, end_date):
+        """构建全球指数查询SQL"""
+        return f"""
+        SELECT
+            trade_date as trade_date,
+            close as close_point
+        FROM df_tushare_index_global
         WHERE ts_code = '{stock}'
           AND trade_date >= '{start_date}'
           AND trade_date <= '{end_date}'
@@ -819,6 +849,8 @@ class CMLAnalysis:
                 market_symbol = "SPY"
             elif market_type == "CN":
                 market_symbol = "000001.SH"
+            elif market_type == "GLOBAL":
+                market_symbol = "HSI.HK"  # 恒生指数作为默认全球基准
             else:
                 raise ValueError(f"不支持的市场类型: {market_type}")
 
