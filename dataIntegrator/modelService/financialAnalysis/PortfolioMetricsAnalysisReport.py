@@ -3,6 +3,8 @@
 """
 import os
 from datetime import datetime
+from io import BytesIO
+
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -10,6 +12,7 @@ from reportlab.lib.units import inch, cm
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import pandas as pd
 
 from dataIntegrator import CommonLib, CommonParameters
 
@@ -964,371 +967,201 @@ class PortfolioMetricsAnalysisReport:
         
         return comment
 
-    def generate_comprehensive_pdf(self, all_results, report_title="投资组合指标综合分析研究报告", output_path=None):
-        """
-        生成综合分析报告，合并所有测试案例并添加专业分析
-
-        参数:
-        - all_results: 所有测试结果列表，每个元素包含 {
-            'name': 案例名称,
-            'market_type': 市场类型,
-            'excel_path': Excel 文件路径,
-            'stock_type': 股票类型,
-            'start_date': 开始日期,
-            'end_date': 结束日期,
-            'total_records': 总记录数,
-            'results_df': 分析结果 DataFrame (可选)
-          }
-        - report_title: 报告标题
-        - output_path: 输出路径
-
-        返回:
-        - pdf_path: PDF 文件路径
-        """
-        if not all_results:
-            logger.warning("⚠️ 没有测试结果，无法生成 PDF")
-            return None
-
-        if output_path is None:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = os.path.join(
-                self.output_dir,
-                f"{report_title}_{timestamp}.pdf"
-            )
-
-        logger.info(f"📄 开始生成 PDF 报告: {output_path}")
-
-        # 创建 PDF 文档（使用横向A4以容纳更多表格内容）
-        doc = SimpleDocTemplate(
-            output_path,
-            pagesize=landscape(A4),
-            rightMargin=1*cm,
-            leftMargin=1*cm,
-            topMargin=1.5*cm,
-            bottomMargin=1*cm
-        )
-
-        # 获取页面宽度
-        page_width = landscape(A4)[0] - 2*cm
-
-        styles = getSampleStyleSheet()
-
-        # 自定义样式
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=22,
-            leading=28,
-            alignment=1,  # 居中
-            fontName=self.reportlab_font,
-            spaceAfter=20,
-            textColor=colors.darkblue
-        )
-
-        heading1_style = ParagraphStyle(
-            'CustomHeading1',
-            parent=styles['Heading1'],
-            fontSize=16,
-            leading=22,
-            fontName=self.reportlab_font,
-            spaceAfter=12,
-            textColor=colors.darkblue
-        )
-
-        heading2_style = ParagraphStyle(
-            'CustomHeading2',
-            parent=styles['Heading2'],
-            fontSize=13,
-            leading=18,
-            fontName=self.reportlab_font,
-            spaceAfter=10,
-            textColor=colors.darkgreen
-        )
-
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=10,
-            leading=14,
-            fontName=self.reportlab_font,
-            spaceAfter=6
-        )
-        
-        # 评论样式
-        comment_style = ParagraphStyle(
-            'CustomComment',
-            parent=styles['Normal'],
-            fontSize=9,
-            leading=13,
-            fontName=self.reportlab_font,
-            spaceAfter=8,
-            textColor=colors.darkslategray,
-            leftIndent=10
-        )
-
-        # 构建PDF内容
-        story = []
-
-        # 标题页
-        story.append(Paragraph(report_title, title_style))
-        story.append(Spacer(1, 0.3*inch))
-        story.append(Paragraph(f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', normal_style))
-        story.append(Paragraph(f'测试案例数量: {len(all_results)}', normal_style))
-        story.append(Spacer(1, 0.5*inch))
-        story.append(PageBreak())
-
-        # 执行摘要
-        story.append(Paragraph('一、执行摘要', heading1_style))
-        summary_text = f"""本报告对 {len(all_results)} 个投资组合进行了全面的指标分析，涵盖多个市场和行业组合。
-通过滚动回测方法，计算了各组合的关键金融指标，包括收益率、波动率、夏普比率、信息比率等。
-报告包含每个组合的详细分析和跨组合的性能对比，为投资决策提供数据支持。"""
-        story.append(Paragraph(summary_text, normal_style))
-        story.append(Spacer(1, 0.3*inch))
-        story.append(PageBreak())
-
-        # 方法论
-        story.append(Paragraph('二、方法论', heading1_style))
-        methodology_text = """本报告采用以下分析方法：
-1. 数据获取：从 ClickHouse 数据库获取历史日线价格数据
-2. 滚动回测：使用滑动窗口方法进行多期回测分析
-3. 指标计算：计算11个关键金融指标（均数、偏度、峰度、标准差、相关系数、Beta、Treynor、Sharpe、Information、SOR、CML Weight）
-4. Pivot分析：将每个指标转换为Pivot表格形式，便于对比分析
-5. 可视化：为每个指标生成趋势折线图
-6. 专业分析：为每个指标提供深入的专业解读和投资建议
-7. 综合评估：跨组合性能对比和投资建议"""
-        story.append(Paragraph(methodology_text, normal_style))
-        story.append(Spacer(1, 0.3*inch))
-        story.append(PageBreak())
-
-        # 逐个案例分析
-        for idx, result in enumerate(all_results, 1):
-            story.append(Paragraph(f'三.{idx}. {result["name"]}', heading1_style))
-
-            # 基本信息
-            info_text = f"""股票类型: {result.get('stock_type', 'N/A')}
-市场类型: {result.get('market_type', 'N/A')}
-分析期间: {result.get('start_date', 'N/A')} 至 {result.get('end_date', 'N/A')}
-记录数量: {result.get('total_records', 'N/A')}"""
-            story.append(Paragraph(info_text, normal_style))
-            story.append(Spacer(1, 0.2*inch))
-
-            # Excel文件信息
-            if 'excel_path' in result:
-                excel_info = f"详细数据: {os.path.basename(result['excel_path'])}"
-                story.append(Paragraph(excel_info, normal_style))
-            
-            story.append(Spacer(1, 0.3*inch))
-            
-            # 如果有 results_df，生成图表和专业分析
-            if 'results_df' in result and result['results_df'] is not None:
-                results_df = result['results_df']
-                
-                # 定义需要生成图表的指标列表
-                pivot_metrics = [
-                    ('均数 (%)', '均数Pivot表'),
-                    ('Skewness', 'Skewness Pivot表'),
-                    ('Kurtosis', 'Kurtosis Pivot表'),
-                    ('Sigma (%)', 'Sigma Pivot表'),
-                    ('与上证相关系数', '相关系数Pivot表'),
-                    ('Beta', 'Beta Pivot表'),
-                    ('Treynor Ratio', 'Treynor Ratio Pivot表'),
-                    ('Sharpe Ratio', 'Sharpe Ratio Pivot表'),
-                    ('Information Ratio', 'Information Ratio Pivot表'),
-                    ('SOR Ratio', 'SOR Ratio Pivot表'),
-                    ('CML Weight', 'CML Weight Pivot表'),
-                ]
-                
-                # 为每个指标生成图表和分析
-                for metric_idx, (metric_col, sheet_name) in enumerate(pivot_metrics, 1):
-                    story.append(Paragraph(f'三.{idx}.{metric_idx}. {sheet_name}', heading2_style))
-                    
-                    try:
-                        # 创建 Pivot 数据
-                        from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsAnalysis import PortfolioMetricsAnalysis
-                        analyzer = PortfolioMetricsAnalysis()
-                        pivot_df = analyzer._create_metric_pivot_table(results_df, metric_col)
-                        
-                        # 数值列保留4位小数
-                        numeric_cols = pivot_df.columns[pivot_df.columns != '回测日期']
-                        for col in numeric_cols:
-                            pivot_df[col] = pivot_df[col].round(4)
-                        
-                        # 生成图表图片
-                        chart_image = self._generate_chart_image(pivot_df, metric_col, sheet_name)
-                        
-                        if chart_image:
-                            # 添加图片
-                            img = Image(chart_image)
-                            img.drawWidth = page_width * 0.95
-                            img.drawHeight = page_width * 0.5
-                            story.append(img)
-                            story.append(Spacer(1, 0.3*cm))
-                            
-                            # 添加专业分析评论
-                            comment = self.generate_professional_comment(metric_col, pivot_df)
-                            comment_html = comment.replace('\n', '<br/>')
-                            story.append(Paragraph(comment_html, comment_style))
-                            story.append(Spacer(1, 0.5*cm))
-                    except Exception as e:
-                        logger.warning(f"   ⚠️ 图表生成失败 {sheet_name}: {e}")
-                        story.append(Paragraph(f"图表生成失败: {str(e)}", normal_style))
-                    
-                    # 分页符（除了最后一个指标）
-                    if metric_idx < len(pivot_metrics):
-                        story.append(PageBreak())
-            
-            story.append(PageBreak())
-
-        # 综合对比分析
-        story.append(Paragraph('四、综合对比分析', heading1_style))
-        
-        # 创建综合对比表格
-        comparison_data = [['组合名称', '股票类型', '市场', '开始日期', '结束日期', '记录数']]
-        
-        for result in all_results:
-            comparison_data.append([
-                result['name'],
-                result.get('stock_type', 'N/A'),
-                result.get('market_type', 'N/A'),
-                result.get('start_date', 'N/A'),
-                result.get('end_date', 'N/A'),
-                str(result.get('total_records', 'N/A'))
-            ])
-        
-        comparison_table = Table(comparison_data, colWidths=[page_width * 0.25, page_width * 0.2, page_width * 0.1, 
-                                                               page_width * 0.15, page_width * 0.15, page_width * 0.15])
-        comparison_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), self.reportlab_font),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTNAME', (0, 1), (-1, -1), self.reportlab_font),
-        ]))
-        
-        story.append(comparison_table)
-        story.append(Spacer(1, 0.3*inch))
-
-        # 结论
-        story.append(Paragraph('五、结论与建议', heading1_style))
-        
-        conclusion_text = """基于本次滚动回测分析的结果，我们得出以下结论：
-
-1. 数据分析质量：所有组合均成功完成滚动回测分析，数据完整性和可靠性得到保证。
-
-2. 指标体系完整性：报告涵盖了11个关键金融指标，提供了全方位的投资组合评估视角。
-
-3. 时间序列分析：通过滚动窗口方法，能够捕捉指标随时间的变化趋势，识别阶段性特征。
-
-4. 跨组合对比：Pivot表格形式使得不同股票在同一指标上的表现可以直观对比。
-
-5. 专业分析深度：每个指标都配有专业的解读和投资建议，帮助投资者更好地理解数据背后的含义。
-
-投资建议：
-• 关注夏普比率较高的组合，这些组合在风险调整后具有更好的收益表现
-• 分析Beta系数，根据市场环境选择进攻型或防御型组合
-• 参考CML权重，构建最优风险收益比的资产配置
-• 定期更新回测数据，动态调整投资策略
-• 结合多个指标进行综合判断，避免单一指标的局限性
-
-注意事项：
-• 历史表现不代表未来收益
-• 建议结合基本面分析进行投资决策
-• 关注市场风险和政策变化
-• 定期重新平衡投资组合
-• 注意交易成本和流动性风险"""
-        
-        story.append(Paragraph(conclusion_text, normal_style))
-        story.append(Spacer(1, 0.3*inch))
-
-        # 构建PDF
-        doc.build(story)
-        
-        logger.info(f"✅ 综合分析报告生成成功: {output_path}")
-        logger.info(f"   包含 {len(all_results)} 个测试案例")
-        
-        return output_path
-    
     def _generate_chart_image(self, pivot_df, metric_col, sheet_name):
         """
-        生成图表图片（内存中的 PNG）
-        
+        生成图表图片（内存中的 PNG）- 在折线图尾部标注股票名称
+
         参数:
         - pivot_df: Pivot 数据 DataFrame
         - metric_col: 指标列名
         - sheet_name: 工作表名称
-        
+
         返回:
         - image_bytes: 图片字节流
         """
         import matplotlib.pyplot as plt
-        
+        import matplotlib.dates as mdates
+
         try:
             # 设置中文字体
-            plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+            plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']  # 用来正常显示中文标签
             plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-            
+
             # 准备数据
             dates = pivot_df['回测日期'].values
             numeric_cols = pivot_df.columns[pivot_df.columns != '回测日期']
-            
+
             if len(numeric_cols) == 0 or len(dates) == 0:
                 return None
-            
+
+            # 转换日期为 datetime 对象
+            date_objects = []
+            for d in dates:
+                date_str = str(d)
+                if len(date_str) == 8:  # 'YYYYMMDD' 格式
+                    date_objects.append(datetime.strptime(date_str, '%Y%m%d'))
+                elif '-' in date_str:  # 'YYYY-MM-DD' 格式
+                    date_objects.append(datetime.strptime(date_str[:10], '%Y-%m-%d'))
+                else:
+                    date_objects.append(datetime.strptime(date_str, '%Y%m%d'))
+
             # 创建图表
             fig, ax = plt.subplots(figsize=(14, 7))
-            
+
             # 根据指标类型选择图表类型
             if metric_col == 'CML Weight':
-                # CML Weight 使用堆积面积图
-                ax.stackplot(range(len(dates)), 
-                           [pivot_df[col].fillna(0).values for col in numeric_cols],
-                           labels=numeric_cols,
-                           alpha=0.7)
+                # CML Weight 使用堆积面积图 - 使用专业的配色方案
+                from matplotlib.colors import ListedColormap
+                
+                # 专业配色方案：温暖的渐变色，避免绿蓝色系
+                professional_colors = [
+                    '#E41A1C',  # 红色
+                    '#377EB8',  # 蓝色
+                    '#4DAF4A',  # 绿色
+                    '#984EA3',  # 紫色
+                    '#FF7F00',  # 橙色
+                    '#A65628',  # 棕色
+                    '#F781BF',  # 粉色
+                    '#999999',  # 灰色
+                    '#66C2A5',  # 青绿色
+                    '#FC8D62',  # 桃红色
+                    '#8DA0CB',  # 浅蓝色
+                    '#E78AC3',  # 浅紫色
+                    '#A6D854',  # 黄绿色
+                    '#FFD92F',  # 黄色
+                    '#E5C494',  # 浅棕色
+                    '#B3B3B3',  # 中灰色
+                ]
+                
+                # 如果资产数量超过预设颜色，循环使用
+                if len(numeric_cols) > len(professional_colors):
+                    professional_colors = professional_colors * (len(numeric_cols) // len(professional_colors) + 1)
+                
+                # 创建堆积面积图
+                stacked_data = ax.stackplot(date_objects, 
+                                          [pivot_df[col].fillna(0).values for col in numeric_cols],
+                                          labels=numeric_cols,
+                                          colors=professional_colors[:len(numeric_cols)],
+                                          alpha=0.85)
             else:
-                # 其他指标使用折线图
+                # 其他指标使用折线图 - 使用 matplotlib 默认颜色循环
                 for col in numeric_cols:
                     values = pivot_df[col].values
-                    ax.plot(range(len(dates)), values, label=col, linewidth=1.5)
-            
+                    ax.plot(date_objects, values, label=col, linewidth=1.5, alpha=0.9)
+
             # 设置标题和标签
             ax.set_title(f"{metric_col} 趋势图", fontsize=14, fontweight='bold')
             ax.set_xlabel('回测日期', fontsize=11)
             ax.set_ylabel(metric_col, fontsize=11)
-            
-            # 设置X轴刻度（只显示部分日期标签）
-            step = max(1, len(dates) // 10)
-            tick_positions = range(0, len(dates), step)
-            tick_labels = [str(d)[4:] if isinstance(d, str) else str(d)[-6:] for d in dates]
-            ax.set_xticks(tick_positions)
-            ax.set_xticklabels([tick_labels[i] if i < len(tick_labels) else '' for i in tick_positions], 
-                             rotation=45, ha='right', fontsize=8)
-            
-            # 添加图例（右侧）
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8, framealpha=0.9)
-            
+
+            # 优化日期显示：只显示月份，自动调整间隔
+            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
+            ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
+
+            # 设置标签格式
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
+
+            # ========== 在每条线的末端添加股票标签 ==========
+            if len(pivot_df) > 0 and metric_col != 'CML Weight':
+                # 找到最后一个有效数据点的日期
+                last_date = date_objects[-1]
+
+                # 为每条线添加标签
+                for col in numeric_cols:
+                    last_value = pivot_df[col].iloc[-1]
+                    if pd.notna(last_value):
+                        # 在线的右端添加标签
+                        ax.text(last_date, last_value, f'  {col}',
+                                fontsize=8, fontweight='normal',
+                                verticalalignment='center',
+                                horizontalalignment='left')
+
+            # ========== 在堆积图的右侧添加股票标签 ==========
+            if len(pivot_df) > 0 and metric_col == 'CML Weight':
+                # 找到最后一个有效数据点的日期
+                last_date = date_objects[-1]
+                
+                # 计算每个资产在最后一个日期的权重
+                final_weights = {}
+                for col_idx, col in enumerate(numeric_cols):
+                    last_weight = pivot_df[col].fillna(0).iloc[-1]
+                    if last_weight > 0:
+                        final_weights[col] = last_weight
+                
+                # 按权重降序排序
+                sorted_weights = sorted(final_weights.items(), key=lambda x: x[1], reverse=True)
+                
+                # 只显示权重 > 5% 的标签，并上下交替布局
+                label_threshold = 0.05  # 5% 阈值
+                for idx, (col, weight) in enumerate(sorted_weights):
+                    if weight >= label_threshold:
+                        # 找到该资产在numeric_cols中的索引
+                        col_idx_in_numeric = numeric_cols.tolist().index(col)
+                        
+                        # 计算累积高度（从下到上）
+                        cumulative_height = sum([pivot_df[numeric_cols[i]].fillna(0).iloc[-1] 
+                                                for i in range(col_idx_in_numeric + 1)])
+                        # 该层的中心位置
+                        y_center = cumulative_height - weight / 2
+                        
+                        # 根据索引决定标签在上方还是下方
+                        if idx % 2 == 0:
+                            y_offset = weight * 0.3  # 向上偏移
+                            va = 'bottom'
+                        else:
+                            y_offset = -weight * 0.3  # 向下偏移
+                            va = 'top'
+                        
+                        # 在堆积层的右侧添加标签
+                        ax.text(last_date, y_center + y_offset, f'{col}', 
+                               fontsize=6, fontweight='normal',
+                               verticalalignment=va,
+                               horizontalalignment='left',
+                               bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='none'))
+
             # 添加网格线
             ax.grid(True, linestyle='--', alpha=0.5)
-            
-            # 调整布局
-            plt.tight_layout()
-            
+
+            # ========== 在图表底部添加图例标签（平铺显示） ==========
+            if len(numeric_cols) > 0:
+                # 计算需要的列数（根据资产数量动态调整）
+                num_assets = len(numeric_cols)
+                if num_assets <= 10:
+                    ncol = num_assets  # 资产少时，每行显示所有
+                elif num_assets <= 20:
+                    ncol = 10  # 中等数量，每行10个
+                else:
+                    ncol = 15  # 大量资产，每行15个
+                
+                # 在图表底部添加图例（平铺显示，带颜色线条）
+                ax.legend(loc='upper center', 
+                         bbox_to_anchor=(0.5, -0.15),  # 位置在图表底部
+                         ncol=ncol,  # 列数
+                         fontsize=7,  # 字体大小
+                         markerscale=0.8,  # 标记大小
+                         columnspacing=0.8,  # 列间距
+                         handlelength=1.5,  # 线条长度
+                         handletextpad=0.4,  # 线条和文字间距
+                         framealpha=0.9,  # 透明度
+                         borderaxespad=0.5)  # 边框间距
+
+            # 调整布局，为底部图例留出足够空间
+            fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
+            plt.tight_layout(rect=[0, 0.12, 1, 1])  # 调整布局，为底部图例留出12%的空间
+
             # 保存到内存缓冲区
-            from io import BytesIO
             buf = BytesIO()
             plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
             buf.seek(0)
             plt.close(fig)
-            
+
             return buf
-        
+
         except Exception as e:
             logger.warning(f"图表生成异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
 

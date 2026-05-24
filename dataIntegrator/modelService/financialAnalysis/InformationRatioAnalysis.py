@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.financialAnalysis.MarketDataService import MarketDataService
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -66,6 +67,7 @@ class InformationRatioAnalysis:
     def __init__(self):
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event="InformationRatioAnalysis started")
+        self.market_data_service = MarketDataService()
 
     def writeLogInfo(self, className="unknown", functionName="unknown", event="unknown"):
         """记录日志信息"""
@@ -128,6 +130,11 @@ class InformationRatioAnalysis:
                     for _, row in name_df.iterrows():
                         stock_names[row['ts_code']] = row['enname']
 
+        elif market_type == "GLOBAL":
+            # 全球指数表(df_tushare_index_global)没有name字段，直接使用ts_code
+            logger.info(f"🌍 全球指数数据源不包含名称信息，将使用指数代码作为显示名称")
+            pass
+
         # Step 2: 获取股票数据
         for stock in stocks:
             is_market_index = (stock == market_symbol)
@@ -144,8 +151,12 @@ class InformationRatioAnalysis:
                     sql = self._build_cn_stock_sql(stock, start_date, end_date)
                     display_name = stock
 
+            elif market_type == "GLOBAL":
+                sql = self._build_global_index_sql(stock, start_date, end_date)
+                display_name = stock
+
             else:
-                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN']")
+                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN', 'GLOBAL']")
 
             clickhouseService = ClickhouseService()
             df = clickhouseService.getDataFrameWithoutColumnsName(sql)
@@ -207,6 +218,19 @@ class InformationRatioAnalysis:
             trade_date as trade_date,
             close as close_point
         FROM df_tushare_cn_index_daily
+        WHERE ts_code = '{stock}'
+          AND trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date ASC
+        """
+
+    def _build_global_index_sql(self, stock, start_date, end_date):
+        """构建全球指数查询SQL"""
+        return f"""
+        SELECT
+            trade_date as trade_date,
+            close as close_point
+        FROM df_tushare_index_global
         WHERE ts_code = '{stock}'
           AND trade_date >= '{start_date}'
           AND trade_date <= '{end_date}'

@@ -28,7 +28,8 @@ class ChinaTreasuryForwardRateCalculator:
     
     def __init__(self, output_dir=None):
         self.clickhouseService = ClickhouseService()
-        self.output_dir = output_dir if output_dir else os.path.join(CommonParameters.outBoundPath, "report", "TreasuryForwardRate")
+        # 使用 CommonParameters 中的路径配置
+        self.output_dir = output_dir if output_dir else os.path.join(CommonParameters.reportPath, "TreasuryForwardRate")
         self.reportlab_font = self._register_chinese_font()
         
         # 期限配置（以年为单位）- 根据国债收益率曲线关键期限节点
@@ -85,12 +86,12 @@ class ChinaTreasuryForwardRateCalculator:
 
         return reportlab_font
     
-    def _generate_forward_rate_pdf(self, chart_paths, forward_rates_df, treasury_df, start_date, end_date, output_path=None):
+    def _generate_forward_rate_pdf(self, chart_images, forward_rates_df, treasury_df, start_date, end_date, output_path=None):
         """
         生成国债远期收益率分析 PDF 报告
         
         参数:
-        - chart_paths: 图表路径列表 [(path, title), ...]
+        - chart_images: 图表对象列表 [(fig, title), ...]
         - forward_rates_df: 远期收益率 DataFrame
         - treasury_df: 原始国债收益率数据 DataFrame
         - start_date: 开始日期
@@ -100,8 +101,8 @@ class ChinaTreasuryForwardRateCalculator:
         返回:
         - pdf_path: PDF 文件路径
         """
-        if not chart_paths:
-            logger.warning("⚠️ 没有图表路径，无法生成 PDF")
+        if not chart_images:
+            logger.warning("⚠️ 没有图表，无法生成 PDF")
             return None
 
         if output_path is None:
@@ -112,6 +113,9 @@ class ChinaTreasuryForwardRateCalculator:
             )
 
         logger.info(f"📄 开始生成 PDF 报告: {output_path}")
+        
+        # 确保输出目录存在
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         doc = SimpleDocTemplate(
             output_path,
@@ -220,15 +224,22 @@ class ChinaTreasuryForwardRateCalculator:
         # 图表展示
         story.append(Paragraph('三、图表分析', heading1_style))
         
-        for idx, (chart_path, chart_title) in enumerate(chart_paths, 1):
-            if not os.path.exists(chart_path):
-                logger.warning(f"⚠️ 图表文件不存在，跳过: {chart_path}")
-                continue
-
+        from io import BytesIO
+        
+        for idx, (fig, chart_title) in enumerate(chart_images, 1):
             story.append(Paragraph(f'三.{idx}. {chart_title}', heading2_style))
-            img = Image(chart_path, width=page_width, height=page_width * 0.6)
+            
+            # 将 matplotlib figure 转换为图片
+            buf = BytesIO()
+            fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            
+            img = Image(buf, width=page_width, height=page_width * 0.6)
             story.append(img)
             story.append(Spacer(1, 0.3 * inch))
+            
+            # 关闭 figure 释放内存
+            plt.close(fig)
 
             # 为不同图表添加专业解析
             if idx == 1:
@@ -265,7 +276,7 @@ class ChinaTreasuryForwardRateCalculator:
 • 期限利差收窄：市场趋于稳定"""
                 story.append(Paragraph(analysis_text, normal_style))
 
-            if idx < len(chart_paths):
+            if idx < len(chart_images):
                 story.append(PageBreak())
 
         # 统计分析
@@ -489,300 +500,6 @@ class ChinaTreasuryForwardRateCalculator:
         logger.info(f"远期收益率计算完成，共 {len(forward_rates_df.columns) - 1} 个期限组合")
         return forward_rates_df
     
-    def plot_spot_rates(self, spot_df, save_path=None, figsize=(14, 8)):
-        """
-        绘制即期收益率曲线
-        
-        参数:
-        - spot_df: 即期收益率DataFrame
-        - save_path: 保存路径（如果为None，则显示图形）
-        - figsize: 图形大小
-        """
-        logger.info("开始绘制即期收益率曲线...")
-        
-        import matplotlib.dates as mdates
-        
-        # 设置中文字体
-        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 获取即期收益率列
-        spot_columns = [col for col in spot_df.columns if col.startswith('Y_')]
-        
-        if not spot_columns:
-            raise ValueError("没有即期收益率数据可供绘制")
-        
-        # 转换日期为 datetime 对象（创建副本避免修改原始数据）
-        spot_df_copy = spot_df.copy()
-        spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
-        
-        fig, ax = plt.subplots(figsize=figsize)
-        
-        # 使用 viridis 颜色映射，与远期收益率图表保持一致
-        spot_colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(spot_columns)))
-        
-        for idx, col in enumerate(spot_columns):
-            # 从列名中提取期限名称
-            tenor_name = col.replace('Y_', '')
-            label = f"Y({tenor_name})"
-            ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
-                   linewidth=1.5, label=label, color=spot_colors[idx], alpha=0.9)
-        
-        # 设置图形属性
-        ax.set_xlabel('交易日期', fontsize=12)
-        ax.set_ylabel('收益率 (%)', fontsize=12)
-        ax.set_title('中国国债即期收益率历史走势', fontsize=14, fontweight='bold')
-        
-        # 添加图例（分两列显示）
-        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
-        ax.grid(True, alpha=0.3)
-        
-        # 优化日期显示：只显示月份，自动调整间隔
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
-        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
-        
-        # 设置标签格式
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
-        
-        # ========== 在每条线的末端添加清晰标注 ==========
-        if len(spot_df_copy) > 0:
-            # 找到最后一个有效数据点的日期
-            last_date = spot_df_copy['trade_date_dt'].iloc[-1]
-            
-            # 即期收益率标注
-            spot_labels = []
-            for idx, col in enumerate(spot_columns):
-                # 获取最后一行的值
-                last_value = spot_df_copy[col].iloc[-1]
-                if pd.notna(last_value):
-                    spot_labels.append((col.replace('Y_', ''), last_value, spot_colors[idx]))
-            
-            # 按数值从大到小排序，从上到下标注
-            spot_labels.sort(key=lambda x: x[1], reverse=True)
-            
-            # 添加即期收益率标注
-            for idx, (label, value, color) in enumerate(spot_labels):
-                # 标注位置：直接在最后数据点处
-                x_label_pos = last_date
-                # y轴位置：使用实际数据值
-                y_label_pos = value
-                
-                # 添加标注文字（去掉边框，紧贴线条）
-                ax.text(x_label_pos, y_label_pos, f'  Y({label})', 
-                       fontsize=9, fontweight='bold', color=color,
-                       verticalalignment='center',
-                       horizontalalignment='left')
-        
-        # 调整布局，右侧留出标注空间
-        fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
-        plt.tight_layout()
-        # 调整右侧边距，为标注留出空间
-        fig.subplots_adjust(right=0.85)
-        
-        # 保存或显示
-        if save_path:
-            # 确保目录存在
-            os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"国债即期收益率曲线已保存至: {save_path}")
-        else:
-            plt.show()
-        
-        plt.close()
-    
-    def plot_forward_rates(self, forward_rates_df, original_spot_df=None, save_path=None, figsize=(14, 8)):
-        """
-        绘制远期收益率曲线（同时显示即期收益率作为对比）
-        
-        参数:
-        - forward_rates_df: 远期收益率DataFrame
-        - original_spot_df: 原始即期收益率DataFrame（可选）
-        - save_path: 保存路径（如果为None，则显示图形）
-        - figsize: 图形大小
-        """
-        logger.info("开始绘制远期收益率曲线...")
-        
-        import matplotlib.dates as mdates
-        
-        # 设置中文字体
-        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 获取远期收益率列
-        forward_columns = [col for col in forward_rates_df.columns if col.startswith('F(')]
-        
-        if not forward_columns:
-            raise ValueError("没有远期收益率数据可供绘制")
-        
-        # 转换日期为 datetime 对象（创建副本避免修改原始数据）
-        forward_df_copy = forward_rates_df.copy()
-        forward_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in forward_df_copy['trade_date']]
-        
-        spot_df_copy = None
-        if original_spot_df is not None:
-            spot_df_copy = original_spot_df.copy()
-            spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
-        
-        fig, ax = plt.subplots(figsize=figsize)
-        
-        # 绘制即期收益率曲线（如果提供）
-        if spot_df_copy is not None:
-            spot_columns = [col for col in spot_df_copy.columns if col.startswith('Y_')]
-            
-            # 使用虚线、较细线宽、半透明来区分即期收益率
-            spot_styles = [
-                {'linestyle': '--', 'linewidth': 1.0, 'alpha': 0.5, 'marker': 's', 'markersize': 3},
-                {'linestyle': '-.', 'linewidth': 1.0, 'alpha': 0.5, 'marker': 'd', 'markersize': 3},
-                {'linestyle': ':', 'linewidth': 1.0, 'alpha': 0.5, 'marker': '^', 'markersize': 3},
-            ]
-            
-            for idx, col in enumerate(spot_columns):
-                style = spot_styles[idx % len(spot_styles)]
-                # 从列名中提取期限名称
-                tenor_name = col.replace('Y_', '')
-                label = f"即期 {tenor_name}"
-                ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
-                       label=label, color='gray', **style)
-        
-        # 绘制远期收益率曲线（使用实线、较粗线宽、高对比度颜色）
-        forward_colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(forward_columns)))
-        
-        for idx, col in enumerate(forward_columns):
-            # 数据点太多，不显示标记点，只画连续曲线
-            ax.plot(forward_df_copy['trade_date_dt'], forward_df_copy[col], 
-                   linewidth=2.0, label=col, color=forward_colors[idx], alpha=0.9)
-        
-        # 设置图形属性
-        ax.set_xlabel('交易日期', fontsize=12)
-        ax.set_ylabel('收益率 (%)', fontsize=12)
-        ax.set_title('中国国债远期收益率 vs 即期收益率对比曲线', fontsize=14, fontweight='bold')
-        
-        # 添加图例（分两列显示）
-        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
-        ax.grid(True, alpha=0.3)
-        
-        # 优化日期显示：只显示月份，自动调整间隔
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))  # 每2个月显示一次
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # 格式：YYYY-MM
-        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))  # 每月小刻度
-        
-        # 设置标签格式
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
-        
-        # ========== 在每条线的末端添加清晰标注 ==========
-        # 在最右侧添加标注（远期收益率）
-        if len(forward_df_copy) > 0:
-            # 找到最后一个有效数据点的日期
-            last_date = forward_df_copy['trade_date_dt'].iloc[-1]
-            
-            # 远期收益率标注（从右到左，避免重叠）
-            forward_labels = []
-            for idx, col in enumerate(forward_columns):
-                # 获取最后一行的值
-                last_value = forward_df_copy[col].iloc[-1]
-                if pd.notna(last_value):
-                    forward_labels.append((col, last_value, forward_colors[idx]))
-            
-            # 按数值从大到小排序，从上到下标注
-            forward_labels.sort(key=lambda x: x[1], reverse=True)
-            
-            # 添加远期收益率标注 - 紧贴线条末端
-            for idx, (label, value, color) in enumerate(forward_labels):
-                # 标注位置：直接在最后数据点处
-                x_label_pos = last_date
-                # y轴位置：使用实际数据值
-                y_label_pos = value
-                
-                # 添加标注文字（去掉边框，紧贴线条）
-                ax.text(x_label_pos, y_label_pos, f'  {label}', 
-                       fontsize=9, fontweight='bold', color=color,
-                       verticalalignment='center',
-                       horizontalalignment='left')
-        
-        # 调整布局，右侧留出标注空间
-        fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
-        plt.tight_layout()
-        # 调整右侧边距，为标注留出空间
-        fig.subplots_adjust(right=0.85)
-        
-        # 保存或显示
-        if save_path:
-            # 确保目录存在
-            os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"国债远期收益率曲线已保存至: {save_path}")
-        else:
-            plt.show()
-        
-        plt.close()
-        
-    def plot_latest_forward_curve(self, forward_rates_df, save_path=None, figsize=(12, 6)):
-        """
-        绘制最新日期的远期收益率曲线（横轴为期限，纵轴为收益率）
-        
-        参数:
-        - forward_rates_df: 远期收益率DataFrame
-        - save_path: 保存路径
-        - figsize: 图形大小
-        """
-        logger.info("绘制最新远期收益率曲线...")
-        
-        # 设置中文字体
-        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
-        plt.rcParams['axes.unicode_minus'] = False
-        
-        # 获取最新日期的数据
-        latest_date = forward_rates_df['trade_date'].iloc[-1]
-        latest_data = forward_rates_df.iloc[-1]
-        
-        # 提取远期收益率数据
-        forward_columns = [col for col in forward_rates_df.columns if col.startswith('F(')]
-        
-        # 解析期限组合，用于横轴
-        periods = []
-        rates = []
-        
-        for col in forward_columns:
-            # 从列名中提取期限信息 F(1Y,2Y) -> 1Y-2Y
-            period_label = col.replace('F(', '').replace(')', '').replace(',', '-')
-            periods.append(period_label)
-            rates.append(latest_data[col])
-        
-        fig, ax = plt.subplots(figsize=figsize)
-        
-        # 绘制折线图和柱状图
-        x = range(len(periods))
-        ax.plot(x, rates, 'o-', linewidth=2, markersize=8, color='b', label='远期收益率')
-        ax.bar(x, rates, alpha=0.3, color='skyblue', label='收益率柱状图')
-        
-        # 设置x轴标签
-        ax.set_xticks(x)
-        ax.set_xticklabels(periods, rotation=45, ha='right')
-        
-        # 设置图形属性
-        ax.set_xlabel('期限组合', fontsize=12)
-        ax.set_ylabel('远期收益率 (%)', fontsize=12)
-        ax.set_title(f'中国国债远期收益率曲线 ({latest_date})', fontsize=14, fontweight='bold')
-        ax.legend(loc='best', fontsize=10)
-        ax.grid(True, alpha=0.3)
-        
-        # 添加数值标签
-        for i, rate in enumerate(rates):
-            ax.text(i, rate + 0.05, f'{rate:.3f}%', ha='center', va='bottom', fontsize=9)
-        
-        plt.tight_layout()
-        
-        # 保存或显示
-        if save_path:
-            os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"最新国债远期收益率曲线已保存至: {save_path}")
-        else:
-            plt.show()
-        
-        plt.close()
-    
     def run(self, start_date=None, end_date=None, output_dir=None):
         """
         运行完整分析流程
@@ -810,31 +527,34 @@ class ChinaTreasuryForwardRateCalculator:
         # 生成时间戳
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        # 4. 绘制即期收益率时间序列图
-        spot_only_path = os.path.join(output_dir, f'treasury_spot_rates_{timestamp}.png')
-        self.plot_spot_rates(treasury_df, save_path=spot_only_path)
+        # 4. 生成图表（仅用于PDF报告，不保存为单独文件）
+        logger.info("📊 开始生成图表...")
         
-        # 4.1 绘制纯远期收益率时间序列图（不包含即期收益率）
-        forward_only_path = os.path.join(output_dir, f'treasury_forward_rates_{timestamp}.png')
-        self.plot_forward_rates(forward_rates_df, original_spot_df=None, save_path=forward_only_path)
+        # 创建临时图表用于PDF报告
+        import matplotlib.pyplot as plt
+        from io import BytesIO
         
-        # 4.2 绘制时间序列图（包含即期收益率对比）
-        time_series_path = os.path.join(output_dir, f'treasury_forward_rates_timeseries_{timestamp}.png')
-        self.plot_forward_rates(forward_rates_df, original_spot_df=treasury_df, save_path=time_series_path)
+        chart_images = []
         
-        # 5. 绘制最新远期收益率曲线
-        latest_curve_path = os.path.join(output_dir, f'treasury_forward_rates_latest_{timestamp}.png')
-        self.plot_latest_forward_curve(forward_rates_df, save_path=latest_curve_path)
+        # 4.1 即期收益率图表
+        logger.info("生成即期收益率图表...")
+        spot_fig = self._create_spot_rates_chart(treasury_df)
+        chart_images.append((spot_fig, '国债即期收益率历史走势'))
         
-        # 6. 生成 PDF 报告
-        logger.info("📊 开始生成 PDF 报告...")
-        chart_paths = [
-            (spot_only_path, '国债即期收益率历史走势'),
-            (forward_only_path, '国债远期收益率历史走势'),
-            (time_series_path, '国债远期收益率与即期收益率历史对比走势'),
-        ]
+        # 4.2 远期收益率图表（纯远期）
+        logger.info("生成远期收益率图表...")
+        forward_fig = self._create_forward_rates_chart(forward_rates_df, original_spot_df=None)
+        chart_images.append((forward_fig, '国债远期收益率历史走势'))
+        
+        # 4.3 远期与即期对比图表
+        logger.info("生成远期与即期对比图表...")
+        comparison_fig = self._create_forward_rates_chart(forward_rates_df, original_spot_df=treasury_df)
+        chart_images.append((comparison_fig, '国债远期收益率与即期收益率历史对比走势'))
+        
+        # 5. 生成 PDF 报告（直接传入图表对象）
+        logger.info("📄 开始生成 PDF 报告...")
         pdf_path = self._generate_forward_rate_pdf(
-            chart_paths=chart_paths,
+            chart_images=chart_images,
             forward_rates_df=forward_rates_df,
             treasury_df=treasury_df,
             start_date=start_date,
@@ -843,32 +563,166 @@ class ChinaTreasuryForwardRateCalculator:
         if pdf_path:
             logger.info(f"✅ PDF 报告已生成: {pdf_path}")
         
-        # 7. 保存数据到CSV（包含即期收益率和远期收益率）
-        csv_path = os.path.join(output_dir, f'treasury_forward_rates_{timestamp}.csv')
-        
-        # 合并即期收益率和远期收益率数据
-        combined_df = pd.merge(
-            treasury_df,
-            forward_rates_df,
-            on='trade_date',
-            how='left'
-        )
-        
-        # 重新排列列顺序：日期、即期收益率、远期收益率
-        spot_columns = [col for col in combined_df.columns if col.startswith('Y_')]
-        forward_columns = [col for col in combined_df.columns if col.startswith('F(')]
-        ordered_columns = ['trade_date'] + spot_columns + forward_columns
-        combined_df = combined_df[ordered_columns]
-        
-        combined_df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-        logger.info(f"国债远期收益率和即期收益率数据已保存至: {csv_path}")
-        
         logger.info("=" * 80)
         logger.info("✅ 中国国债远期收益率分析完成")
-        logger.info(f" 输出目录: {output_dir}")
+        logger.info(f"📁 输出目录: {output_dir}")
         logger.info("=" * 80)
         
         return forward_rates_df
+    
+    def _create_spot_rates_chart(self, spot_df, figsize=(14, 8)):
+        """
+        创建即期收益率图表（返回 Figure 对象，不保存）
+        """
+        import matplotlib.dates as mdates
+        
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 获取即期收益率列
+        spot_columns = [col for col in spot_df.columns if col.startswith('Y_')]
+        
+        if not spot_columns:
+            raise ValueError("没有即期收益率数据可供绘制")
+        
+        # 转换日期为 datetime 对象
+        spot_df_copy = spot_df.copy()
+        spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 使用专业配色方案
+        professional_colors = [
+            '#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00',
+            '#A65628', '#F781BF', '#999999', '#66C2A5', '#FC8D62',
+            '#8DA0CB', '#E78AC3', '#A6D854', '#FFD92F', '#E5C494'
+        ]
+        # 如果即期收益率列超过预设颜色数量，循环使用
+        if len(spot_columns) > len(professional_colors):
+            spot_colors = professional_colors * (len(spot_columns) // len(professional_colors) + 1)
+        else:
+            spot_colors = professional_colors[:len(spot_columns)]
+        
+        for idx, col in enumerate(spot_columns):
+            tenor_name = col.replace('Y_', '')
+            label = f"Y({tenor_name})"
+            ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
+                   linewidth=1.5, label=label, color=spot_colors[idx], alpha=0.9)
+        
+        ax.set_xlabel('交易日期', fontsize=12)
+        ax.set_ylabel('收益率 (%)', fontsize=12)
+        ax.set_title('中国国债即期收益率历史走势', fontsize=14, fontweight='bold')
+        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
+        ax.grid(True, alpha=0.3)
+        
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
+        
+        if len(spot_df_copy) > 0:
+            last_date = spot_df_copy['trade_date_dt'].iloc[-1]
+            spot_labels = []
+            for idx, col in enumerate(spot_columns):
+                last_value = spot_df_copy[col].iloc[-1]
+                if pd.notna(last_value):
+                    spot_labels.append((col.replace('Y_', ''), last_value, spot_colors[idx]))
+            spot_labels.sort(key=lambda x: x[1], reverse=True)
+            for idx, (label, value, color) in enumerate(spot_labels):
+                ax.text(last_date, value, f'  Y({label})', 
+                       fontsize=9, fontweight='bold', color=color,
+                       verticalalignment='center', horizontalalignment='left')
+        
+        fig.autofmt_xdate(bottom=0.2)
+        plt.tight_layout()
+        fig.subplots_adjust(right=0.85)
+        
+        return fig
+    
+    def _create_forward_rates_chart(self, forward_rates_df, original_spot_df=None, figsize=(14, 8)):
+        """
+        创建远期收益率图表（返回 Figure 对象，不保存）
+        """
+        import matplotlib.dates as mdates
+        
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        forward_columns = [col for col in forward_rates_df.columns if col.startswith('F(')]
+        
+        if not forward_columns:
+            raise ValueError("没有远期收益率数据可供绘制")
+        
+        forward_df_copy = forward_rates_df.copy()
+        forward_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in forward_df_copy['trade_date']]
+        
+        spot_df_copy = None
+        if original_spot_df is not None:
+            spot_df_copy = original_spot_df.copy()
+            spot_df_copy['trade_date_dt'] = [datetime.strptime(str(d), '%Y%m%d') for d in spot_df_copy['trade_date']]
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        
+        if spot_df_copy is not None:
+            spot_columns = [col for col in spot_df_copy.columns if col.startswith('Y_')]
+            spot_styles = [
+                {'linestyle': '--', 'linewidth': 1.0, 'alpha': 0.5, 'marker': 's', 'markersize': 3},
+                {'linestyle': '-.', 'linewidth': 1.0, 'alpha': 0.5, 'marker': 'd', 'markersize': 3},
+                {'linestyle': ':', 'linewidth': 1.0, 'alpha': 0.5, 'marker': '^', 'markersize': 3},
+            ]
+            for idx, col in enumerate(spot_columns):
+                style = spot_styles[idx % len(spot_styles)]
+                tenor_name = col.replace('Y_', '')
+                label = f"即期 {tenor_name}"
+                ax.plot(spot_df_copy['trade_date_dt'], spot_df_copy[col], 
+                       label=label, color='gray', **style)
+        
+        professional_colors = [
+            '#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00',
+            '#A65628', '#F781BF', '#999999', '#66C2A5', '#FC8D62',
+            '#8DA0CB', '#E78AC3', '#A6D854', '#FFD92F', '#E5C494'
+        ]
+        # 如果远期收益率列超过预设颜色数量，循环使用
+        if len(forward_columns) > len(professional_colors):
+            forward_colors = professional_colors * (len(forward_columns) // len(professional_colors) + 1)
+        else:
+            forward_colors = professional_colors[:len(forward_columns)]
+        
+        for idx, col in enumerate(forward_columns):
+            ax.plot(forward_df_copy['trade_date_dt'], forward_df_copy[col], 
+                   linewidth=2.0, label=col, color=forward_colors[idx], alpha=0.9)
+        
+        ax.set_xlabel('交易日期', fontsize=12)
+        ax.set_ylabel('收益率 (%)', fontsize=12)
+        title = '中国国债远期收益率 vs 即期收益率对比曲线' if spot_df_copy is not None else '中国国债远期收益率历史走势'
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.legend(loc='upper left', fontsize=9, ncol=2, framealpha=0.9)
+        ax.grid(True, alpha=0.3)
+        
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
+        
+        if len(forward_df_copy) > 0:
+            last_date = forward_df_copy['trade_date_dt'].iloc[-1]
+            forward_labels = []
+            for idx, col in enumerate(forward_columns):
+                last_value = forward_df_copy[col].iloc[-1]
+                if pd.notna(last_value):
+                    forward_labels.append((col, last_value, forward_colors[idx]))
+            forward_labels.sort(key=lambda x: x[1], reverse=True)
+            for idx, (label, value, color) in enumerate(forward_labels):
+                ax.text(last_date, value, f'  {label}', 
+                       fontsize=9, fontweight='bold', color=color,
+                       verticalalignment='center', horizontalalignment='left')
+        
+        fig.autofmt_xdate(bottom=0.2)
+        plt.tight_layout()
+        fig.subplots_adjust(right=0.85)
+        
+        return fig
 
 
 if __name__ == '__main__':
