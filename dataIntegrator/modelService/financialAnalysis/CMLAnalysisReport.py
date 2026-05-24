@@ -419,19 +419,23 @@ class CMLAnalysisReport:
 
         us_results = [r for r in all_results if r.get('market_type') == 'US']
         cn_results = [r for r in all_results if r.get('market_type') == 'CN']
+        global_results = [r for r in all_results if r.get('market_type') == 'GLOBAL']
 
         comparison_text = f"""美股组合数量: {len(us_results)}
 A 股组合数量: {len(cn_results)}
+全球指数组合数量: {len(global_results)}
 
 市场特征对比：
 • 美股市场：资产类别丰富，市场成熟度高，波动性相对较低
 • A 股市场：成长性较强，政策影响显著，波动性相对较高
+• 全球市场：涵盖主要经济体，分散地域风险，反映全球经济格局
 
 跨市场配置建议：
 • 建议采用全球化资产配置策略，分散单一市场风险
-• 可考虑美股稳定资产 + A 股成长资产的组合配置
+• 可考虑美股稳定资产 + A 股成长资产 + 全球指数的组合配置
 • 关注汇率风险，适当使用对冲工具
 • 根据不同市场的经济周期调整配置比例
+• 全球指数可作为基准参考，评估区域市场表现
 """
         story.append(Paragraph(comparison_text, normal_style))
         story.append(Spacer(1, 0.3 * inch))

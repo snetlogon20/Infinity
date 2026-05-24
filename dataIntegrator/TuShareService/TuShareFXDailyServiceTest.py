@@ -23,8 +23,8 @@ class TuShareFXDailyServiceTest(TuShareService):
         # start_date = '20231028'
         # end_date = '20231028'
 
-        start_date = '20260101'
-        end_date = CommonParameters.today
+        start_date = '20180101'
+        end_date = 20200101
 
         calendar = CalendarService()
         #date_range = self.generate_date_range(start_date, end_date)

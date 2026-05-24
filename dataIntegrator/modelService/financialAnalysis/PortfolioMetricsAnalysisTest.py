@@ -224,222 +224,94 @@ if __name__ == "__main__":
             "interest_country": "US",
             "market_type": "US"
         },
-        {
-            "name": "美国科技股",
-            "stock_type": "us_tech",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国科技股",
-            "stock_type": "us_tech",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国金融股",
-            "stock_type": "us_finance",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国金融股",
-            "stock_type": "us_finance",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国金融股",
-            "stock_type": "us_finance",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国混合股票",
-            "stock_type": "us_mixed",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国混合股票",
-            "stock_type": "us_mixed",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国混合股票",
-            "stock_type": "us_mixed",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "美国自定义组合",
-            "stock_type": "us_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
-        {
-            "name": "中国蓝筹股组合",
-            "stock_type": "cn_blue_chip",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国蓝筹股组合",
-            "stock_type": "cn_blue_chip",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国蓝筹股组合",
-            "stock_type": "cn_blue_chip",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国科技股组合",
-            "stock_type": "cn_tech",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国科技股组合",
-            "stock_type": "cn_tech",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国科技股组合",
-            "stock_type": "cn_tech",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国大消费组合",
-            "stock_type": "cn_consumer",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国大消费组合",
-            "stock_type": "cn_consumer",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国大消费组合",
-            "stock_type": "cn_consumer",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国金融股组合",
-            "stock_type": "cn_financial",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国金融股组合",
-            "stock_type": "cn_financial",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国金融股组合",
-            "stock_type": "cn_financial",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国能源与制造业组合",
-            "stock_type": "cn_energy",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国能源与制造业组合",
-            "stock_type": "cn_energy",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国能源与制造业组合",
-            "stock_type": "cn_energy",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国自定义股票组合",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国自定义股票组合",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        },
-        {
-            "name": "中国自定义股票组合",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=60),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN",
-            "market_type": "CN"
-        }
+        # {
+        #     "name": "美国科技股",
+        #     "stock_type": "us_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=360),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
+        # {
+        #     "name": "美国科技股",
+        #     "stock_type": "us_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=60),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
+        # {
+        #     "name": "美国金融股",
+        #     "stock_type": "us_finance",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
+        # {
+        #     "name": "美国混合股票",
+        #     "stock_type": "us_mixed",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
+        # {
+        #     "name": "美国自定义组合",
+        #     "stock_type": "us_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=360),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
+        # {
+        #     "name": "中国蓝筹股组合",
+        #     "stock_type": "cn_blue_chip",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
+        # {
+        #     "name": "中国科技股组合",
+        #     "stock_type": "cn_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
+        # {
+        #     "name": "中国大消费组合",
+        #     "stock_type": "cn_consumer",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
+        # {
+        #     "name": "中国金融股组合",
+        #     "stock_type": "cn_financial",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
+        # {
+        #     "name": "中国能源与制造业组合",
+        #     "stock_type": "cn_energy",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
+        # {
+        #     "name": "中国自定义股票组合",
+        #     "stock_type": "cn_custom",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "CN",
+        #     "market_type": "CN"
+        # },
     ]
 
     all_results = []
@@ -501,18 +373,10 @@ if __name__ == "__main__":
 
     if all_results:
         logger.info("\n" + "=" * 80)
-        logger.info(" 开始生成投资组合指标综合分析研究报告")
-        logger.info("=" * 80)
-
-        comprehensive_pdf_path = portfolioMetricsAnalysisReport.generate_comprehensive_pdf(
-            all_results=all_results,
-            report_title="投资组合指标综合分析研究报告"
-        )
-
-        logger.info(f"\n✅ 综合分析报告生成成功: {comprehensive_pdf_path}")
-        logger.info(f" 包含 {len(all_results)} 个测试案例")
+        logger.info("✅ 投资组合指标分析完成")
+        logger.info(f"📊 包含 {len(all_results)} 个测试案例")
     else:
-        logger.warning("️ 没有成功的测试案例，无法生成综合报告")
+        logger.warning("⚠️ 没有成功的测试案例")
 
     logger.info("\n" + "=" * 80)
     logger.info(" 所有投资组合指标分析任务完成！")

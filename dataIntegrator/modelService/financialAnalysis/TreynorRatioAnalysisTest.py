@@ -141,11 +141,39 @@ class TreynorRatioAnalysisTest:
             market_type = "CN"
             market_symbol = "000001.SH"
 
+        # 全球指数组合
+        elif asset_type == "global_major":
+            assets = [
+                'HSI', 'N225', 'KS11', 'STI', 'AS51',
+                'SENSEX', 'FTSE', 'GDAXI', 'FCHI', 'SPX',
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
+        elif asset_type == "global_asia":
+            assets = [
+                'HSI', 'N225', 'KS11', 'STI', 'AS51',
+                'SENSEX', 'TWII', 'XIN9',
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
+        elif asset_type == "global_europe":
+            assets = ['FTSE', 'GDAXI', 'FCHI', 'HKAH', 'CKLSE']
+            market_type = "GLOBAL"
+            market_symbol = "FTSE"
+
+        elif asset_type == "global_custom":
+            assets = ['HSI', 'SPX', 'GDAXI', 'N225']
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
         else:
             raise ValueError(
                 f"不支持的资产类型: {asset_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
-                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']")
+                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', "
+                f"'global_major', 'global_asia', 'global_europe', 'global_custom']")
 
         return assets, market_type, market_symbol
 
@@ -290,6 +318,38 @@ if __name__ == "__main__":
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN"
+        },
+        {
+            "name": "全球主要指数组合",
+            "asset_type": "global_major",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球亚洲指数组合",
+            "asset_type": "global_asia",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球欧洲指数组合",
+            "asset_type": "global_europe",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球自定义指数组合",
+            "asset_type": "global_custom",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
         }
     ]
 

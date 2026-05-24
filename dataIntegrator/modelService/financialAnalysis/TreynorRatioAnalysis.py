@@ -20,6 +20,7 @@ import statsmodels.api as sm
 from matplotlib import rcParams
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.financialAnalysis.MarketDataService import MarketDataService
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -66,6 +67,7 @@ class TreynorRatioAnalysis:
     def __init__(self):
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event="TreynorRatioAnalysis started")
+        self.market_data_service = MarketDataService()
 
     def writeLogInfo(self, className="unknown", functionName="unknown", event="unknown"):
         """记录日志信息"""
@@ -74,258 +76,19 @@ class TreynorRatioAnalysis:
 
     def fetch_asset_data(self, assets, start_date, end_date, market_type="CN", market_symbol=None, include_commodities=None):
         """
-        从 ClickHouse 获取资产数据（支持多数据源：股票 + 商品）
-
-        参数:
-        - assets: 资产代码列表
-        - start_date: 开始日期 (格式: 'YYYYMMDD')
-        - end_date: 结束日期 (格式: 'YYYYMMDD')
-        - market_type: 市场类型 ['US', 'CN']
-        - market_symbol: 市场指数符号（用于区分指数和股票）
-        - include_commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'}
-
-        返回:
-        - dfs: 字典，key为资产代码（A股格式为 ts_code-name，美股格式为 ts_code-enname），value为DataFrame
-        - asset_names: 字典，key为ts_code，value为资产名称
+        从 ClickHouse 获取资产数据（委托给 MarketDataService）
         """
-        self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
-                          event=f"Fetching data for {len(assets)} assets from {start_date} to {end_date}, market={market_type}")
+        return self.market_data_service.fetch_asset_data(
+            assets=assets,
+            start_date=start_date,
+            end_date=end_date,
+            market_type=market_type,
+            market_symbol=market_symbol,
+            include_commodities=include_commodities,
+            asset_type="asset"
+        )
 
-        if include_commodities:
-            logger.info(f" 同时获取 {len(include_commodities)} 种商品数据: {list(include_commodities.keys())}")
 
-        dfs = {}
-        asset_names = {}
-
-        # Step 1: 获取资产名称
-        if market_type == "CN":
-            cn_assets = [a for a in assets if a != market_symbol]
-            if cn_assets:
-                clickhouseService = ClickhouseService()
-                asset_codes = "','".join(cn_assets)
-                name_sql = f"""
-                SELECT ts_code, name
-                FROM indexsysdb.df_tushare_stock_basic
-                WHERE ts_code IN ('{asset_codes}')
-                """
-                logger.info(f"🔍 查询A股名称: {len(cn_assets)} 只股票")
-                name_df = clickhouseService.getDataFrameWithoutColumnsName(name_sql)
-                if not name_df.empty:
-                    for _, row in name_df.iterrows():
-                        asset_names[row['ts_code']] = row['name']
-                    logger.info(f"✅ 成功获取 {len(asset_names)} 只A股名称")
-                else:
-                    logger.warning(f"⚠️ 未获取到A股名称数据")
-
-        elif market_type == "US":
-            us_assets = [a for a in assets if a != market_symbol]
-            if us_assets:
-                clickhouseService = ClickhouseService()
-                asset_codes = "','".join(us_assets)
-                name_sql = f"""
-                SELECT ts_code, enname
-                FROM indexsysdb.df_tushare_us_stock_basic
-                WHERE ts_code IN ('{asset_codes}')
-                """
-                logger.info(f"🔍 查询美股名称: {len(us_assets)} 只股票")
-                name_df = clickhouseService.getDataFrameWithoutColumnsName(name_sql)
-                if not name_df.empty:
-                    for _, row in name_df.iterrows():
-                        asset_names[row['ts_code']] = row['enname']
-                    logger.info(f"✅ 成功获取 {len(asset_names)} 只美股名称")
-                else:
-                    logger.warning(f"⚠️ 未获取到美股名称数据")
-
-        # Step 2: 获取股票/指数数据
-        for asset in assets:
-            is_market_index = (asset == market_symbol)
-
-            if market_type == "US":
-                sql = self._build_us_stock_sql(asset, start_date, end_date)
-                display_name = asset
-
-            elif market_type == "CN":
-                if is_market_index:
-                    sql = self._build_cn_index_sql(asset, start_date, end_date)
-                    display_name = asset
-                else:
-                    sql = self._build_cn_stock_sql(asset, start_date, end_date)
-                    display_name = asset
-
-            else:
-                raise ValueError(f"不支持的市场类型: {market_type}。支持的类型: ['US', 'CN']")
-
-            clickhouseService = ClickhouseService()
-            df = clickhouseService.getDataFrameWithoutColumnsName(sql)
-            if df.empty:
-                logger.warning(f"警告: {asset} 在 {start_date} 到 {end_date} 期间没有数据")
-                continue
-
-            df['trade_date'] = pd.to_datetime(df['trade_date'])
-            df.set_index('trade_date', inplace=True)
-
-            # 拼接显示名称（与 CMLAnalysis 对齐）
-            if market_type == "CN" and not is_market_index:
-                if asset in asset_names and asset_names[asset]:
-                    display_name = f"{asset}-{asset_names[asset]}"
-                    logger.debug(f"   {asset} -> {display_name}")
-                else:
-                    logger.debug(f"   {asset}: 未找到名称，使用原始代码")
-
-            if market_type == "US" and not is_market_index:
-                if asset in asset_names and asset_names[asset]:
-                    display_name = f"{asset}-{asset_names[asset]}"
-                    logger.debug(f"   {asset} -> {display_name}")
-                else:
-                    logger.debug(f"   {asset}: 未找到名称，使用原始代码")
-
-            dfs[display_name] = df
-
-        # Step 3: 获取商品数据（如果有配置）
-        if include_commodities:
-            commodity_dfs = self._fetch_commodities_data(include_commodities, start_date, end_date, market_type)
-            dfs.update(commodity_dfs)
-
-        logger.info(f"成功获取 {len(dfs)} 个资产的数据")
-        return dfs
-
-    def _build_us_stock_sql(self, stock, start_date, end_date):
-        """构建美股查询SQL"""
-        return f"""
-        SELECT
-            date as trade_date,
-            close as close_point
-        FROM df_akshare_stock_us_daily
-        WHERE symbol = '{stock}'
-          AND date >= '{start_date}'
-          AND date <= '{end_date}'
-        ORDER BY date ASC
-        """
-
-    def _build_cn_stock_sql(self, stock, start_date, end_date):
-        """构建A股查询SQL"""
-        return f"""
-        SELECT
-            trade_date as trade_date,
-            close as close_point
-        FROM df_tushare_stock_daily
-        WHERE ts_code = '{stock}'
-          AND trade_date >= '{start_date}'
-          AND trade_date <= '{end_date}'
-        ORDER BY trade_date ASC
-        """
-
-    def _build_cn_index_sql(self, stock, start_date, end_date):
-        """构建中国指数查询SQL"""
-        return f"""
-        SELECT
-            trade_date as trade_date,
-            close as close_point
-        FROM df_tushare_cn_index_daily
-        WHERE ts_code = '{stock}'
-          AND trade_date >= '{start_date}'
-          AND trade_date <= '{end_date}'
-        ORDER BY trade_date ASC
-        """
-
-    def _fetch_commodities_data(self, commodities, start_date, end_date, market_type="US"):
-        """
-        获取商品数据（支持 UNION 多商品一次性查询）
-        
-        参数:
-        - commodities: 商品配置字典，例如 {'GC': '黄金', 'CL': '原油'} 或 {'Au99.99': '上海黄金'}
-        - start_date: 开始日期 (格式: 'YYYYMMDD')
-        - end_date: 结束日期 (格式: 'YYYYMMDD')
-        - market_type: 市场类型 ('US' 使用国外期货表, 'CN' 使用国内SGE表)
-        
-        返回:
-        - dfs: 商品数据字典
-        """
-        if not commodities:
-            return {}
-
-        logger.info(f" 开始获取商品数据，市场类型: {market_type}, 商品列表: {list(commodities.keys())}")
-
-        # 格式化日期（YYYYMMDD -> YYYY-MM-DD）
-        start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
-        end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
-
-        # 根据市场类型选择数据表
-        if market_type == "CN":
-            # 中国资产：使用上海黄金交易所数据
-            # 注意：df_akshare_spot_hist_sge 表只包含上海黄金(Au99.99)数据，没有 symbol 字段
-            table_name = "indexsysdb.df_akshare_spot_hist_sge"
-            has_symbol_field = False  # 该表没有 symbol 字段
-            logger.info(f"🇨🇳 使用国内黄金数据表: {table_name}")
-            logger.info(f"   日期范围: {start_date_formatted} 至 {end_date_formatted}")
-            logger.info(f"   ⚠️ 注意: 该表只包含上海黄金(Au99.99)数据，不支持多商品查询")
-        else:
-            # 美国/国际资产：使用外盘期货数据
-            table_name = "indexsysdb.df_akshare_futures_foreign_hist"
-            has_symbol_field = True  # 该表有 symbol 字段
-            logger.info(f"🇺🇸 使用国外期货数据表: {table_name}")
-            logger.info(f"   日期范围: {start_date_formatted} 至 {end_date_formatted}")
-
-        # 构建 UNION ALL 查询
-        union_queries = []
-        for symbol, name in commodities.items():
-            if market_type == "CN":
-                # 中国资产：不使用 symbol 过滤（表中只有上海黄金数据）
-                union_queries.append(f"""
-                    SELECT
-                        '{symbol}' AS ts_code,
-                        replaceAll(toString(date), '-', '') AS trade_date,
-                        close AS close_point
-                    FROM {table_name}
-                    WHERE date >= '{start_date_formatted}'
-                      AND date <= '{end_date_formatted}'
-                      AND close > 0
-                """)
-            else:
-                # 美国/国际资产：使用 symbol 过滤
-                union_queries.append(f"""
-                    SELECT
-                        '{symbol}' AS ts_code,
-                        replaceAll(toString(date), '-', '') AS trade_date,
-                        close AS close_point
-                    FROM {table_name}
-                    WHERE symbol = '{symbol}'
-                      AND date >= '{start_date_formatted}'
-                      AND date <= '{end_date_formatted}'
-                      AND close > 0
-                """)
-
-        # 合并为完整 SQL
-        combined_sql = " UNION ALL ".join(union_queries) + " ORDER BY trade_date, ts_code"
-        logger.info(f"📝 执行商品数据查询 SQL:\n{combined_sql}")
-
-        clickhouseService = ClickhouseService()
-        df = clickhouseService.getDataFrameWithoutColumnsName(combined_sql)
-
-        if df.empty:
-            logger.warning(f"⚠️ 警告: 未获取到任何商品数据 (市场类型: {market_type}, 商品: {list(commodities.keys())})")
-            logger.warning(f"   请检查:")
-            logger.warning(f"   1. 表 {table_name} 中是否有数据")
-            logger.warning(f"   2. 日期范围 {start_date_formatted} 至 {end_date_formatted} 是否正确")
-            if has_symbol_field:
-                logger.warning(f"   3. 商品代码 {list(commodities.keys())} 是否存在于表中")
-            return {}
-
-        logger.info(f"✅ 成功获取商品原始数据: {len(df)} 条记录")
-        logger.info(f"   包含商品: {df['ts_code'].unique().tolist()}")
-
-        # 按商品分组
-        dfs = {}
-        for symbol in df['ts_code'].unique():
-            commodity_df = df[df['ts_code'] == symbol][['trade_date', 'close_point']].copy()
-            commodity_df['trade_date'] = pd.to_datetime(commodity_df['trade_date'])
-            commodity_df.set_index('trade_date', inplace=True)
-            
-            display_name = f"{symbol}-{commodities.get(symbol, '')}"
-            dfs[display_name] = commodity_df
-            logger.info(f"   {display_name}: {len(commodity_df)} 条数据, 日期范围: {commodity_df.index.min()} 至 {commodity_df.index.max()}")
-
-        return dfs
 
     def filter_common_dates(self, dfs):
         """
@@ -475,10 +238,10 @@ class TreynorRatioAnalysis:
         plt.figure(figsize=(14, 10))
 
         # 绘制 SML (证券市场线) - 作为参考线
+        # 绘制 SML (证券市场线) - 作为参考线
         beta_range = np.linspace(0, 2.5, 100)
         sml_returns = risk_free_rate + beta_range * market_risk_premium
-        plt.plot(beta_range, sml_returns * 100, 'r-', linewidth=2,
-                label='市场风险溢价线 (参考)', alpha=0.5, linestyle='--')
+        plt.plot(beta_range, sml_returns * 100, 'r--', linewidth=2, label='市场风险溢价线 (参考)', alpha=0.5)
 
         # 绘制各资产的点
         colors = plt.cm.viridis(np.linspace(0, 1, len(assets)))

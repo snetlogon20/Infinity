@@ -92,11 +92,12 @@ class PortfolioMetricsWithCommoditiesTest:
                       美股: ['us_tech', 'us_finance', 'us_mixed', 'us_custom']
                       A股: ['cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']
                       纯商品: ['commodities_us']
+                      纯外汇: ['forex_major']
 
         返回:
-        - stocks: 股票代码列表（纯商品场景返回空列表）
+        - stocks: 股票代码列表（纯商品/纯外汇场景返回空列表）
         - market_type: 市场类型 ('US' 或 'CN')
-        - market_symbol: 市场指数符号（纯商品场景使用主要商品作为基准）
+        - market_symbol: 市场指数符号（纯商品/纯外汇场景使用主要资产作为基准）
         """
         # 纯大宗商品组合（美国市场）
         if stock_type == "commodities_us":
@@ -105,6 +106,14 @@ class PortfolioMetricsWithCommoditiesTest:
             stocks = []  # 纯商品场景不需要股票
             market_type = "US"
             market_symbol = "GC"  # 以 COMEX 黄金作为基准
+
+        # 纯外汇组合（主要货币对）
+        elif stock_type == "forex_major":
+            # 主要外汇货币对组合（从 df_tushare_fx_daily 表获取）
+            # 包含: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD, USDHKD, USDCNH, USDSEK
+            stocks = []  # 纯外汇场景不需要股票
+            market_type = "US"
+            market_symbol = "EURUSD.FXCM"  # 以 EUR/USD 作为基准
 
         # 美国股票组合
         elif stock_type == "us_tech":
@@ -222,7 +231,7 @@ class PortfolioMetricsWithCommoditiesTest:
                 f"不支持的股票类型: {stock_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
                 f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', "
-                f"'commodities_us']")
+                f"'commodities_us', 'forex_major']")
 
         return stocks, market_type, market_symbol
 
@@ -256,15 +265,15 @@ if __name__ == "__main__":
     # 配置测试案例（股票 + 商品组合）
     # ========================================
     report_configs = [
-        # {
-        #     "name": "美国科技股 + COMEX黄金",
-        #     "stock_type": "us_tech",
-        #     "start_date": CommonDataParameters.get_start_date(days=720),
-        #     "end_date": CommonParameters.today,
-        #     "interest_country": "US",
-        #     "market_type": "US",
-        #     "commodities": {'GC': 'COMEX黄金'}
-        # },
+        {
+            "name": "美国科技股 + COMEX黄金",
+            "stock_type": "us_tech",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "US",
+            "commodities": {'GC': 'COMEX黄金'}
+        },
         # {
         #     "name": "美国金融股 + 多种国际商品",
         #     "stock_type": "us_finance",
@@ -365,23 +374,48 @@ if __name__ == "__main__":
         #     "market_type": "CN",
         #     "commodities": {'Au99.99': '上海黄金'}
         # },
+        # # ========================================
+        # # 纯大宗商品分析（新增）
+        # # ========================================
+        # {
+        #     "name": "纯美国大宗商品组合",
+        #     "stock_type": "commodities_us",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US",
+        #     "commodities": {
+        #         'XAG': '白银',
+        #         'GC': 'COMEX黄金',
+        #         'XAU': '伦敦金',
+        #         'CL': 'WTI原油',
+        #         'OIL': '布伦特原油',
+        #         'NG': '天然气'
+        #     }
+        # },
         # ========================================
-        # 纯大宗商品分析（新增）
+        # 纯外汇分析（新增）
         # ========================================
         {
-            "name": "纯美国大宗商品组合",
-            "stock_type": "commodities_us",
-            "start_date": CommonDataParameters.get_start_date(days=720),
+            "name": "主要外汇货币对组合",
+            "stock_type": "forex_major",
+            # "start_date": CommonDataParameters.get_start_date(days=30),
+            # "end_date": CommonParameters.today,
+            "start_date": "20250101",
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "US",
             "commodities": {
-                'XAG': '白银',
-                'GC': 'COMEX黄金',
-                'XAU': '伦敦金',
-                'CL': 'WTI原油',
-                'OIL': '布伦特原油',
-                'NG': '天然气'
+                'EURUSD.FXCM': '欧元/美元',
+                'GBPUSD.FXCM': '英镑/美元',
+                'USDJPY.FXCM': '美元/日元',
+                'USDCHF.FXCM': '美元/瑞郎',
+                'AUDUSD.FXCM': '澳元/美元',
+                'USDCAD.FXCM': '美元/加元',
+                'NZDUSD.FXCM': '纽元/美元',
+                'USDHKD.FXCM': '美元/港币',
+                'USDCNH.FXCM': '美元/离岸人民币',
+                'USDSEK.FXCM': '美元/瑞典克朗'
             }
         }
     ]
@@ -448,18 +482,10 @@ if __name__ == "__main__":
 
     if all_results:
         logger.info("\n" + "=" * 80)
-        logger.info(" 开始生成投资组合指标综合分析研究报告（含商品资产）")
-        logger.info("=" * 80)
-
-        comprehensive_pdf_path = portfolioMetricsAnalysisReport.generate_comprehensive_pdf(
-            all_results=all_results,
-            report_title="投资组合指标综合分析研究报告（含商品资产）"
-        )
-
-        logger.info(f"\n✅ 综合分析报告生成成功: {comprehensive_pdf_path}")
-        logger.info(f" 包含 {len(all_results)} 个测试案例")
+        logger.info("✅ 投资组合指标分析完成（含商品资产）")
+        logger.info(f"📊 包含 {len(all_results)} 个测试案例")
     else:
-        logger.warning("⚠️ 没有成功的测试案例，无法生成综合报告")
+        logger.warning("⚠️ 没有成功的测试案例")
 
     logger.info("\n" + "=" * 80)
     logger.info(" 所有投资组合指标分析任务完成！")

@@ -37,7 +37,7 @@ def call_isotonic_regression_analyst(symbol, start_date, end_date, sql_template=
 def analyze_gc():
     # 设置参数
     symbol = 'GC'  # 例如：黄金期货
-    start_date = '2024-01-01'
+    start_date = '2022-01-01'
     end_date = '2026-12-31'
     x_column = 'trade_date'
     y_column = 'close'
@@ -184,8 +184,8 @@ def analyze_stock_daily():
 # 使用示例
 if __name__ == "__main__":
 
-    # analyze_gc()
+    analyze_gc()
     # analyze_usd_index()
     # analyze_usd_cny()
     # analyze_stock_daily()
-    analyze_wti()
+    # analyze_wti()
