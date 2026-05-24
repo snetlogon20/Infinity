@@ -1010,11 +1010,39 @@ class PortfolioMetricsAnalysisReport:
 
             # 根据指标类型选择图表类型
             if metric_col == 'CML Weight':
-                # CML Weight 使用堆积面积图
-                ax.stackplot(date_objects,
-                             [pivot_df[col].fillna(0).values for col in numeric_cols],
-                             labels=numeric_cols,
-                             alpha=0.7)
+                # CML Weight 使用堆积面积图 - 使用专业的配色方案
+                from matplotlib.colors import ListedColormap
+                
+                # 专业配色方案：温暖的渐变色，避免绿蓝色系
+                professional_colors = [
+                    '#E41A1C',  # 红色
+                    '#377EB8',  # 蓝色
+                    '#4DAF4A',  # 绿色
+                    '#984EA3',  # 紫色
+                    '#FF7F00',  # 橙色
+                    '#A65628',  # 棕色
+                    '#F781BF',  # 粉色
+                    '#999999',  # 灰色
+                    '#66C2A5',  # 青绿色
+                    '#FC8D62',  # 桃红色
+                    '#8DA0CB',  # 浅蓝色
+                    '#E78AC3',  # 浅紫色
+                    '#A6D854',  # 黄绿色
+                    '#FFD92F',  # 黄色
+                    '#E5C494',  # 浅棕色
+                    '#B3B3B3',  # 中灰色
+                ]
+                
+                # 如果资产数量超过预设颜色，循环使用
+                if len(numeric_cols) > len(professional_colors):
+                    professional_colors = professional_colors * (len(numeric_cols) // len(professional_colors) + 1)
+                
+                # 创建堆积面积图
+                stacked_data = ax.stackplot(date_objects, 
+                                          [pivot_df[col].fillna(0).values for col in numeric_cols],
+                                          labels=numeric_cols,
+                                          colors=professional_colors[:len(numeric_cols)],
+                                          alpha=0.85)
             else:
                 # 其他指标使用折线图 - 使用 matplotlib 默认颜色循环
                 for col in numeric_cols:
@@ -1048,6 +1076,49 @@ class PortfolioMetricsAnalysisReport:
                                 fontsize=8, fontweight='normal',
                                 verticalalignment='center',
                                 horizontalalignment='left')
+
+            # ========== 在堆积图的右侧添加股票标签 ==========
+            if len(pivot_df) > 0 and metric_col == 'CML Weight':
+                # 找到最后一个有效数据点的日期
+                last_date = date_objects[-1]
+                
+                # 计算每个资产在最后一个日期的权重
+                final_weights = {}
+                for col_idx, col in enumerate(numeric_cols):
+                    last_weight = pivot_df[col].fillna(0).iloc[-1]
+                    if last_weight > 0:
+                        final_weights[col] = last_weight
+                
+                # 按权重降序排序
+                sorted_weights = sorted(final_weights.items(), key=lambda x: x[1], reverse=True)
+                
+                # 只显示权重 > 5% 的标签，并上下交替布局
+                label_threshold = 0.05  # 5% 阈值
+                for idx, (col, weight) in enumerate(sorted_weights):
+                    if weight >= label_threshold:
+                        # 找到该资产在numeric_cols中的索引
+                        col_idx_in_numeric = numeric_cols.tolist().index(col)
+                        
+                        # 计算累积高度（从下到上）
+                        cumulative_height = sum([pivot_df[numeric_cols[i]].fillna(0).iloc[-1] 
+                                                for i in range(col_idx_in_numeric + 1)])
+                        # 该层的中心位置
+                        y_center = cumulative_height - weight / 2
+                        
+                        # 根据索引决定标签在上方还是下方
+                        if idx % 2 == 0:
+                            y_offset = weight * 0.3  # 向上偏移
+                            va = 'bottom'
+                        else:
+                            y_offset = -weight * 0.3  # 向下偏移
+                            va = 'top'
+                        
+                        # 在堆积层的右侧添加标签
+                        ax.text(last_date, y_center + y_offset, f'{col}', 
+                               fontsize=6, fontweight='normal',
+                               verticalalignment=va,
+                               horizontalalignment='left',
+                               bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='none'))
 
             # 添加网格线
             ax.grid(True, linestyle='--', alpha=0.5)
