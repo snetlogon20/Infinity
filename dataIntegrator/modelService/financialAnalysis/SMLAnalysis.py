@@ -10,6 +10,7 @@ import statsmodels.api as sm
 from matplotlib import rcParams
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.financialAnalysis.MarketDataService import MarketDataService
 
 logger = CommonLib.logger
 commonLib = CommonLib()
@@ -56,6 +57,7 @@ class SMLAnalysis:
     def __init__(self):
         self.writeLogInfo(className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
                           event="SMLAnalysis started")
+        self.market_data_service = MarketDataService()
 
     def writeLogInfo(self, className="unknown", functionName="unknown", event="unknown"):
         """记录日志信息"""
