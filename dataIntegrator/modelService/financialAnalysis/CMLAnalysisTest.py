@@ -342,7 +342,7 @@ if __name__ == "__main__":
         {
             "name": "全球主要指数组合",
             "stock_type": "global_major",
-            "start_date": CommonDataParameters.get_start_date(days=360),
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "GLOBAL"
@@ -350,7 +350,7 @@ if __name__ == "__main__":
         {
             "name": "全球亚洲指数组合",
             "stock_type": "global_asia",
-            "start_date": CommonDataParameters.get_start_date(days=360),
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "GLOBAL"
@@ -358,7 +358,7 @@ if __name__ == "__main__":
         {
             "name": "全球欧洲指数组合",
             "stock_type": "global_europe",
-            "start_date": CommonDataParameters.get_start_date(days=360),
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "GLOBAL"
@@ -366,7 +366,7 @@ if __name__ == "__main__":
         {
             "name": "全球自定义指数组合",
             "stock_type": "global_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "US",
             "market_type": "GLOBAL"

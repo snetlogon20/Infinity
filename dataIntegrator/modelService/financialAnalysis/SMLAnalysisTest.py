@@ -143,11 +143,64 @@ class SMLAnalysisTest:
             market_type = "CN"
             market_symbol = "000001.SH"
 
+        # 全球指数组合
+        elif stock_type == "global_major":
+            stocks = [
+                'HSI',      # 恒生指数
+                'N225',     # 日经225
+                'KS11',     # 韩国综合指数
+                'STI',      # 新加坡海峡时报
+                'AS51',     # 澳大利亚标普200
+                'SENSEX',   # 印度孟买敏感30
+                'FTSE',     # 英国富时100
+                'GDAXI',    # 德国DAX
+                'FCHI',     # 法国CAC40
+                'SPX',      # 标普500
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
+        elif stock_type == "global_asia":
+            stocks = [
+                'HSI',      # 恒生指数
+                'N225',     # 日经225
+                'KS11',     # 韩国综合指数
+                'STI',      # 新加坡海峡时报
+                'AS51',     # 澳大利亚标普200
+                'SENSEX',   # 印度孟买敏感30
+                'TWII',     # 台湾加权指数
+                'XIN9',     # 新华富时A50
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
+        elif stock_type == "global_europe":
+            stocks = [
+                'FTSE',     # 英国富时100
+                'GDAXI',    # 德国DAX
+                'FCHI',     # 法国CAC40
+                'HKAH',     # 恒生AH股指数
+                'CKLSE',    # 伦敦富时100
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "FTSE"
+
+        elif stock_type == "global_custom":
+            stocks = [
+                'HSI',      # 恒生指数
+                'SPX',      # 标普500
+                'GDAXI',    # 德国DAX
+                'N225',     # 日经225
+            ]
+            market_type = "GLOBAL"
+            market_symbol = "HSI"
+
         else:
             raise ValueError(
                 f"不支持的股票类型: {stock_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
-                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']")
+                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', "
+                f"'global_major', 'global_asia', 'global_europe', 'global_custom']")
 
         return stocks, market_type, market_symbol
 
@@ -285,6 +338,38 @@ if __name__ == "__main__":
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN"
+        },
+        {
+            "name": "全球主要指数组合",
+            "stock_type": "global_major",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球亚洲指数组合",
+            "stock_type": "global_asia",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球欧洲指数组合",
+            "stock_type": "global_europe",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
+        },
+        {
+            "name": "全球自定义指数组合",
+            "stock_type": "global_custom",
+            "start_date": CommonDataParameters.get_start_date(days=360),
+            "end_date": CommonParameters.today,
+            "interest_country": "US",
+            "market_type": "GLOBAL"
         }
     ]
 
