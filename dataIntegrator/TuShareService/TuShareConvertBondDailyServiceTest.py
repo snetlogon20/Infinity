@@ -24,7 +24,7 @@ class TuShareConvertBondDailyServiceTest(TuShareService):
             if end_date is None:
                 end_date = datetime.now().strftime("%Y%m%d")
             if start_date is None:
-                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y%m%d")
+                start_date = (datetime.now() - timedelta(days=60)).strftime("%Y%m%d")
             
             csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_cb_daily.csv")
 
