@@ -1,9 +1,9 @@
 import time
 import os
-from datetime import datetime, timedelta
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareConvertBondDailyService import TuShareConvertBondDailyService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 
 logger = CommonLib.logger
 
@@ -22,9 +22,9 @@ class TuShareConvertBondDailyServiceTest(TuShareService):
         try:
             # 设置默认日期范围
             if end_date is None:
-                end_date = datetime.now().strftime("%Y%m%d")
+                end_date = CommonParameters.today
             if start_date is None:
-                start_date = (datetime.now() - timedelta(days=200)).strftime("%Y%m%d")
+                start_date = CommonDataParameters.get_start_date(days=10)
             
             csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_cb_daily.csv")
 
@@ -82,9 +82,9 @@ class TuShareConvertBondDailyServiceTest(TuShareService):
         """
         logger.info(f"测试单个可转债: {ts_code}")
         
-        # 获取最近90天的数据
-        end_date = datetime.now().strftime("%Y%m%d")
-        start_date = (datetime.now() - timedelta(days=90)).strftime("%Y%m%d")
+        # 获取最近360天的数据
+        end_date = CommonParameters.today
+        start_date = CommonDataParameters.get_start_date(days=360)
         
         self.refresh_cb_daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
 
@@ -97,7 +97,9 @@ if __name__ == '__main__':
         logger.info("=" * 80)
         
         # 方式1: 获取所有可转债最近30天的数据
-        tuShareCbDailyServiceTest.refresh_cb_daily()
+        end_date = CommonParameters.today
+        start_date = CommonDataParameters.get_start_date(days=10)
+        tuShareCbDailyServiceTest.refresh_cb_daily(None, start_date, end_date)
         
         # 方式2: 获取指定可转债的数据（取消注释使用）
         # tuShareCbDailyServiceTest.test_single_bond(ts_code="110030.SH")
