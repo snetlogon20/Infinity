@@ -20,13 +20,13 @@ if __name__ == "__main__":
 
     manager = ConvertibleBondManager()
 
-    # 单日测试
-    manager.caculate_single_convertable_bond()
-    manager.calculate_selected_bonds("20260525")
-    manager.calculate_all_bonds("20260525")
-
-    # 单日保存
-    manager._save_bonds_for_date("20260525")
+    # # 单日测试
+    # manager.caculate_single_convertable_bond()
+    # manager.calculate_selected_bonds("20260525")
+    # manager.calculate_all_bonds("20260525")
+    #
+    # # 单日保存
+    # manager._save_bonds_for_date("20260525")
 
     # 批量保存: start_date ~ end_date
     manager.save_calculated_bonds("20260101", "20260524")
