@@ -35,6 +35,18 @@ class ConvertibleBondManagerReport:
         ('m.pvbp',               'PVBP',               'PVBP 走势'),
         ('m.simple_ytm',         'Simple YTM',         '简易到期收益率 走势'),
         ('m.current_yield',      'Current Yield',       '当期收益率 走势'),
+        ('m.var_hist_99',        '历史VaR 99%(%)',      '历史VaR(99%置信) 走势'),
+        ('m.var_param_99',       '参数VaR 99%(%)',      '参数VaR(99%置信) 走势'),
+        ('m.es_99',              'ES 99%(%)',          'Expected Shortfall(99%) 走势'),
+        ('m.var_price_hist_99',  '历史VaR 99%(元)',      '历史VaR(99%置信,元) 走势'),
+        ('m.var_price_param_99', '参数VaR 99%(元)',      '参数VaR(99%置信,元) 走势'),
+        ('m.es_price_99',        'ES 99%(元)',          'ES(99%置信,元) 走势'),
+        ('m.effective_duration',    '有效久期',              '有效久期 走势'),
+        ('m.effective_convexity',   '有效凸性',              '有效凸性 走势'),
+        ('m.pct_price_chg_p50bp',   '价格变动 +50bp(%)',      '收益率+50bp价格变动 走势'),
+        ('m.pct_price_chg_m50bp',   '价格变动 -50bp(%)',      '收益率-50bp价格变动 走势'),
+        ('m.pct_price_chg_p100bp',  '价格变动 +100bp(%)',     '收益率+100bp价格变动 走势'),
+        ('m.pct_price_chg_m100bp',  '价格变动 -100bp(%)',     '收益率-100bp价格变动 走势'),
     ]
 
     def __init__(self):
@@ -111,7 +123,19 @@ class ConvertibleBondManagerReport:
                 m.market_price,
                 m.par             AS metrics_par,
                 m.coupon_rate     AS metrics_coupon_rate,
-                m.pay_per_year    AS metrics_pay_per_year
+                m.pay_per_year    AS metrics_pay_per_year,
+                m.var_hist_99,
+                m.var_param_99,
+                m.es_99,
+                m.var_price_hist_99,
+                m.var_price_param_99,
+                m.es_price_99,
+                m.effective_duration,
+                m.effective_convexity,
+                m.pct_price_chg_p50bp,
+                m.pct_price_chg_m50bp,
+                m.pct_price_chg_p100bp,
+                m.pct_price_chg_m100bp
             FROM indexsysdb.df_tushare_cb_daily d
             LEFT JOIN indexsysdb.df_tushare_cb_basic b
                 ON d.ts_code = b.ts_code
@@ -190,6 +214,50 @@ class ConvertibleBondManagerReport:
 
         conv = df['m.convexity'].dropna()
         stats['avg_convexity'] = conv.mean()
+
+        # ----- 有效久期 & 有效凸性 & 价格变动 -----
+        eff_dur = df['m.effective_duration'].dropna()
+        stats['avg_effective_duration'] = eff_dur.mean()
+        stats['max_effective_duration'] = eff_dur.max()
+
+        eff_conv = df['m.effective_convexity'].dropna()
+        stats['avg_effective_convexity'] = eff_conv.mean()
+        stats['max_effective_convexity'] = eff_conv.max()
+
+        pct_50 = df['m.pct_price_chg_p50bp'].dropna()
+        stats['avg_pct_price_chg_p50bp'] = pct_50.mean()
+        stats['min_pct_price_chg_p50bp'] = pct_50.min()
+        stats['max_pct_price_chg_p50bp'] = pct_50.max()
+
+        pct_100 = df['m.pct_price_chg_p100bp'].dropna()
+        stats['avg_pct_price_chg_p100bp'] = pct_100.mean()
+        stats['min_pct_price_chg_p100bp'] = pct_100.min()
+        stats['max_pct_price_chg_p100bp'] = pct_100.max()
+
+        # ----- VaR & ES 统计 -----
+        var_hist = df['m.var_hist_99'].dropna()
+        stats['avg_var_hist_99'] = var_hist.mean()
+        stats['max_var_hist_99'] = var_hist.max()
+
+        var_param = df['m.var_param_99'].dropna()
+        stats['avg_var_param_99'] = var_param.mean()
+        stats['max_var_param_99'] = var_param.max()
+
+        es = df['m.es_99'].dropna()
+        stats['avg_es_99'] = es.mean()
+        stats['max_es_99'] = es.max()
+
+        var_price_hist = df['m.var_price_hist_99'].dropna()
+        stats['avg_var_price_hist_99'] = var_price_hist.mean()
+        stats['max_var_price_hist_99'] = var_price_hist.max()
+
+        var_price_param = df['m.var_price_param_99'].dropna()
+        stats['avg_var_price_param_99'] = var_price_param.mean()
+        stats['max_var_price_param_99'] = var_price_param.max()
+
+        es_price = df['m.es_price_99'].dropna()
+        stats['avg_es_price_99'] = es_price.mean()
+        stats['max_es_price_99'] = es_price.max()
 
         # ----- 首末日数据对比（趋势判断）-----
         first_date = df['d.trade_date'].min()
@@ -480,8 +548,148 @@ class ConvertibleBondManagerReport:
 
         lines.append('')
 
+        # ===== VaR & ES 尾部分析 =====
+        lines.append("## 六、VaR 与 Expected Shortfall 风险分析")
+
+        avg_var_hist = stats.get('avg_var_hist_99', 0)
+        max_var_hist = stats.get('max_var_hist_99', 0)
+        avg_var_param = stats.get('avg_var_param_99', 0)
+        max_var_param = stats.get('max_var_param_99', 0)
+        avg_es = stats.get('avg_es_99', 0)
+        max_es = stats.get('max_es_99', 0)
+        avg_var_price = stats.get('avg_var_price_hist_99', 0)
+        avg_es_price = stats.get('avg_es_price_99', 0)
+
+        lines.append(
+            f"历史模拟法 VaR(99%): 均值 {avg_var_hist:.2f}%，最大 {max_var_hist:.2f}%。"
+        )
+        lines.append(
+            f"参数法 VaR(99%): 均值 {avg_var_param:.2f}%，最大 {max_var_param:.2f}%。"
+        )
+        lines.append(
+            f"Expected Shortfall(99%): 均值 {avg_es:.2f}%，最大 {max_es:.2f}%。"
+        )
+        lines.append(
+            f"VaR 代表的日均最大潜在亏损约 {avg_var_price:.2f} 元/张，"
+            f"极端尾部损失(ES)日均约 {avg_es_price:.2f} 元/张。"
+        )
+
+        # 判断风险等级
+        if avg_es > 3:
+            lines.append(
+                "【策略提示】尾部风险较高（ES > 3%），个券在极端行情下回撤幅度大。"
+                "建议：1) 严格止损纪律，单券设置 2%-3% 硬止损线；"
+                "2) 降低单券仓位上限至组合 3% 以下；"
+                "3) 避免重仓高波动、低流动性标的；"
+                "4) 考虑配置国债期货或利率衍生品对冲尾部风险。"
+            )
+        elif avg_es > 1.5:
+            lines.append(
+                "【策略提示】尾部风险处于中等水平（1.5% < ES ≤ 3%）。"
+                "建议：1) 设置单券 3%-5% 止损线；"
+                "2) 分散行业配置，避免单一行业敞口过大；"
+                "3) 关注ES变动趋势，若持续扩大需及时调降仓位。"
+            )
+        else:
+            lines.append(
+                "【策略提示】尾部风险较低（ES ≤ 1.5%），市场波动可控。"
+                "可适度放宽止损阈值至 5%，便于趋势行情中充分获利。"
+                "但需持续监控 ES 变化，防范尾部风险突然放大。"
+            )
+
+        # 参数法 vs 历史模拟法 对比
+        if abs(avg_var_hist - avg_var_param) > 1:
+            lines.append(
+                "【模型提示】历史模拟法与参数法 VaR 偏差较大（>1%），说明收益率分布存在"
+                "明显的肥尾或偏态特征，参数法的正态假设可能低估尾部风险。建议以历史模拟法"
+                "和 ES 作为主要风险度量参考。"
+            )
+
+        lines.append('')
+
+        # ===== 有效久期与利率敏感性分析 =====
+        lines.append("## 七、有效久期与利率敏感性分析")
+
+        avg_eff_dur = stats.get('avg_effective_duration', 0)
+        max_eff_dur = stats.get('max_effective_duration', 0)
+        avg_eff_conv = stats.get('avg_effective_convexity', 0)
+        max_eff_conv = stats.get('max_effective_convexity', 0)
+
+        lines.append(
+            f"平均有效久期 {avg_eff_dur:.2f} 年，最大 {max_eff_dur:.2f} 年。"
+        )
+        lines.append(
+            f"平均有效凸性 {avg_eff_conv:.2f}，最大 {max_eff_conv:.2f}。"
+        )
+        lines.append(
+            "有效久期通过实际收益率波动±1bp计算，相比修正久期更能反映含权债券的真实利率敏感度。"
+            "有效凸性衡量了债券价格-收益率曲线的弯曲程度，凸性越大，收益率变动时的价格变化非对称性越强。"
+        )
+        lines.append('')
+
+        # 场景分析
+        avg_pct_50 = stats.get('avg_pct_price_chg_p50bp', 0)
+        avg_pct_100 = stats.get('avg_pct_price_chg_p100bp', 0)
+        min_pct_50 = stats.get('min_pct_price_chg_p50bp', 0)
+        max_pct_50 = stats.get('max_pct_price_chg_p50bp', 0)
+        min_pct_100 = stats.get('min_pct_price_chg_p100bp', 0)
+        max_pct_100 = stats.get('max_pct_price_chg_p100bp', 0)
+
+        lines.append(
+            f"利率上行 50bp 场景：平均价格变动 {avg_pct_50:+.2f}%，"
+            f"区间 [{min_pct_50:+.2f}%, {max_pct_50:+.2f}%]。"
+        )
+        lines.append(
+            f"利率上行 100bp 场景：平均价格变动 {avg_pct_100:+.2f}%，"
+            f"区间 [{min_pct_100:+.2f}%, {max_pct_100:+.2f}%]。"
+        )
+        lines.append(
+            f"利率下行 50bp 场景：平均价格变动 {-avg_pct_50:+.2f}%（对称估算）。"
+        )
+        lines.append('')
+
+        lines.append(
+            "价格变动公式：ΔP% ≈ -Eff_Dur × Δy + ½ × Eff_Conv × (Δy)²"
+        )
+        lines.append(
+            "其中第一项 -Eff_Dur×Δy 为久期效应（一阶线性），"
+            "第二项 ½×Eff_Conv×(Δy)² 为凸性调整（二阶非线性），"
+            "凸性越大，利率下行时收益增强越显著，利率上行时损失缓冲越明显。"
+        )
+        lines.append('')
+
+        # 策略建议
+        if abs(avg_pct_100) > 5:
+            lines.append(
+                "【策略提示】利率敏感性较高（±100bp 平均价格波动 > 5%）。"
+                "若预期加息周期来临，建议：1) 大幅降低长久期转债仓位；"
+                "2) 重点配置剩余期限 < 2 年的短久期转债；"
+                "3) 利用国债期货或利率互换对冲利率风险敞口；"
+                "4) 关注浮息转债或临近到期的品种降低利率敏感度。"
+            )
+        elif abs(avg_pct_100) > 3:
+            lines.append(
+                "【策略提示】利率敏感性中等（±100bp 价格波动 3%-5%）。"
+                "建议：1) 根据利率预期动态调整久期敞口；"
+                "2) 预期利率下行时可适度拉长久期，上行时缩短久期；"
+                "3) 关注凸性较高的标的，在利率下行时获取超额收益。"
+            )
+        else:
+            lines.append(
+                "【策略提示】利率敏感性较低（±100bp 价格波动 < 3%），利率风险可控。"
+                "组合对利率变动的防御性较强，可将更多精力放在信用分析和转股价值评估上。"
+            )
+
+        if avg_eff_conv > 10:
+            lines.append(
+                "【凸性提示】组合平均有效凸性较高（> 10），表明市场存在较多长久期或高票息标的。"
+                "高凸性在利率下行时提供放大收益的非对称优势，但需注意流动性风险和久期错配风险。"
+            )
+
+        lines.append('')
+
         # ===== 综合策略建议 =====
-        lines.append("## 六、综合策略建议")
+        lines.append("## 八、综合策略建议")
 
         if stats.get('period_return', 0) > 2 and stats.get('vol_trend') == '放量':
             lines.append(

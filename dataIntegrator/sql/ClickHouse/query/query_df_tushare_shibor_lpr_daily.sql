@@ -20,12 +20,11 @@ select * from df_tushare_shibor_daily
 --LRP
 select *
 from indexsysdb.df_tushare_shibor_lpr_daily
-WHERE trade_date <= '20260329'
+--WHERE trade_date <= '20260329'
 ORDER BY trade_date DESC
-LIMIT 1
 
 
---¹úÕ®ÊÕÒæÇúÏß
+--å›½å€ºæ”¶ç›Šæ›²çº¿
 select * from df_tushare_yc_cb
 where trade_date = '20260508'
 
@@ -37,7 +36,7 @@ select trade_date, ts_code,	curve_name,	curve_type,	concat(ts_code, '_', curve_t
 from df_tushare_yc_cb
 where trade_date = '20260508'
 
---¸÷ÏîÉÌÒµÕ®È¯
+--å„é¡¹å•†ä¸šå€ºåˆ¸ - akshare åºŸé™¤ 
 select * from df_akshare_bond_china_close_return
 
 SELECT distinct(date)
@@ -47,14 +46,20 @@ order by date
 SELECT date, concat(bond_type, '-', toString(tenor)), yield_to_maturity 
 FROM df_akshare_bond_china_close_return
 
---¿É×ªÕ® ÐÅÏ¢
+--å¯è½¬å€º ä¿¡æ¯
 select * from indexsysdb.df_tushare_cb_basic
 
 select * from indexsysdb.df_tushare_cb_basic
 where ts_code = '110073.SH'
 
+select issue_rating , newest_rating,rating_comp from indexsysdb.df_tushare_cb_basic
+where ts_code = '110073.SH'
 
---¿É×ªÕ® ÈÕ½»Ò× 
+select issue_rating , newest_rating,rating_comp from indexsysdb.df_tushare_cb_basic
+group by issue_rating , newest_rating,rating_comp
+
+
+--å¯è½¬å€º æ—¥äº¤æ˜“ 
 select * from indexsysdb.df_tushare_cb_daily
 where  ts_code = '110073.SH'
 
@@ -101,19 +106,28 @@ order by trade_date desc
 select * from indexsysdb.df_tushare_cb_metrics
 
 
+select * from indexsysdb.df_tushare_cb_metrics
+where ts_code = '110073.SH'
+order by trade_date
+
+
 select ts_code, trade_date,count(1)  from indexsysdb.df_tushare_cb_metrics
 group by ts_code, trade_date
 
 
-select min(trade_date), max(trade_date)  from indexsysdb.df_tushare_cb_metrics
+select min(trade_date), max(trade_date), count(1)  from indexsysdb.df_tushare_cb_metrics
 
---¿´ÏÂÓÐ¶àÉÙÌìµÄÊý¾ÝÒÑÉú³É
+--çœ‹ä¸‹æœ‰å¤šå°‘å¤©çš„æ•°æ®å·²ç”Ÿæˆ
 select trade_date,count(1) from indexsysdb.df_tushare_cb_metrics
 group by trade_date
 order by trade_date
 
+--æŸ¥çœ‹å“ªä¸ªæœ€èµšé’±
+select * from indexsysdb.df_tushare_cb_metrics
+where trade_date ='20260105'
+order by current_yield desc, modified_duration, convexity desc, dv01 desc, pvbp desc 
 
--- ¿É×ªÕ®È«¾°ÊÓÍ¼: df_tushare_cb_daily LEFT JOIN df_tushare_cb_basic LEFT JOIN df_tushare_cb_metrics
+-- å¯è½¬å€ºå…¨æ™¯è§†å›¾: df_tushare_cb_daily LEFT JOIN df_tushare_cb_basic LEFT JOIN df_tushare_cb_metrics
 SELECT
 	d.trade_date,
     b.ts_code,
@@ -193,3 +207,12 @@ LEFT JOIN indexsysdb.df_tushare_cb_metrics m
 WHERE d.trade_date >= '20260301' AND
 		 d.trade_date <= '20260525' 
 ORDER BY d.trade_date, d.ts_code;
+
+
+select * from indexsysdb.vw_tushare_cb_full
+
+select b.ts_code , b.bond_full_name, d.trade_date, b.maturity,m.current_yield  from indexsysdb.vw_tushare_cb_full
+where m.current_yield  <> 0 AND d.trade_date = '20260105'
+
+
+--ALTER TABLE indexsysdb.df_tushare_cb_metrics  DELETE WHERE trade_date >= '20260101' AND trade_date <= '20260531'
