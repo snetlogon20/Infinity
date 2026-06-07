@@ -73,7 +73,15 @@ class ConvertibleBondAnalyst:
         - end_date: 结束日期 (YYYYMMDD)，指定日期范围
         """
 
-        sql = rf"""
+        conditions = [f"ts_code = '{ts_code}'"]
+        if trade_date:
+            conditions.append(f"trade_date = '{trade_date}'")
+        if start_date:
+            conditions.append(f"trade_date >= '{start_date}'")
+        if end_date:
+            conditions.append(f"trade_date <= '{end_date}'")
+
+        sql = f"""
         SELECT
             ts_code,
             trade_date,
@@ -85,13 +93,46 @@ class ConvertibleBondAnalyst:
             cb_value,
             cb_over_rate
         FROM indexsysdb.df_tushare_cb_daily
-        WHERE ts_code = '{ts_code}'
-          AND trade_date = '{trade_date}'
+        WHERE {' AND '.join(conditions)}
         ORDER BY trade_date
         """
 
         df = self.clickhouseService.getDataFrameWithoutColumnsName(sql)
         logger.info(f"获取可转债 {ts_code} 日线数据: {len(df)} 条记录")
+        return df
+
+    def get_bond_daily_history(self, ts_code, lookback_days=252, end_date=None):
+        """
+        获取可转债历史日线数据，用于 VaR/ES 计算
+
+        参数:
+        - ts_code: 转债代码
+        - lookback_days: 回溯天数（默认252个交易日≈1年）
+        - end_date: 截止日期 (YYYYMMDD)，默认取最新数据
+
+        返回:
+        - DataFrame: 历史日线行情（按 trade_date 升序排列）
+        """
+        if end_date:
+            end_date_cond = f"AND trade_date <= '{end_date}'"
+        else:
+            end_date_cond = ""
+
+        sql = f"""
+        SELECT
+            ts_code,
+            trade_date,
+            close
+        FROM indexsysdb.df_tushare_cb_daily
+        WHERE ts_code = '{ts_code}'
+          {end_date_cond}
+        ORDER BY trade_date DESC
+        LIMIT {lookback_days}
+        """
+
+        df = self.clickhouseService.getDataFrameWithoutColumnsName(sql)
+        df = df.sort_values('trade_date', ascending=True).reset_index(drop=True)
+        logger.info(f"获取可转债 {ts_code} 历史日线: {len(df)} 条记录（lookback={lookback_days}）")
         return df
 
     def calculate_remaining_maturity(self, maturity_date, trade_date):
@@ -295,6 +336,265 @@ class ConvertibleBondAnalyst:
         dvbp = dollar_duration / 10000.0
         return dollar_duration, dvbp
 
+    # ==============================
+    #  VaR & Expected Shortfall 方法
+    # ==============================
+
+    @staticmethod
+    def _calculate_daily_returns(prices):
+        """
+        从价格序列计算日收益率
+
+        参数:
+        - prices: 价格序列（升序排列）
+
+        返回:
+        - np.array: 日收益率序列
+        """
+        prices = np.asarray(prices, dtype=float)
+        if len(prices) < 2:
+            return np.array([])
+        returns = np.diff(prices) / prices[:-1]
+        return returns
+
+    # ==============================
+    #  有效久期 & 有效凸性 & 价格变动
+    # ==============================
+
+    @staticmethod
+    def _calc_bond_price(ytm_per_period, face_value, coupon_payment, periods):
+        """
+        计算债券理论价格（给定每期收益率）
+
+        参数:
+        - ytm_per_period: 每期收益率
+        - face_value: 面值
+        - coupon_payment: 每期付息金额
+        - periods: 剩余付息期数
+
+        返回:
+        - float: 债券理论价格
+        """
+        price = 0.0
+        for t in range(1, periods + 1):
+            price += coupon_payment / (1 + ytm_per_period) ** t
+        price += face_value / (1 + ytm_per_period) ** periods
+        return price
+
+    @staticmethod
+    def calculate_effective_duration(market_price, face_value, coupon_payment, periods,
+                                     pay_per_year, ytm_per_period, shock_bps=1):
+        """
+        计算有效久期（通过收益率上下波动计算）
+
+        公式: Eff_Dur = (P_down - P_up) / (2 × P_0 × Δy)
+
+        参数:
+        - market_price: 当前市场价格
+        - face_value: 面值
+        - coupon_payment: 每期付息金额
+        - periods: 剩余付息期数
+        - pay_per_year: 年付息次数
+        - ytm_per_period: 当前每期收益率（YTM）
+        - shock_bps: 收益率波动基点（默认1bp）
+
+        返回:
+        - float: 年化有效久期
+        """
+        delta_y_ann = shock_bps / 10000.0  # bps → 小数
+        y_ann = ytm_per_period * pay_per_year
+
+        y_up_per_period = (y_ann + delta_y_ann) / pay_per_year
+        y_down_per_period = (y_ann - delta_y_ann) / pay_per_year
+
+        p_up = ConvertibleBondAnalyst._calc_bond_price(
+            y_up_per_period, face_value, coupon_payment, periods)
+        p_down = ConvertibleBondAnalyst._calc_bond_price(
+            y_down_per_period, face_value, coupon_payment, periods)
+
+        effective_duration = (p_down - p_up) / (2.0 * market_price * delta_y_ann)
+        return round(effective_duration, 6)
+
+    @staticmethod
+    def calculate_effective_convexity(market_price, face_value, coupon_payment, periods,
+                                      pay_per_year, ytm_per_period, shock_bps=1):
+        """
+        计算有效凸性（通过收益率上下波动计算）
+
+        公式: Eff_Conv = (P_down + P_up - 2×P_0) / (P_0 × (Δy)²)
+
+        参数:
+        - market_price: 当前市场价格
+        - face_value: 面值
+        - coupon_payment: 每期付息金额
+        - periods: 剩余付息期数
+        - pay_per_year: 年付息次数
+        - ytm_per_period: 当前每期收益率（YTM）
+        - shock_bps: 收益率波动基点（默认1bp）
+
+        返回:
+        - float: 年化有效凸性
+        """
+        delta_y_ann = shock_bps / 10000.0
+        y_ann = ytm_per_period * pay_per_year
+
+        y_up_per_period = (y_ann + delta_y_ann) / pay_per_year
+        y_down_per_period = (y_ann - delta_y_ann) / pay_per_year
+
+        p_up = ConvertibleBondAnalyst._calc_bond_price(
+            y_up_per_period, face_value, coupon_payment, periods)
+        p_down = ConvertibleBondAnalyst._calc_bond_price(
+            y_down_per_period, face_value, coupon_payment, periods)
+
+        effective_convexity = (p_down + p_up - 2.0 * market_price) / (market_price * delta_y_ann ** 2)
+        return round(effective_convexity, 6)
+
+    @staticmethod
+    def calculate_pct_price_change(effective_duration, effective_convexity,
+                                   yield_shocks_bps=(50, -50, 100, -100)):
+        """
+        百分比价格变动，使用二阶近似公式:
+            %ΔP ≈ -Eff_Dur × Δy + ½ × Eff_Conv × (Δy)²
+
+        参数:
+        - effective_duration: 年化有效久期
+        - effective_convexity: 年化有效凸性
+        - yield_shocks_bps: 收益率变动场景（基点，正=上升，负=下降）
+
+        返回:
+        - dict: {50: -2.3456, -50: 2.5678, 100: -4.8912, -100: 5.4321, ...}（%）
+        """
+        result = {}
+        for shock_bps in yield_shocks_bps:
+            delta_y = shock_bps / 10000.0  # bps → 小数
+            pct_change = -effective_duration * delta_y + 0.5 * effective_convexity * (delta_y ** 2)
+            result[shock_bps] = round(pct_change * 100, 4)  # 转为百分比
+        return result
+
+    @staticmethod
+    def calculate_var_historical(returns, confidence_levels=(0.95, 0.99)):
+        """
+        历史模拟法计算 VaR
+
+        参数:
+        - returns: 日收益率序列
+        - confidence_levels: 置信水平元组
+
+        返回:
+        - dict: {0.95: var_value, 0.99: var_value}（百分比形式，正值代表损失）
+        """
+        returns = np.asarray(returns, dtype=float)
+        returns = returns[~np.isnan(returns)]
+        if len(returns) < 10:
+            return {cl: 0.0 for cl in confidence_levels}
+
+        result = {}
+        for cl in confidence_levels:
+            var_value = -np.percentile(returns, (1 - cl) * 100) * 100
+            result[cl] = round(var_value, 6)
+        return result
+
+    @staticmethod
+    def calculate_var_parametric(returns, confidence_levels=(0.95, 0.99)):
+        """
+        参数法（方差-协方差法）计算 VaR，假设收益率服从正态分布
+
+        参数:
+        - returns: 日收益率序列
+        - confidence_levels: 置信水平元组
+
+        返回:
+        - dict: {0.95: var_value, 0.99: var_value}（百分比形式，正值代表损失）
+        """
+        from scipy import stats
+        returns = np.asarray(returns, dtype=float)
+        returns = returns[~np.isnan(returns)]
+        if len(returns) < 10:
+            return {cl: 0.0 for cl in confidence_levels}
+
+        mu = np.mean(returns)
+        sigma = np.std(returns, ddof=1)
+
+        result = {}
+        for cl in confidence_levels:
+            z_score = stats.norm.ppf(1 - cl)
+            var_value = -(mu + z_score * sigma) * 100
+            result[cl] = round(var_value, 6)
+        return result
+
+    @staticmethod
+    def calculate_expected_shortfall(returns, confidence_levels=(0.95, 0.99)):
+        """
+        历史模拟法计算 Expected Shortfall (CVaR)
+
+        参数:
+        - returns: 日收益率序列
+        - confidence_levels: 置信水平元组
+
+        返回:
+        - dict: {0.95: es_value, 0.99: es_value}（百分比形式，正值代表损失）
+        """
+        returns = np.asarray(returns, dtype=float)
+        returns = returns[~np.isnan(returns)]
+        if len(returns) < 10:
+            return {cl: 0.0 for cl in confidence_levels}
+
+        result = {}
+        for cl in confidence_levels:
+            threshold = np.percentile(returns, (1 - cl) * 100)
+            tail = returns[returns <= threshold]
+            if len(tail) == 0:
+                es_value = -threshold * 100
+            else:
+                es_value = -np.mean(tail) * 100
+            result[cl] = round(es_value, 6)
+        return result
+
+    def _calc_var_es_from_history(self, ts_code, trade_date, market_price, lookback_days=252):
+        """
+        从历史数据计算 VaR 和 ES
+
+        参数:
+        - ts_code: 转债代码
+        - trade_date: 交易日期 (YYYYMMDD)
+        - market_price: 当日收盘价
+        - lookback_days: 回溯天数
+
+        返回:
+        - tuple: (var_hist_dict, var_param_dict, es_dict, actual_lookback_days)
+        """
+        empty = (
+            {0.95: 0.0, 0.99: 0.0},
+            {0.95: 0.0, 0.99: 0.0},
+            {0.95: 0.0, 0.99: 0.0},
+            0
+        )
+
+        try:
+            history_df = self.get_bond_daily_history(ts_code, lookback_days=lookback_days, end_date=trade_date)
+
+            # 确保包含当日价格以计算完整收益率
+            prices = history_df['close'].astype(float).values
+            if len(prices) < 10:
+                logger.warning(f"可转债 {ts_code} 历史数据不足 ({len(prices)} 条)，无法计算 VaR/ES")
+                return empty
+
+            returns = self._calculate_daily_returns(prices)
+            if len(returns) < 5:
+                logger.warning(f"可转债 {ts_code} 收益率数据不足 ({len(returns)} 条)，无法计算 VaR/ES")
+                return empty
+
+            var_hist = self.calculate_var_historical(returns)
+            var_param = self.calculate_var_parametric(returns)
+            es = self.calculate_expected_shortfall(returns)
+
+            logger.info(f"可转债 {ts_code} VaR/ES 计算完成（{len(returns)} 个日收益率样本）")
+            return var_hist, var_param, es, len(returns)
+
+        except Exception as e:
+            logger.error(f"可转债 {ts_code} VaR/ES 计算异常: {e}")
+            return empty
+
     def get_bond_metrics(self, ts_code, trade_date):
         """
         获取可转债的完整指标
@@ -402,7 +702,21 @@ class ConvertibleBondAnalyst:
             # 10. 计算简单到期收益率
             simple_ytm = self.calculate_simple_yield_to_maturity(coupon_rate, market_price, remaining_years, par)
 
-            # 11. 整理结果
+            # 11. 计算有效久期和有效凸性
+            coupon_payment = par * (coupon_rate / 100.0) / pay_per_year
+            periods = max(int(remaining_years * pay_per_year), 1)
+            effective_duration = self.calculate_effective_duration(
+                market_price, par, coupon_payment, periods, pay_per_year, ytm)
+            effective_convexity = self.calculate_effective_convexity(
+                market_price, par, coupon_payment, periods, pay_per_year, ytm)
+
+            # 12. 计算百分比价格变动（+/-50bp, +/-100bp）
+            pct_price_chg = self.calculate_pct_price_change(effective_duration, effective_convexity)
+
+            # 13. 计算 VaR 和 Expected Shortfall
+            var_hist, var_param, es, lookback_days = self._calc_var_es_from_history(ts_code, trade_date, market_price)
+
+            # 14. 整理结果
             result = {
                 'ts_code': ts_code,
                 'trade_date': trade_date,
@@ -420,7 +734,30 @@ class ConvertibleBondAnalyst:
                 'market_price': market_price,
                 'par': par,
                 'coupon_rate': coupon_rate,
-                'pay_per_year': pay_per_year
+                'pay_per_year': pay_per_year,
+                # 有效久期 & 有效凸性
+                'effective_duration': effective_duration,
+                'effective_convexity': effective_convexity,
+                # 百分比价格变动（%）
+                'pct_price_chg_p50bp': pct_price_chg.get(50, 0.0),
+                'pct_price_chg_m50bp': pct_price_chg.get(-50, 0.0),
+                'pct_price_chg_p100bp': pct_price_chg.get(100, 0.0),
+                'pct_price_chg_m100bp': pct_price_chg.get(-100, 0.0),
+                # VaR & ES (百分数，正值=损失)
+                'var_hist_95': var_hist.get(0.95, 0.0),
+                'var_hist_99': var_hist.get(0.99, 0.0),
+                'var_param_95': var_param.get(0.95, 0.0),
+                'var_param_99': var_param.get(0.99, 0.0),
+                'es_95': es.get(0.95, 0.0),
+                'es_99': es.get(0.99, 0.0),
+                # VaR & ES（绝对价格，正值=损失）
+                'var_price_hist_95': var_hist.get(0.95, 0.0) / 100.0 * market_price,
+                'var_price_hist_99': var_hist.get(0.99, 0.0) / 100.0 * market_price,
+                'var_price_param_95': var_param.get(0.95, 0.0) / 100.0 * market_price,
+                'var_price_param_99': var_param.get(0.99, 0.0) / 100.0 * market_price,
+                'es_price_95': es.get(0.95, 0.0) / 100.0 * market_price,
+                'es_price_99': es.get(0.99, 0.0) / 100.0 * market_price,
+                'lookback_days': lookback_days,
             }
 
             logger.info(f"✅ 可转债 {ts_code} 在 {trade_date} 的指标计算完成")
@@ -432,6 +769,14 @@ class ConvertibleBondAnalyst:
             logger.info(f"   剩余期限: {remaining_years:.4f} 年")
             logger.info(f"   当期票息收益率: {current_yield:.4f}%")
             logger.info(f"   简单到期收益率: {simple_ytm:.4f}%")
+            logger.info(f"   有效久期: {effective_duration:.4f}")
+            logger.info(f"   有效凸性: {effective_convexity:.4f}")
+            logger.info(f"   价格变动 +50bp / -50bp:   {pct_price_chg.get(50, 0):+.4f}% / {pct_price_chg.get(-50, 0):+.4f}%")
+            logger.info(f"   价格变动 +100bp / -100bp: {pct_price_chg.get(100, 0):+.4f}% / {pct_price_chg.get(-100, 0):+.4f}%")
+            logger.info(f"   VaR 历史 95%/99%: {var_hist.get(0.95, 0):.4f}% / {var_hist.get(0.99, 0):.4f}%")
+            logger.info(f"   VaR 参数 95%/99%: {var_param.get(0.95, 0):.4f}% / {var_param.get(0.99, 0):.4f}%")
+            logger.info(f"   ES 95%/99%:         {es.get(0.95, 0):.4f}% / {es.get(0.99, 0):.4f}%")
+            logger.info(f"   lookback_days: {lookback_days}")
 
             return result
 
