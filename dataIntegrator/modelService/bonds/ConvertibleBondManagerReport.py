@@ -312,7 +312,8 @@ class ConvertibleBondManagerReport:
             y -= 0.04
 
         # 分隔线
-        ax.axhline(y=y + 0.005, xmin=0.15, xmax=0.85, color='#e94560', linewidth=2)
+        ax.plot([0.15, 0.85], [y + 0.005, y + 0.005], color='#e94560', linewidth=2,
+                transform=ax.transAxes)
 
         y -= 0.03
 
@@ -329,8 +330,8 @@ class ConvertibleBondManagerReport:
                 y -= 0.04
             elif line == '---':
                 y -= 0.01
-                ax.axhline(y=y, xmin=0.08, xmax=0.92, color='#cccccc', linewidth=0.5,
-                           transform=ax.transAxes)
+                ax.plot([0.08, 0.92], [y, y], color='#cccccc', linewidth=0.5,
+                        transform=ax.transAxes)
                 y -= 0.02
             elif line.strip() == '':
                 y -= 0.01
@@ -677,6 +678,252 @@ class ConvertibleBondManagerReport:
             ],
         }
         return mapping.get(value_col, None)
+
+    # ==================== 量化组合推荐（交易员三步法） ====================
+
+    def _run_trader_screening_pipeline(self, df):
+        """交易员三步量化筛选：1) 数据对齐 2) 硬过滤 3) 四维度策略精筛
+
+        Returns:
+            dict with keys: total_count, hard_filter, dim1, dim2, dim3, dim4, final
+            无标的时返回 None
+        """
+        dfm = self._prepare_data(df)
+        latest_date = dfm['d.trade_date'].max()
+        latest = dfm[dfm['d.trade_date'] == latest_date].copy()
+        if latest.empty:
+            logger.warning("无法获取最新交易日数据")
+            return None
+
+        total_count = latest['series_name'].nunique()
+        logger.info(f"[三步筛选] 全市场 {total_count} 只可转债，最新日期 {latest_date.strftime('%Y-%m-%d')}")
+
+        def _f(col):
+            """安全获取 float 列"""
+            return latest[col].fillna(0).astype(float)
+
+        def _s(col):
+            """安全获取 string 列"""
+            return latest[col].fillna('')
+
+        # ==================== Step 1: 核心字段对齐 ====================
+        pool = pd.DataFrame({
+            'ts_code':        _s('b.ts_code'),
+            'bond_name':      _s('b.bond_short_name'),
+            'close':          _f('d.close'),
+            'par':            _f('b.par'),
+            'rem_years':      _f('m.remaining_years'),
+            'cur_yield':      _f('m.current_yield'),
+            'ytm':            _f('m.ytm'),
+            'mod_dur':        _f('m.modified_duration'),
+            'var_price':      _f('m.var_price_param_99'),
+            'var_pct':        _f('m.var_param_99'),
+            'es_pct':         _f('m.es_99'),
+            'es_price':       _f('m.es_price_99'),
+            'remain_size':    _f('b.remain_size'),
+            'stk_name':       _s('b.stk_short_name'),
+            'cb_type':        _s('b.cb_type'),
+            'series_name':    _s('series_name'),
+            'trade_date':     latest['d.trade_date'],
+            # 新增关键指标
+            'mac_dur':        _f('m.macaulay_duration'),
+            'eff_dur':        _f('m.effective_duration'),
+            'convexity':      _f('m.convexity'),
+            'eff_conv':       _f('m.effective_convexity'),
+            'dv01':           _f('m.dv01'),
+            'pvbp':           _f('m.pvbp'),
+            'ytm_simple':     _f('m.simple_ytm'),
+            'var_price_hist': _f('m.var_price_hist_99'),
+            'pct_p50bp':      _f('m.pct_price_chg_p50bp'),
+            'pct_m50bp':      _f('m.pct_price_chg_m50bp'),
+        })
+        pool = pool.drop_duplicates(subset=['ts_code']).reset_index(drop=True)
+
+        # ==================== Step 2: 硬过滤 ====================
+        reason = pd.Series('', index=pool.index)
+
+        mask_rem       = pool['rem_years'] >= 0.01
+        reason[~mask_rem]       = reason[~mask_rem] + '剩余年限不足;'
+
+        mask_size      = pool['remain_size'] >= 10000
+        reason[~mask_size]      = reason[~mask_size] + '剩余规模<1亿;'
+
+        mask_stk       = ~pool['stk_name'].str.contains('退', na=False)
+        reason[~mask_stk]       = reason[~mask_stk] + '正股含退市风险;'
+
+        mask_close     = pool['close'] <= 130
+        reason[~mask_close]     = reason[~mask_close] + f'收盘价{pool.loc[~mask_close,"close"].round(1).values}超130;'
+
+        mask_var       = pool['var_pct'] <= 3
+        reason[~mask_var]       = reason[~mask_var] + f'VaR99={pool.loc[~mask_var,"var_pct"].round(2).values}%超3%;'
+
+        mask_es        = pool['es_pct'] <= 6
+        reason[~mask_es]        = reason[~mask_es] + f'ES99={pool.loc[~mask_es,"es_pct"].round(2).values}%超6%;'
+
+        passed = mask_rem & mask_size & mask_stk & mask_close & mask_var & mask_es
+
+        retained = pool[passed].copy()
+        eliminated = pool[~passed].copy()
+        eliminated['淘汰原因'] = reason[~passed].values
+
+        logger.info(f"[三步筛选] Step2 硬过滤: {len(retained)}/{len(pool)} 通过 (淘汰 {len(eliminated)} 只)")
+
+        if retained.empty:
+            return None
+
+        # ==================== Step 3: 四维度策略精筛 ====================
+        r = retained.copy()
+
+        # --- 辅助函数：归一化得分到0-100 ---
+        def _norm(s):
+            mn, mx = s.min(), s.max()
+            if mx - mn < 1e-9:
+                return pd.Series(50, index=s.index)
+            return ((s - mn) / (mx - mn) * 100).round(1)
+
+        # ---------- 维度1：稳健收息型 ----------
+        r['dim1_raw'] = (
+            r['cur_yield'] * 0.40 +
+            (-r['ytm'])  * 0.30 +
+            (1 / r['rem_years'].clip(lower=0.01)) * 0.20 +
+            (1 / r['var_price'].clip(lower=0.01)) * 0.10
+        )
+        r['dim1_score'] = _norm(r['dim1_raw'])
+        dim1_mask = (r['cur_yield'] >= 1.8) & (r['ytm'] >= -5) & (r['var_pct'] <= 1.5)
+        dim1 = r[dim1_mask].nlargest(min(10, dim1_mask.sum()), 'dim1_score').copy()
+        logger.info(f"[三步筛选] 维度1-稳健收息: {dim1_mask.sum()} 只候选, 取Top{len(dim1)}")
+
+        # ---------- 维度2：深度价值型 ----------
+        r['dim2_raw'] = (
+            (100 - r['close']) * 0.50 +
+            r['ytm']           * 0.30 +
+            (1 / r['rem_years'].clip(lower=0.01)) * 0.20
+        )
+        r['dim2_score'] = _norm(r['dim2_raw'])
+        dim2_mask = (r['close'] < 100) & (r['ytm'] > 0) & (r['rem_years'] < 2)
+        dim2 = r[dim2_mask].nlargest(min(10, dim2_mask.sum()), 'dim2_score').copy()
+        logger.info(f"[三步筛选] 维度2-深度价值: {dim2_mask.sum()} 只候选, 取Top{len(dim2)}")
+
+        # ---------- 维度3：久期博弈型 ----------
+        r['dim3_raw'] = (
+            r['rem_years'] * 0.40 +
+            r['mod_dur']  * 0.30 +
+            (1 / r['var_price'].clip(lower=0.01)) * 0.20 +
+            r['cur_yield'] * 0.10
+        )
+        r['dim3_score'] = _norm(r['dim3_raw'])
+        dim3_mask = (r['rem_years'] >= 1.5) & (r['mod_dur'] >= 1.1) & (r['var_pct'] <= 2)
+        dim3 = r[dim3_mask].nlargest(min(10, dim3_mask.sum()), 'dim3_score').copy()
+        logger.info(f"[三步筛选] 维度3-久期博弈: {dim3_mask.sum()} 只候选, 取Top{len(dim3)}")
+
+        # ---------- 维度4：风险调整收益 ----------
+        r['dim4_val'] = (r['cur_yield'] / r['var_price'].clip(lower=0.01)).round(3)
+        dim4 = r.nlargest(min(10, len(r)), 'dim4_val').copy()
+        logger.info(f"[三步筛选] 维度4-风险调整收益: 取Top{len(dim4)}")
+
+        # ==================== 最终综合推荐 ====================
+        # 交集法：找出多少只出现在多个维度
+        all_dim_codes = []
+        for d, label in [(dim1, '稳健收息'), (dim2, '深度价值'), (dim3, '久期博弈'), (dim4, '风险调整')]:
+            if not d.empty:
+                for _, row in d.iterrows():
+                    all_dim_codes.append((row['ts_code'], row['bond_name'], label, row.get('dim1_score', row.get('dim2_score', row.get('dim3_score', 0))), row.get('dim4_val', 0)))
+
+        from collections import Counter
+        code_counter = Counter(c[0] for c in all_dim_codes)
+        multi_dim = {code for code, cnt in code_counter.items() if cnt >= 2}
+
+        # 综合推荐表：取多维度标的重叠 + 各维度首位
+        final_recs = []
+        seen = set()
+        # 先加满足2个维度以上的
+        for code in multi_dim:
+            hits = [c for c in all_dim_codes if c[0] == code]
+            row = retained[retained['ts_code'] == code].iloc[0] if len(retained[retained['ts_code'] == code]) > 0 else None
+            if row is not None and code not in seen:
+                dims_tag = ','.join([h[2] for h in hits])
+                final_recs.append({
+                    'ts_code': code, 'bond_name': row['bond_name'], 'close': row['close'],
+                    'ytm': row['ytm'], 'cur_yield': row['cur_yield'], 'rem_years': row['rem_years'],
+                    'mod_dur': row['mod_dur'], 'var_pct': row['var_pct'], 'es_pct': row['es_pct'],
+                    'mac_dur': row['mac_dur'], 'eff_dur': row['eff_dur'],
+                    'convexity': row['convexity'], 'eff_conv': row['eff_conv'],
+                    'dv01': row['dv01'], 'pvbp': row['pvbp'],
+                    'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
+                    'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'dim_tags': dims_tag, 'dim_count': len(hits),
+                })
+                seen.add(code)
+
+        # 如果不足5只，每个维度补首位
+        for d, label in [(dim1, '稳健收息'), (dim2, '深度价值'), (dim3, '久期博弈'), (dim4, '风险调整')]:
+            if len(final_recs) >= 8:
+                break
+            if d.empty:
+                continue
+            top_code = d.iloc[0]['ts_code']
+            if top_code not in seen:
+                row = retained[retained['ts_code'] == top_code].iloc[0]
+                final_recs.append({
+                    'ts_code': top_code, 'bond_name': row['bond_name'], 'close': row['close'],
+                    'ytm': row['ytm'], 'cur_yield': row['cur_yield'], 'rem_years': row['rem_years'],
+                    'mod_dur': row['mod_dur'], 'var_pct': row['var_pct'], 'es_pct': row['es_pct'],
+                    'mac_dur': row['mac_dur'], 'eff_dur': row['eff_dur'],
+                    'convexity': row['convexity'], 'eff_conv': row['eff_conv'],
+                    'dv01': row['dv01'], 'pvbp': row['pvbp'],
+                    'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
+                    'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'dim_tags': label, 'dim_count': 1,
+                })
+                seen.add(top_code)
+
+        logger.info(f"[三步筛选] 最终综合推荐: {len(final_recs)} 只")
+
+        return {
+            'total_count': total_count,
+            'retained_count': len(retained),
+            'eliminated_count': len(eliminated),
+            'eliminated': eliminated,
+            'dim1': dim1,
+            'dim2': dim2,
+            'dim3': dim3,
+            'dim4': dim4,
+            'dim4_full': r,
+            'final_recs': final_recs,
+        }
+
+    def _generate_screening_table_fig(self, data_rows, col_labels, title, subtitle=None, col_widths=None):
+        """通用筛选表格 Figure 生成器"""
+        n = len(data_rows)
+        if n == 0:
+            return None
+        nc = len(col_labels)
+        fig_height = max(3, 1.2 + n * 0.44)
+        fig, ax = plt.subplots(figsize=(24, fig_height))
+        ax.axis('off')
+        ax.set_title(title, fontsize=14, fontweight='bold', pad=12)
+        if subtitle:
+            ax.text(0.5, 0.97, subtitle, transform=ax.transAxes, ha='center', fontsize=9, color='#666')
+
+        if col_widths is None:
+            col_widths = [1.0 / nc] * nc
+
+        table = ax.table(
+            cellText=data_rows, colLabels=col_labels,
+            cellLoc='center', loc='center', colWidths=col_widths,
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(7.5)
+        table.scale(1.0, 1.5)
+        for i in range(nc):
+            table[0, i].set_facecolor('#2F5496')
+            table[0, i].set_text_props(color='white', fontweight='bold', fontsize=8)
+        for i in range(1, n + 1):
+            bg = '#D6E4F0' if i % 2 == 0 else '#FFFFFF'
+            for j in range(nc):
+                table[i, j].set_facecolor(bg)
+        plt.tight_layout(pad=1.2)
+        return fig
 
     def _generate_line_chart_fig(self, df, value_col, y_label, title_suffix, top_n=20, select_smallest=False, pivot=None):
         """返回折线图 Figure（用于拼入 PDF），只展示 y 值最极端的 top_n 条"""
@@ -1081,7 +1328,8 @@ class ConvertibleBondManagerReport:
                     transform=ax.transAxes, ha='center', fontsize=16,
                     color='#888888', style='italic')
 
-            ax.axhline(y=0.68, xmin=0.2, xmax=0.8, color='#e94560', linewidth=3)
+            ax.plot([0.2, 0.8], [0.68, 0.68], color='#e94560', linewidth=3,
+                    transform=ax.transAxes)
 
             info_text = (
                 f"报告区间：{start_date} — {end_date}\n"
@@ -1149,6 +1397,201 @@ class ConvertibleBondManagerReport:
                         if low_table_fig:
                             pdf.savefig(low_table_fig)
                             plt.close(low_table_fig)
+
+            # ============ 量化组合推荐（交易员三步筛选法） ============
+            logger.info("开始量化组合推荐（三步法）...")
+            screening = self._run_trader_screening_pipeline(df)
+
+            if screening:
+                # ---------- 总览页 ----------
+                overview_lines = [
+                    "## 交易员量化组合推荐",
+                    "",
+                    "以下按实盘交易逻辑，使用「硬指标量化打分 -> 人工排除噪音 -> 归类策略」三步筛选法，从全市场可转债中精选组合。",
+                    "",
+                    "### 第一步：核心字段对齐",
+                    f"全市场共 {screening['total_count']} 只可转债，提取 16 个核心字段：",
+                    "收盘价、面值、剩余年限、当期收益率、YTM、修正久期、麦考利久期、",
+                    "有效久期、凸性、有效凸性、DV01、PVBP、参数VaR(价格/%)、ES(价格/%)、",
+                    "剩余规模、正股名称、转债类型、+50bp价格变动、-50bp价格变动",
+                    "",
+                    "### 第二步：硬过滤规则（必须全部通过）",
+                    "- 剩余年限 >= 0.01 年          （排除已到期标的）",
+                    "- 剩余规模 >= 1 亿元            （避免流动性枯竭）",
+                    "- 正股不含\"退\"字              （规避违约风险）",
+                    "- 收盘价 <= 130 元              （超过130博弈空间小）",
+                    "- 参数VaR99 <= 3%              （单日极端跌幅可控）",
+                    "- ES99 <= 6%                   （尾部风险不过大）",
+                    "",
+                    f">> 结果：{screening['total_count']} 只中保留 {screening['retained_count']} 只，淘汰 {screening['eliminated_count']} 只。",
+                    "",
+                    "### 第三步：四维度策略因子精筛",
+                    "- 维度1：稳健收息型（防守）- 当期收益率×40% + (-YTM)×30% + 1/剩余年限×20% + 1/VaR×10%",
+                    "- 维度2：深度价值型（折价套利）- (100-收盘价)×50% + YTM×30% + 1/剩余年限×20%",
+                    "- 维度3：久期博弈型（利率敏感）- 剩余年限×40% + 修正久期×30% + 1/VaR×20% + 当期收益率×10%",
+                    "- 维度4：风险调整收益（夏普替代）- 当期收益率 / VaR99",
+                    "",
+                    "---",
+                    "最终推荐：交集法取同时满足多个策略维度的标的，辅以各维度首位。",
+                ]
+                self._add_text_page(pdf, '量化组合推荐总览', overview_lines)
+
+                # ---------- 淘汰明细表 ----------
+                elim = screening['eliminated']
+                if not elim.empty:
+                    elim_data = []
+                    for _, row in elim.iterrows():
+                        elim_data.append([
+                            str(row.get('ts_code', ''))[:12],
+                            str(row.get('bond_name', ''))[:10],
+                            f"{row.get('close', 0):.1f}",
+                            f"{row.get('var_pct', 0):.1f}%",
+                            f"{row.get('es_pct', 0):.1f}%",
+                            f"{row.get('rem_years', 0):.2f}",
+                            f"{row.get('ytm', 0):.1f}%",
+                            str(row.get('淘汰原因', ''))[:50],
+                        ])
+                    elim_cols = ['代码', '简称', '收盘价', 'VaR%', 'ES%', '剩余年', 'YTM%', '淘汰原因']
+                    fig = self._generate_screening_table_fig(
+                        elim_data, elim_cols,
+                        f'硬过滤淘汰明细（共 {len(elim)} 只）',
+                        col_widths=[0.10, 0.10, 0.08, 0.08, 0.08, 0.08, 0.08, 0.40],
+                    )
+                    if fig:
+                        pdf.savefig(fig)
+                        plt.close(fig)
+
+                # ---------- 四维度表 ----------
+                dim_columns = ['ts_code', 'bond_name', 'close', 'ytm', 'cur_yield', 'rem_years',
+                               'mod_dur', 'mac_dur', 'eff_dur', 'convexity', 'eff_conv',
+                               'dv01', 'pvbp', 'ytm_simple', 'var_price_hist',
+                               'pct_p50bp', 'pct_m50bp',
+                               'var_pct', 'es_pct',
+                               'dim1_score', 'dim2_score', 'dim3_score', 'dim4_val']
+
+                for dim_idx, (dim_df, dim_name, dim_key, score_col) in enumerate([
+                    (screening['dim1'], '维度1-稳健收息型（防守）', 'dim1', 'dim1_score'),
+                    (screening['dim2'], '维度2-深度价值型（折价套利）', 'dim2', 'dim2_score'),
+                    (screening['dim3'], '维度3-久期博弈型（利率敏感）', 'dim3', 'dim3_score'),
+                    (screening['dim4'], '维度4-风险调整收益（夏普替代）', 'dim4', 'dim4_val'),
+                ]):
+                    if dim_df is None or dim_df.empty:
+                        continue
+                    logger.info(f"生成 {dim_name} 表格 ({len(dim_df)} 只)")
+
+                    dim_data = []
+                    for _, row in dim_df.iterrows():
+                        dim_data.append([
+                            str(row.get('ts_code', ''))[:12],
+                            str(row.get('bond_name', ''))[:10],
+                            f"{row.get('close', 0):.1f}",
+                            f"{row.get('ytm', 0):.1f}%",
+                            f"{row.get('ytm_simple', 0):.1f}%",
+                            f"{row.get('cur_yield', 0):.2f}%",
+                            f"{row.get('rem_years', 0):.2f}",
+                            f"{row.get('mod_dur', 0):.2f}",
+                            f"{row.get('mac_dur', 0):.2f}",
+                            f"{row.get('eff_dur', 0):.2f}",
+                            f"{row.get('convexity', 0):.3f}",
+                            f"{row.get('eff_conv', 0):.3f}",
+                            f"{row.get('dv01', 0):.4f}",
+                            f"{row.get('pvbp', 0):.4f}",
+                            f"{row.get('pct_p50bp', 0):.2f}%",
+                            f"{row.get('pct_m50bp', 0):.2f}%",
+                            f"{row.get('var_price_hist', 0):.2f}",
+                            f"{row.get('var_pct', 0):.1f}%",
+                            f"{row.get('es_pct', 0):.1f}%",
+                            f"{row.get(score_col, 0):.1f}",
+                        ])
+                    dim_cols = ['代码', '简称', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                                '修久期', '麦久期', '有久期', '凸性', '有效凸性',
+                                'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
+                                'VaR%', 'ES%', '得分']
+                    fig = self._generate_screening_table_fig(
+                        dim_data, dim_cols, dim_name,
+                        col_widths=[0.06, 0.06, 0.04, 0.05, 0.05, 0.05, 0.04,
+                                    0.04, 0.04, 0.04, 0.05, 0.05,
+                                    0.04, 0.04, 0.05, 0.05, 0.05,
+                                    0.04, 0.04, 0.04],
+                    )
+                    if fig:
+                        pdf.savefig(fig)
+                        plt.close(fig)
+
+                # ---------- 最终综合推荐 ----------
+                final_recs = screening['final_recs']
+                if final_recs:
+                    final_data = []
+                    for i, rec in enumerate(final_recs, 1):
+                        final_data.append([
+                            f"#{i}",
+                            str(rec.get('ts_code', ''))[:12],
+                            str(rec.get('bond_name', ''))[:10],
+                            f"{rec.get('close', 0):.1f}",
+                            f"{rec.get('ytm', 0):.1f}%",
+                            f"{rec.get('ytm_simple', 0):.1f}%",
+                            f"{rec.get('cur_yield', 0):.2f}%",
+                            f"{rec.get('rem_years', 0):.2f}",
+                            f"{rec.get('mod_dur', 0):.2f}",
+                            f"{rec.get('mac_dur', 0):.2f}",
+                            f"{rec.get('eff_dur', 0):.2f}",
+                            f"{rec.get('convexity', 0):.3f}",
+                            f"{rec.get('eff_conv', 0):.3f}",
+                            f"{rec.get('dv01', 0):.4f}",
+                            f"{rec.get('pvbp', 0):.4f}",
+                            f"{rec.get('pct_p50bp', 0):.2f}%",
+                            f"{rec.get('pct_m50bp', 0):.2f}%",
+                            f"{rec.get('var_price_hist', 0):.2f}",
+                            f"{rec.get('var_pct', 0):.1f}%",
+                            f"{rec.get('es_pct', 0):.1f}%",
+                            str(rec.get('dim_tags', '')),
+                            str(rec.get('dim_count', 0)),
+                        ])
+                    final_cols = ['排名', '代码', '简称', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                                  '修久期', '麦久期', '有久期', '凸性', '有效凸性',
+                                  'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
+                                  'VaR%', 'ES%', '匹配维度', '匹配数']
+                    fig = self._generate_screening_table_fig(
+                        final_data, final_cols,
+                        f'最终量化推荐组合（共 {len(final_recs)} 只）',
+                        subtitle='综合四维度交叉验证，优先选出多维度同时认可的标的',
+                        col_widths=[0.03, 0.06, 0.06, 0.04, 0.04, 0.04, 0.05, 0.04,
+                                    0.04, 0.04, 0.04, 0.04, 0.04,
+                                    0.04, 0.04, 0.04, 0.04, 0.05,
+                                    0.04, 0.04, 0.10, 0.03],
+                    )
+                    if fig:
+                        pdf.savefig(fig)
+                        plt.close(fig)
+
+                    # 推荐理由页
+                    rec_lines = [
+                        "## 量化推荐总结",
+                        "",
+                        f"从 {screening['total_count']} 只可转债出发，经过硬过滤保留 {screening['retained_count']} 只，",
+                        f"再经四维度独立精筛，最终综合推荐 {len(final_recs)} 只。",
+                        "",
+                        "### 筛选逻辑",
+                        "本推荐完全基于硬指标量化打分，无主观拍脑袋。每一步阈值和权重均来自交易员实际风控框架。",
+                        "",
+                        "### 推荐要点",
+                    ]
+                    # 按维度分组展示
+                    from collections import defaultdict
+                    dim_groups = defaultdict(list)
+                    for rec in final_recs:
+                        for tag in rec['dim_tags'].split(','):
+                            dim_groups[tag.strip()].append(rec)
+                    for dim_tag, recs in dim_groups.items():
+                        codes = [f"{r['ts_code'][:12]} {r['bond_name'][:8]}" for r in recs]
+                        rec_lines.append(f"- **{dim_tag}**（{len(recs)}只）: {', '.join(codes[:5])}")
+                    rec_lines.append("")
+                    rec_lines.append("### 风险提示")
+                    rec_lines.append("- 以上推荐基于量化模型和历史数据，不构成投资建议。")
+                    rec_lines.append("- 实际交易需结合流动性、信用评级、正股基本面综合判断。")
+                    rec_lines.append("- 建议单券仓位不超过组合的5%，定期再平衡。")
+                    rec_lines.append("---")
+                    self._add_text_page(pdf, '量化推荐总结与理由', rec_lines)
 
         logger.info(f"PDF 策略报告已生成: {pdf_path}")
         return pdf_path
