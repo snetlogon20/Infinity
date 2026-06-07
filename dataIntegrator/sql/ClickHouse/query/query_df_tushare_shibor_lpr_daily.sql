@@ -210,9 +210,31 @@ ORDER BY d.trade_date, d.ts_code;
 
 
 select * from indexsysdb.vw_tushare_cb_full
+where  d.trade_date = '20260522'
 
-select b.ts_code , b.bond_full_name, d.trade_date, b.maturity,m.current_yield  from indexsysdb.vw_tushare_cb_full
-where m.current_yield  <> 0 AND d.trade_date = '20260105'
+SELECT b.ts_code, d.bond_value, b.bond_short_name, d.trade_date, b.maturity, m.current_yield,
+    m.coupon_rate,
+    m.ytm,
+    m.macaulay_duration,
+    m.modified_duration,
+    m.effective_duration,
+    m.convexity,
+    m.effective_convexity,
+    m.dv01,
+    m.pvbp,
+    m.remaining_years,
+    m.current_yield,
+    m.simple_ytm,
+    m.market_price,
+    m.var_price_hist_99,
+    m.var_price_param_99,
+    m.es_price_99,
+    m.pct_price_chg_p50bp,
+    m.pct_price_chg_m50bp
+FROM indexsysdb.vw_tushare_cb_full
+WHERE d.trade_date = '20260522' 
+  and b.ts_code in ('127033.SZ', '113037.SH', '128129.SZ', '127025.SZ', '127018.SZ', '128135.SZ', '113042.SH', '123072.SZ', '128127.SZ', '113052.SH')
+  AND m.current_yield <> 0
 
 
 --ALTER TABLE indexsysdb.df_tushare_cb_metrics  DELETE WHERE trade_date >= '20260101' AND trade_date <= '20260531'
