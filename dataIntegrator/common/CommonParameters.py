@@ -25,7 +25,7 @@ class CommonParameters():
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.182'
+    clickhouseHostName='192.168.98.184'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
@@ -52,19 +52,25 @@ class CommonParameters():
     # # Configuration - 2
     SPARKAI_URL_REQUEST_TIMEOUT = 120
     #SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
-    SPARKAI_URL = 'wss://spark-api.xf-yun.com/chat/max-32k'  #超长文本时使用
-    SPARKAI_DOMAIN = 'generalv3.5'
+    #SPARKAI_URL = 'wss://spark-api.xf-yun.com/chat/max-32k'  #超长文本时使用
+    SPARKAI_URL = "wss://spark-api.xf-yun.com/v4.0/chat"
+    SPARKAI_DOMAIN = 'spark-x'  # 仅支持 spark-x/x1/asean
     SPARK_APPID = "c4c24a9d"
-    SPARK_API_KEY = "7ee29f75c407872e608b2cc7e19115fb"
     SPARK_API_SECRET = "YmI5MGEwOWQ5NzMyMWMzYTk0YjE4MDA2"
+    SPARK_API_KEY = "7ee29f75c407872e608b2cc7e19115fb"
 
+
+    # Alibaba Cloud Bailian (DashScope / Tongyi Qianwen)
+    BAILIAN_API_KEY = "sk-49cf76b94af74825b15eafd0b5acabcb"
+    BAILIAN_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    BAILIAN_MODEL = "qwen-plus"  # qwen-turbo / qwen-plus / qwen-max / qwen-max-longcontext
 
     #Keep the parameter when you are running PlotManager standalone (not within StreamLit)
     IS_STREAMLIT_ON = False
     # IS_STREAMLIT_ON = True
 
-    IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
-    # IF_ENABLE_MOCKED_AI = False  # use real AI answer
+    # IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
     STOCK_LIST=[
             {'ts_code': '002093.SZ', 'name': '国脉科技'},

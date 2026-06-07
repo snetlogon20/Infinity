@@ -18,7 +18,26 @@ CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_cb_metrics
     `market_price` Float64 COMMENT '市场价格',
     `par` Float64 COMMENT '面值',
     `coupon_rate` Float64 COMMENT '票面利率(%)',
-    `pay_per_year` Int32 COMMENT '年付息次数'
+    `pay_per_year` Int32 COMMENT '年付息次数',
+    `var_hist_95` Float64 COMMENT '历史模拟VaR-95%置信(%)',
+    `var_hist_99` Float64 COMMENT '历史模拟VaR-99%置信(%)',
+    `var_param_95` Float64 COMMENT '参数法VaR-95%置信(%)',
+    `var_param_99` Float64 COMMENT '参数法VaR-99%置信(%)',
+    `es_95` Float64 COMMENT 'Expected Shortfall-95%置信(%)',
+    `es_99` Float64 COMMENT 'Expected Shortfall-99%置信(%)',
+    `var_price_hist_95` Float64 COMMENT '历史模拟VaR-95%置信(元)',
+    `var_price_hist_99` Float64 COMMENT '历史模拟VaR-99%置信(元)',
+    `var_price_param_95` Float64 COMMENT '参数法VaR-95%置信(元)',
+    `var_price_param_99` Float64 COMMENT '参数法VaR-99%置信(元)',
+    `es_price_95` Float64 COMMENT 'Expected Shortfall-95%置信(元)',
+    `es_price_99` Float64 COMMENT 'Expected Shortfall-99%置信(元)',
+    `lookback_days` Int32 COMMENT 'VaR/ES计算使用的历史样本天数',
+    `effective_duration` Float64 COMMENT '有效久期',
+    `effective_convexity` Float64 COMMENT '有效凸性',
+    `pct_price_chg_p50bp` Float64 COMMENT '收益率+50bp价格变动(%)',
+    `pct_price_chg_m50bp` Float64 COMMENT '收益率-50bp价格变动(%)',
+    `pct_price_chg_p100bp` Float64 COMMENT '收益率+100bp价格变动(%)',
+    `pct_price_chg_m100bp` Float64 COMMENT '收益率-100bp价格变动(%)'
 )
 ENGINE = MergeTree()
 ORDER BY (ts_code, trade_date)
