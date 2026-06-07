@@ -49,6 +49,14 @@ class ConvertibleBondManagerReport:
         ('m.pct_price_chg_m100bp',  '价格变动 -100bp(%)',     '收益率-100bp价格变动 走势'),
     ]
 
+    # 需要同时展示高风险 top20 和低风险 top20 的字段
+    RISK_DUAL_FIELDS = {
+        'm.var_price_hist_99',
+        'm.var_price_param_99',
+        'm.es_price_99',
+        'm.es_99',
+    }
+
     def __init__(self):
         self.clickhouse_service = ClickhouseService()
 
@@ -340,8 +348,8 @@ class ConvertibleBondManagerReport:
         pdf.savefig(fig)
         plt.close(fig)
 
-    def _generate_line_chart_fig(self, df, value_col, y_label, title_suffix, top_n=20):
-        """返回折线图 Figure（用于拼入 PDF），只展示 y 值最大的 top_n 条"""
+    def _get_top_pivot(self, df, value_col, top_n=20, select_smallest=False):
+        """提取 pivot 表并筛选 top_n 条极端曲线，供图表和数据表复用"""
         df = df.dropna(subset=[value_col])
         if df.empty:
             return None
@@ -353,11 +361,329 @@ class ConvertibleBondManagerReport:
             aggfunc='first'
         ).sort_index()
 
-        # 选出 y 绝对值最大的 top_n 条曲线
         if len(pivot.columns) > top_n:
             max_abs_values = pivot.abs().max()
-            top_columns = max_abs_values.nlargest(top_n).index.tolist()
+            if select_smallest:
+                top_columns = max_abs_values.nsmallest(top_n).index.tolist()
+            else:
+                top_columns = max_abs_values.nlargest(top_n).index.tolist()
             pivot = pivot[top_columns]
+
+        return pivot
+
+    def _generate_data_table_fig(self, pivot, y_label, title_suffix):
+        """生成一条折线图对应的数据明细表 Figure"""
+        if pivot is None or pivot.empty:
+            return None
+
+        # 先收集原始数值，按 |最新值| 降序排列，方便交易员快速定位极值标的
+        raw_data = []
+        for col in pivot.columns:
+            series = pivot[col].dropna()
+            if series.empty:
+                continue
+            last_date = series.index[-1]
+            date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
+            raw_data.append((
+                col,
+                date_str,
+                float(series.iloc[-1]),
+                float(series.mean()),
+                float(series.std()),
+                float(series.min()),
+                float(series.max()),
+            ))
+
+        if not raw_data:
+            return None
+
+        # 按最新值的绝对值降序排列，极值标的最显眼
+        raw_data.sort(key=lambda x: abs(x[2]), reverse=True)
+
+        # 格式化成展示字符串
+        table_data = []
+        for item in raw_data:
+            table_data.append([
+                item[0],
+                item[1],
+                f"{item[2]:.4f}",
+                f"{item[3]:.4f}",
+                f"{item[4]:.4f}",
+                f"{item[5]:.4f}",
+                f"{item[6]:.4f}",
+            ])
+
+        col_labels = ['代码/名称', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
+        n_rows = len(table_data)
+        zero_count = 0
+        for row in table_data:
+            try:
+                if abs(float(row[2])) < 1e-8:
+                    zero_count += 1
+            except ValueError:
+                pass
+        suffix_note = f"（注：{zero_count}只标的最新值接近0）" if zero_count > 0 else ""
+        title = f'可转债 {title_suffix} (Top {n_rows}) 数据明细{suffix_note}'
+
+        fig_height = max(3, 1.0 + n_rows * 0.42)
+        fig, ax = plt.subplots(figsize=(22, fig_height))
+        ax.axis('off')
+        ax.set_title(title, fontsize=13, fontweight='bold', pad=16)
+
+        table = ax.table(
+            cellText=table_data,
+            colLabels=col_labels,
+            cellLoc='center',
+            loc='center',
+            colWidths=[0.28, 0.11, 0.12, 0.12, 0.12, 0.12, 0.13]
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(8)
+        table.scale(1.0, 1.45)
+
+        # header style
+        for i in range(len(col_labels)):
+            table[0, i].set_facecolor('#2F5496')
+            table[0, i].set_text_props(color='white', fontweight='bold', fontsize=8.5)
+
+        # alternating row color
+        for i in range(1, n_rows + 1):
+            bg = '#D6E4F0' if i % 2 == 0 else '#FFFFFF'
+            for j in range(len(col_labels)):
+                table[i, j].set_facecolor(bg)
+
+        plt.tight_layout(pad=1.0)
+        return fig
+
+    def _get_trader_explanation(self, value_col):
+        """返回交易员层面的专业解读文本列表"""
+        mapping = {
+            'd.pre_close': [
+                "## 交易员视角：前收盘价 (Pre_Close)",
+                "前收盘价是每日开盘前的锚定价格，也是计算涨跌幅的基准。",
+                "",
+                "【市场含义】",
+                "• 连续上行 → 多头趋势确立，市场共识偏强，可顺势持有或加仓",
+                "• 连续下行 → 空头主导，持仓面临浮亏压力，需审视止损位",
+                "• 横盘整理 → 多空均衡，等待方向选择，观望或轻仓参与",
+                "",
+                "【交易策略】突破前高可追多，设前收盘价下方1%为止损；跌破前低应减仓。",
+            ],
+            'd.pct_chg': [
+                "## 交易员视角：涨跌幅 (Pct_Chg%)",
+                "涨跌幅是日内多空博弈的直接体现。高波动意味着分歧大、机会多，也意味着风险敞口大。",
+                "",
+                "【实战解读】",
+                "• 涨幅 >5%：强势标的，关注是否触发短线止盈信号",
+                "• 涨幅 1-3%：温和上行，适合中线持有",
+                "• 跌幅 >3%：风险信号，检查是否有信用事件或正股利空",
+                "• 跌幅 1-3%：正常波动，不必过度反应",
+                "",
+                "【操作建议】转债T+0特性使日内波动放大是常态。涨幅过大先兑现部分利润，",
+                "跌幅过大不宜盲目补仓，先判断是否为系统性风险。",
+            ],
+            'd.vol': [
+                "## 交易员视角：成交量 (Vol)",
+                "成交量是市场情绪的体温计——放量代表分歧加大或资金进场，缩量代表观望或流动性枯竭。",
+                "",
+                "【量价关系】",
+                "• 放量上涨 → 多头强势，可靠性高，可顺势加仓",
+                "• 放量下跌 → 恐慌抛售或主力出货，果断减仓",
+                "• 缩量上涨 → 上攻乏力，可能冲高回落，谨慎追多",
+                "• 缩量下跌 → 抛压减轻，接近底部但未确认反转前不抄底",
+                "",
+                "【流动性管理】日均成交低于1000手的标的，冲击成本可能超0.5%，大资金谨慎参与。",
+            ],
+            'd.amount': [
+                "## 交易员视角：成交额 (Amount)",
+                "成交额直接反映资金参与规模，大额成交意味着机构参与度高，趋势更具持续性。",
+                "",
+                "【实战信号】",
+                "• 成交额持续放大 → 增量资金入场，行情有望延续",
+                "• 成交额急剧放大后萎缩 → 短期高点信号，注意止盈",
+                "• 成交额低迷 → 市场缺乏方向，降低交易频率",
+                "",
+                "【策略建议】大额成交标的适合趋势跟踪；小额成交标的需警惕流动性折价。",
+            ],
+            'm.ytm': [
+                "## 交易员视角：到期收益率 (YTM)",
+                "YTM是持有至到期的年化总回报。转债YTM通常低于同评级信用债，差额即为转股期权隐含价格。",
+                "",
+                "【关键判断】",
+                "• YTM > 0 → 债底保护充分，下行空间有限，安全性较高",
+                "• YTM < 0 → 完全依赖转股价值，纯债安全垫为负",
+                "• YTM 上升 → 债券价格下跌或信用利差走阔，可能是买入机会",
+                "• YTM 下降 → 债券价格上涨，持有者盈利但新增持仓性价比降低",
+                "",
+                "【策略应用】利率下行周期可配置高YTM转债获取骑乘收益。",
+            ],
+            'm.modified_duration': [
+                "## 交易员视角：修正久期 (Modified Duration)",
+                "修正久期衡量可转债价格对收益率变化1%的线性敏感度。数值越大，利率风险暴露越高。",
+                "",
+                "【关键阈值】",
+                "• 修正久期 < 2 → 短久期，利率风险低，适合防御性配置",
+                "• 修正久期 2-5 → 中等久期，利率波动产生明显影响",
+                "• 修正久期 > 5 → 长久期，利率下行时收益放大，上行时亏损加剧",
+                "",
+                "【对冲建议】组合久期超目标水平时：减持长久期标的 / 配置短久期品种 / 国债期货对冲。",
+            ],
+            'm.convexity': [
+                "## 交易员视角：凸性 (Convexity)",
+                "凸性衡量久期随收益率变化的速率，是利率风险管理的二阶工具。",
+                "正凸性 → 利率下行时价格涨幅 > 利率上行时价格跌幅（非对称优势）。",
+                "",
+                "【交易者视角】",
+                "• 凸性越高，降息时久期拉长，进一步放大价格上涨弹性",
+                "• 高凸性转债在降息周期表现优异",
+                "• 临近到期转债凸性趋近于零，投资者应关注剩余期限影响",
+            ],
+            'm.dv01': [
+                "## 交易员视角：DV01",
+                "DV01表示收益率每变动1bp时，每张可转债价格的变动金额（元）。",
+                "",
+                "【实战应用】",
+                "• 持仓DV01 = 单券DV01 × 持仓张数，汇总得组合整体利率风险敞口",
+                "• DV01匹配可对冲利率风险：多空DV01相等即实现免疫",
+                "• DV01越大 → 利率微小变动造成盈亏波动越大，需关注止损设定",
+            ],
+            'm.pvbp': [
+                "## 交易员视角：PVBP",
+                "PVBP（Price Value of a Basis Point）与DV01含义相同，标准化为每百元面值。",
+                "是国际通行的利率风险度量标准。",
+                "",
+                "【交易应用】比较不同面额标的风险时，PVBP提供标准化标尺。",
+                "【经验法则】每PVBP=0.05元时，收益率变动50bp ≈ 每张盈亏2.5元。",
+            ],
+            'm.simple_ytm': [
+                "## 交易员视角：简易到期收益率 (Simple YTM)",
+                "不考虑复利效应的YTM，计算简便直观。短期标的与标准YTM差异不大。",
+                "",
+                "【使用建议】",
+                "• 短期(<1年)：Simple YTM ≈ 标准YTM，可直接参考",
+                "• 中长期：Simple YTM低估复利效应，应以标准YTM为准",
+                "• 一般仅作快速筛选参考，不用于精确估值决策",
+            ],
+            'm.current_yield': [
+                "## 交易员视角：当期收益率 (Current Yield)",
+                "当期收益率 = 年票息 / 当前市价，仅反映利息收入，不考虑资本利得。",
+                "",
+                "【策略意义】高当期收益率标的提供稳定现金流，适合收入导向型策略。",
+                "转债通常票息较低，当前收益率对总回报贡献有限，主要依赖转股价值驱动。",
+            ],
+            'm.var_hist_99': [
+                "## 交易员视角：历史VaR(99%置信, %)",
+                "基于历史收益率分布，99%置信度下单日最大可能亏损比例。",
+                "如VaR=2% → 99%情况下单日亏损不超过2%。",
+                "",
+                "【风控阈值】",
+                "• VaR 1-2%：低风险，适合稳健型组合",
+                "• VaR 2-5%：中度风险，需设止损线并控仓",
+                "• VaR >5%：高风险，仅适合激进策略，单券仓位≤2%",
+                "",
+                "【局限性】依赖历史样本代表性，市场突变时可能低估风险，需结合参数法+ES综合判断。",
+            ],
+            'm.var_param_99': [
+                "## 交易员视角：参数VaR(99%置信, %)",
+                "假设收益率正态分布，基于均值和标准差计算。简洁但无法捕捉肥尾特征。",
+                "",
+                "【对比判断】",
+                "• 参数VaR << 历史VaR → 分布存在明显肥尾，参数法低估风险",
+                "• 参数VaR > 历史VaR → 近期波动率下降，历史样本含极端行情",
+                "• 参数VaR ≈ 历史VaR → 正态假设可接受",
+            ],
+            'm.es_99': [
+                "## 交易员视角：Expected Shortfall(ES, 99%)",
+                "ES衡量损失超过VaR阈值时的平均损失幅度，是比VaR更全面的尾部风险度量。",
+                "",
+                "【实战价值】",
+                "• ES给出\"最糟糕情况平均亏多少\"，比VaR的\"不会超过多少\"更有指导意义",
+                "• ES > VaR 幅度越大 → 尾部风险越不对称，极端行情伤害越深",
+                "• 监管机构越来越倾向使用ES替代VaR",
+                "",
+                "【风控建议】ES超3%的标的，极端行情下可能单日跌5-10%，需严格控仓。",
+            ],
+            'm.var_price_hist_99': [
+                "## 交易员视角：历史VaR(99%置信, 元/张)",
+                "以每张可转债绝对元计价计量的VaR，直观展示最大潜在亏损金额。",
+                "",
+                "【实用解读】",
+                "• VaR_price=3元/张 → 99%概率每张单日亏损≤3元",
+                "• 乘以持仓张数即得组合VaR金额",
+                "• 低VaR_price标的适合组合稳定器，高VaR_price标的需严格控仓",
+                "",
+                "【实操步骤】每日监控持仓券VaR_price变化，单券VaR_price超总资产0.5%即为重仓风险信号。",
+            ],
+            'm.var_price_param_99': [
+                "## 交易员视角：参数VaR(99%置信, 元/张)",
+                "基于正态假设的参数法VaR（元/张），对近期波动率变化更敏感。",
+                "",
+                "【交易应用】若参数VaR突然跳升，提示波动率骤增，应立即降低风险敞口。",
+                "若参数VaR持续下降，表明市场趋于稳定。",
+            ],
+            'm.es_price_99': [
+                "## 交易员视角：ES(99%置信, 元/张)",
+                "ES_price计量极端情景下平均损失金额（元/张），是最保守的风险度量。",
+                "",
+                "【风控纪律】",
+                "• 单券ES_price > 5元/张 → 高风险券，单券仓位≤2%",
+                "• 单券ES_price > 10元/张 → 极高风险券，仅投机性参与",
+                "• 组合总ES = Σ(各券ES_price × 持仓张数)，确保不超过组合净值5%",
+            ],
+            'm.effective_duration': [
+                "## 交易员视角：有效久期 (Effective Duration)",
+                "通过数值法（±1bp冲击）计算，比修正久期更准确反映含权债券真实利率敏感度。",
+                "",
+                "【交易逻辑】",
+                "• 有效久期 < 修正久期 → 存在负凸性或嵌入期权约束（如赎回条款）",
+                "• 有效久期 ≈ 修正久期 → 定价接近普通债券，期权价值较低",
+                "• 有效久期越大 → 利率对冲需要的国债期货手数越多",
+            ],
+            'm.effective_convexity': [
+                "## 交易员视角：有效凸性 (Effective Convexity)",
+                "有效凸性通过数值模拟计算，反映价格-收益率曲线的弯曲程度。",
+                "",
+                "【交易优势】",
+                "• 正凸性越大 → 利率下行时收益放大效应越明显",
+                "• 高凸性标的在降息周期是优质配置选择",
+                "• 低凸性或负凸性标的需警惕，利率不利时损失可能急剧放大",
+            ],
+            'm.pct_price_chg_p50bp': [
+                "## 交易员视角：收益率+50bp价格变动(%)",
+                "模拟利率上行50bp时价格预期变动。是压力测试的基础情景之一。",
+                "",
+                "【风控场景】美联储加息50bp或央行MLF利率上调时，快速评估持仓损失：",
+                "损失 ≈ |pct_chg| × 持仓市值。若超风险预算，应提前调仓。",
+            ],
+            'm.pct_price_chg_m50bp': [
+                "## 交易员视角：收益率-50bp价格变动(%)",
+                "模拟利率下行50bp时价格预期变动。",
+                "",
+                "【交易应用】预期降息时可筛选涨幅最大的标的超配，预期加息时规避该数值大的标的。",
+            ],
+            'm.pct_price_chg_p100bp': [
+                "## 交易员视角：收益率+100bp价格变动(%)",
+                "极端利率上行冲击（+100bp）下的价格变动，属于严重压力情景。",
+                "",
+                "【风控红线】持仓中 pct_chg_p100bp < -5% 的标的，在加息周期必须设硬性减仓纪律。",
+                "组合该指标加权均值超-3%时，应立即启动利率对冲。",
+            ],
+            'm.pct_price_chg_m100bp': [
+                "## 交易员视角：收益率-100bp价格变动(%)",
+                "极端降息情景下的价格变动。",
+                "",
+                "【策略启示】该数值大的标的在宽松周期弹性最大，但加息周期也面临最大反向风险。",
+                "货币政策转折期应动态调整该类标的配置权重。",
+            ],
+        }
+        return mapping.get(value_col, None)
+
+    def _generate_line_chart_fig(self, df, value_col, y_label, title_suffix, top_n=20, select_smallest=False, pivot=None):
+        """返回折线图 Figure（用于拼入 PDF），只展示 y 值最极端的 top_n 条"""
+        if pivot is None:
+            pivot = self._get_top_pivot(df, value_col, top_n, select_smallest)
+            if pivot is None or pivot.empty:
+                return None
 
         series_count = len(pivot.columns)
 
@@ -729,9 +1055,10 @@ class ConvertibleBondManagerReport:
     def _generate_pdf_report(self, df, stats, start_date, end_date):
         """生成完整 PDF 策略报告"""
         os.makedirs(self.REPORT_DIR, exist_ok=True)
+        now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         pdf_path = os.path.join(
             self.REPORT_DIR,
-            f"ConvertibleBond_Strategy_Report_{start_date}_{end_date}.pdf"
+            f"ConvertibleBond_Strategy_Report_{start_date}-{end_date}_{now_ts}.pdf"
         )
 
         df = self._prepare_data(df)
@@ -782,10 +1109,46 @@ class ConvertibleBondManagerReport:
             # ===== 逐一生成图表页 =====
             for value_col, y_label, title_suffix in self.CHART_FIELDS:
                 logger.info(f"生成图表: {title_suffix}")
-                fig = self._generate_line_chart_fig(df, value_col, y_label, title_suffix)
+
+                # 获取数据 pivot
+                pivot = self._get_top_pivot(df, value_col)
+                if pivot is None or pivot.empty:
+                    continue
+
+                # 折线图
+                fig = self._generate_line_chart_fig(df, value_col, y_label, title_suffix, pivot=pivot)
                 if fig:
                     pdf.savefig(fig)
                     plt.close(fig)
+
+                # 数据明细表
+                logger.info(f"生成数据表: {title_suffix}")
+                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix)
+                if table_fig:
+                    pdf.savefig(table_fig)
+                    plt.close(table_fig)
+
+                # 交易员解读
+                explanation = self._get_trader_explanation(value_col)
+                if explanation:
+                    self._add_text_page(pdf, f'交易员解读: {title_suffix}', explanation)
+
+                # 风险字段额外生成低风险 Top 20（数值最小的）
+                if value_col in self.RISK_DUAL_FIELDS:
+                    low_pivot = self._get_top_pivot(df, value_col, select_smallest=True)
+                    if low_pivot is not None and not low_pivot.empty:
+                        low_title = title_suffix + ' (低风险Top20)'
+                        logger.info(f"生成图表: {low_title}")
+                        low_fig = self._generate_line_chart_fig(
+                            df, value_col, y_label, low_title, select_smallest=True, pivot=low_pivot)
+                        if low_fig:
+                            pdf.savefig(low_fig)
+                            plt.close(low_fig)
+                        logger.info(f"生成数据表: {low_title}")
+                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title)
+                        if low_table_fig:
+                            pdf.savefig(low_table_fig)
+                            plt.close(low_table_fig)
 
         logger.info(f"PDF 策略报告已生成: {pdf_path}")
         return pdf_path
@@ -817,12 +1180,3 @@ class ConvertibleBondManagerReport:
         self._generate_pdf_report(df, stats, start_date, end_date)
 
         logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")
-
-
-if __name__ == "__main__":
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)
-    pd.set_option('display.max_colwidth', None)
-
-    report = ConvertibleBondManagerReport()
-    report.run("20260101", "20260525")
