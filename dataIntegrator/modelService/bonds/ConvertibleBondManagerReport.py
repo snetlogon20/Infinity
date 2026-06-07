@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from dataIntegrator import CommonLib
+from dataIntegrator.common.CommonParameters import CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -1593,8 +1594,81 @@ class ConvertibleBondManagerReport:
                     rec_lines.append("---")
                     self._add_text_page(pdf, '量化推荐总结与理由', rec_lines)
 
+                    # ---------- AI 分析报告 ----------
+                    ai_report = self._generate_ai_analysis_report(screening['dim4'])
+                    if ai_report:
+                        ai_lines = [
+                            "以下为 AI 交易员基于维度4-风险调整收益的债券池，自动生成的可转债组合推荐分析：",
+                            "",
+                        ]
+                        for line in ai_report.strip().split('\n'):
+                            if line.strip():
+                                ai_lines.append(line.strip())
+                        self._add_text_page(pdf, 'AI 量化组合推荐分析', ai_lines)
+
         logger.info(f"PDF 策略报告已生成: {pdf_path}")
         return pdf_path
+
+    # ==================== AI 分析报告 ====================
+
+    def _generate_ai_analysis_report(self, dim4):
+        """从维度4（风险调整收益）的债券中提取数据，调用 AI 生成可转债组合推荐分析报告
+
+        Args:
+            dim4: 维度4 DataFrame，包含 ts_code, bond_name, ytm, mod_dur, dv01, close, es_price 等列
+
+        Returns:
+            AI 分析报告字符串，失败时返回错误信息
+        """
+        if dim4 is None or dim4.empty:
+            logger.info("维度4 无数据，跳过 AI 分析报告生成")
+            return None
+
+        # 提取必要列
+        ai_bonds = dim4[['ts_code', 'bond_name', 'ytm', 'mod_dur', 'dv01', 'close', 'es_price']].copy()
+
+        # 保留 2 位小数，节省 token
+        ai_bonds['ytm'] = ai_bonds['ytm'].round(2)
+        ai_bonds['mod_dur'] = ai_bonds['mod_dur'].round(2)
+        ai_bonds['dv01'] = ai_bonds['dv01'].round(4)
+        ai_bonds['close'] = ai_bonds['close'].round(2)
+        ai_bonds['es_price'] = ai_bonds['es_price'].round(2)
+
+        # 构建每行数据
+        data_lines = []
+        for _, row in ai_bonds.iterrows():
+            data_lines.append(
+                f"{row['ts_code']}, {row['bond_name']}, "
+                f"ytm={row['ytm']:+.2f}, duration={row['mod_dur']:.2f}, "
+                f"dv01={row['dv01']:.4f}, price={row['close']:.2f}, "
+                f"es_price_99={row['es_price']:.2f}"
+            )
+
+        n = len(ai_bonds)
+        data_block = "\n".join(data_lines)
+
+        prompt = f"""你是一个资深的银行债券交易员。
+以下是 {n} 只可转债的量化数据（ts_code, name, ytm, duration, dv01, price, es_price_99）：
+
+{data_block}
+
+请从这 {n} 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。
+只需要输出选出的 5 只债券的 ts_code 和理由，不需要计算组合权重。"""
+
+        if CommonParameters.IF_ENABLE_MOCKED_AI:
+            logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析报告")
+            return "（模拟 AI 分析报告）mocked AI analysis..."
+
+        from dataIntegrator.LLMSuport.AiAgents.SparkAIX import SparkX2
+
+        logger.info(f"正在调用 SparkX2 生成 AI 分析报告，输入 {n} 只债券数据")
+        try:
+            result = SparkX2.inquiry(prompt, "")
+            logger.info("SparkX2 AI 分析报告生成成功")
+            return result
+        except Exception as e:
+            logger.error(f"AI 分析报告生成失败: {e}")
+            return f"AI 分析报告生成失败: {e}"
 
     # ==================== 一键流程 ====================
 
