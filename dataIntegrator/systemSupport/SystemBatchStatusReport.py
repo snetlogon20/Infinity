@@ -90,13 +90,18 @@ class SystemBatchStatusReport:
         """查询当日日志明细（包含 extra_params）"""
         sql = f"""
         SELECT 'TuShare' AS source, job_name, job_status, start_time, end_time,
-               duration_seconds, records_processed, error_message, extra_params
+               duration_seconds, records_processed, error_message, comment
         FROM indexsysdb.df_tushare_manager_job_log
         WHERE toDate(start_time) = toDate('{target_date}')
         UNION ALL
         SELECT 'AKShare' AS source, job_name, job_status, start_time, end_time,
-               duration_seconds, records_processed, error_message, extra_params
+               duration_seconds, records_processed, error_message, comment
         FROM indexsysdb.df_akshare_manager_job_log
+        WHERE toDate(start_time) = toDate('{target_date}')
+        UNION ALL
+        SELECT 'Report' AS source, job_name, job_status, start_time, end_time,
+               duration_seconds, records_processed, error_message, comment
+        FROM indexsysdb.df_report_job_log
         WHERE toDate(start_time) = toDate('{target_date}')
         ORDER BY source, start_time
         """
@@ -120,6 +125,10 @@ class SystemBatchStatusReport:
             SELECT 'AKShare' AS source, job_status
             FROM indexsysdb.df_akshare_manager_job_log
             WHERE toDate(start_time) = toDate('{target_date}')
+            UNION ALL
+            SELECT 'Report' AS source, job_status
+            FROM indexsysdb.df_report_job_log
+            WHERE toDate(start_time) = toDate('{target_date}')
         )
         GROUP BY source, job_status
         ORDER BY source, job_status
@@ -142,6 +151,10 @@ class SystemBatchStatusReport:
             UNION ALL
             SELECT start_time, job_status
             FROM indexsysdb.df_akshare_manager_job_log
+            WHERE toDate(start_time) >= toDate('{target_date}') - 30
+            UNION ALL
+            SELECT start_time, job_status
+            FROM indexsysdb.df_report_job_log
             WHERE toDate(start_time) >= toDate('{target_date}') - 30
         )
         GROUP BY date
@@ -268,7 +281,7 @@ class SystemBatchStatusReport:
     def _build_detail_table(self, df, page_width=None):
         """构建带状态颜色的明细表（不含数据源列，因为已按源分组）"""
         detail_columns = ['任务名称', '状态', '开始时间', '结束时间',
-                          '耗时(秒)', '处理记录数', '参数', '错误信息']
+                          '耗时(秒)', '处理记录数', '关键参数', '错误信息']
         col_widths = [2.6 * inch, 0.55 * inch, 1.25 * inch, 1.25 * inch,
                       0.65 * inch, 0.75 * inch, 1.5 * inch, 2.2 * inch]
 
@@ -281,11 +294,11 @@ class SystemBatchStatusReport:
             rec_str = str(int(row['records_processed'])) if pd.notna(row.get('records_processed')) else ''
             err_str = str(row.get('error_message', ''))[:60] if pd.notna(row.get('error_message')) else ''
 
-            extra = row.get('extra_params', '')
-            if pd.isna(extra):
-                extra = ''
-            elif len(str(extra)) > 30:
-                extra = str(extra)[:30]
+            comment = row.get('comment', '')
+            if pd.isna(comment):
+                comment = ''
+            elif len(str(comment)) > 30:
+                comment = str(comment)[:30]
 
             table_data.append([
                 row['job_name'],
@@ -294,7 +307,7 @@ class SystemBatchStatusReport:
                 end_str,
                 dur_str,
                 rec_str,
-                extra,
+                comment,
                 err_str,
             ])
 
@@ -485,7 +498,7 @@ class SystemBatchStatusReport:
         story.append(Paragraph('三、日志明细', heading_style))
 
         if not today_logs_df.empty:
-            source_order = ['AKShare', 'TuShare']
+            source_order = ['AKShare', 'TuShare', 'Report']
             for src in source_order:
                 src_df = today_logs_df[today_logs_df['source'] == src]
                 if src_df.empty:
@@ -545,7 +558,3 @@ class SystemBatchStatusReport:
         logger.info(f"PDF 报告已生成: {pdf_path}")
         return pdf_path
 
-
-if __name__ == "__main__":
-    report = SystemBatchStatusReport()
-    report.generate_report()

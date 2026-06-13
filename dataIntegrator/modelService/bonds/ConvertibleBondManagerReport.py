@@ -10,6 +10,7 @@ import pandas as pd
 
 from dataIntegrator import CommonLib
 from dataIntegrator.common.CommonParameters import CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -1693,27 +1694,38 @@ class ConvertibleBondManagerReport:
     # ==================== 一键流程 ====================
 
     def run(self, start_date, end_date):
+        job_logger = ReportJobLogger()
+        job_logger.start_job('ConvertibleBondManagerReport', 'ConvertibleBond',
+                             params={'start_date': start_date, 'end_date': end_date})
+
         logger.info(f"====== ConvertibleBondManagerReport 开始执行 ======")
         logger.info(f"日期范围: {start_date} ~ {end_date}")
 
-        # 1) 查询
-        df = self.query_panorama(start_date, end_date)
-        if df.empty:
-            logger.warning("查询结果为空，流程终止")
-            return
+        try:
+            # 1) 查询
+            df = self.query_panorama(start_date, end_date)
+            if df.empty:
+                logger.warning("查询结果为空，流程终止")
+                job_logger.end_job_failed("查询结果为空")
+                return
 
-        # 2) 保存原始数据
-        self.save_to_file(df, f"panorama_{start_date}_{end_date}")
+            # 2) 保存原始数据
+            self.save_to_file(df, f"panorama_{start_date}_{end_date}")
 
-        # 3) 数据预处理（添加 series_name、转换日期）
-        df = self._prepare_data(df)
+            # 3) 数据预处理（添加 series_name、转换日期）
+            df = self._prepare_data(df)
 
-        # 4) 统计计算
-        stats = self._compute_analysis_stats(df)
-        logger.info(f"统计完成：{stats['total_bonds']} 只可转债，"
-                     f"区间涨跌 {stats.get('period_return', 0):+.2f}%")
+            # 4) 统计计算
+            stats = self._compute_analysis_stats(df)
+            logger.info(f"统计完成：{stats['total_bonds']} 只可转债，"
+                         f"区间涨跌 {stats.get('period_return', 0):+.2f}%")
 
-        # 5) 生成 PDF 策略报告
-        self._generate_pdf_report(df, stats, start_date, end_date)
+            # 5) 生成 PDF 策略报告
+            self._generate_pdf_report(df, stats, start_date, end_date)
 
-        logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")
+            logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")
+            job_logger.end_job_success(records_processed=stats.get('total_bonds', 0))
+        except Exception as e:
+            import traceback
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise

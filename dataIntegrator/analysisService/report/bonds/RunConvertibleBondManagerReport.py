@@ -6,6 +6,7 @@
 """
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.bonds.ConvertibleBondManagerReport import ConvertibleBondManagerReport
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
@@ -17,6 +18,7 @@ class RunConvertibleBondManagerReport:
 
     def __init__(self):
         self.report = ConvertibleBondManagerReport()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, start_date=None, end_date=None):
         """
@@ -38,13 +40,17 @@ class RunConvertibleBondManagerReport:
         logger.info(f"   日期范围: {start_date} ~ {end_date}")
         logger.info("=" * 80)
 
+        self.job_logger.start_job('ConvertibleBondManagerReport', 'ConvertibleBond',
+                                  params={'start_date': start_date, 'end_date': end_date})
         try:
             self.report.run(start_date, end_date)
+            self.job_logger.end_job_success()
             logger.info("可转债量化管理报告 生成成功")
         except Exception as e:
             logger.error(f"可转债量化管理报告 生成失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            self.job_logger.end_job_failed(str(e), traceback.format_exc())
             raise
 
 

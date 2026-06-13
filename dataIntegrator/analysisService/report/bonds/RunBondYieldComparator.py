@@ -9,6 +9,7 @@ from datetime import datetime
 from calendar import monthrange
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.bonds.BondYieldComparator import BondYieldComparator
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
@@ -20,6 +21,7 @@ class RunBondYieldComparator:
 
     def __init__(self):
         self.comparator = BondYieldComparator()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, start_date=None, end_date=None):
         """
@@ -64,16 +66,22 @@ class RunBondYieldComparator:
         logger.info(f"   交易日期列表（月底+end_date）: {trade_dates}")
         logger.info("=" * 80)
 
+        self.job_logger.start_job('BondYieldComparator', 'BondYield',
+                                  params={'start_date': start_date, 'end_date': end_date,
+                                          'trade_date_count': len(trade_dates)})
         try:
             all_shibor_treasury, all_convertible = self.comparator.run(
                 trade_dates=trade_dates
             )
+            records_count = len(all_shibor_treasury) if all_shibor_treasury is not None else 0
+            self.job_logger.end_job_success(records_processed=records_count)
             logger.info("收益率比较报告 生成成功")
-            logger.info(f"   共 {len(all_shibor_treasury)} 个有效日期")
+            logger.info(f"   共 {records_count} 个有效日期")
         except Exception as e:
             logger.error(f"收益率比较报告 生成失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            self.job_logger.end_job_failed(str(e), traceback.format_exc())
             raise
 
 

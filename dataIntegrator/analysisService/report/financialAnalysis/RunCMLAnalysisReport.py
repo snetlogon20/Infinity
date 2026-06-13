@@ -6,6 +6,7 @@ CML 分析报告生成器 - 纯股票分析
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.financialAnalysis.CMLAnalysisTest import CMLAnalysisTest
 from dataIntegrator.modelService.financialAnalysis.CMLAnalysisReport import CMLAnalysisReport
 
@@ -18,6 +19,7 @@ class RunCMLAnalysisReport:
     def __init__(self):
         self.cmlAnalysisTest = CMLAnalysisTest()
         self.cmlAnalysisReport = CMLAnalysisReport()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, stock_type="cn_blue_chip", start_date=None, end_date=None,
                        interest_country=None, case_name=None):
@@ -82,13 +84,17 @@ class RunCMLAnalysisReport:
             logger.info(f"   报告名称: {config['name']}")
             logger.info("=" * 80)
 
+            start_date = config.get("start_date")
+            end_date = config.get("end_date")
+            if end_date is None:
+                end_date = CommonParameters.today
+
+            self.job_logger.start_job('CMLAnalysisReport', 'CMLAnalysis',
+                                      params={'report_name': config['name'],
+                                              'stock_type': config.get('stock_type'),
+                                              'start_date': start_date, 'end_date': end_date,
+                                              'interest_country': config.get('interest_country')})
             try:
-                start_date = config.get("start_date")
-                end_date = config.get("end_date")
-
-                if end_date is None:
-                    end_date = CommonParameters.today
-
                 result = self.generate_report(
                     stock_type=config["stock_type"],
                     start_date=start_date,
@@ -98,6 +104,7 @@ class RunCMLAnalysisReport:
                 )
 
                 all_results.append(result)
+                self.job_logger.end_job_success(records_processed=len(result.get('expected_returns', [])))
 
                 logger.info(f"✅ 第 {idx} 个案例分析完成")
                 logger.info(f"   图表路径: {result['chart_path']}")
@@ -108,6 +115,7 @@ class RunCMLAnalysisReport:
                 logger.error(f"   错误信息: {str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
+                self.job_logger.end_job_failed(str(e), traceback.format_exc())
                 continue
 
         # 生成综合报告

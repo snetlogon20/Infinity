@@ -1,4 +1,5 @@
 from dataIntegrator import CommonLib
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.financialAnalysis.PortfolioAnalysis import PortfolioAnalysis
 
 
@@ -217,12 +218,20 @@ if __name__ == "__main__":
     ]
 
     # 循环执行所有报表
+    job_logger = ReportJobLogger()
+
     for idx, config in enumerate(report_configs, 1):
         logger.info("\n" + "=" * 80)
         logger.info(f"📊 开始生成第 {idx}/{len(report_configs)} 个报表")
         logger.info(f"   报表名称: {config['name']}")
         logger.info("=" * 80)
 
+        job_logger.start_job('PortfolioAnalysisReport', 'PortfolioAnalysis',
+                             params={'report_name': config['name'],
+                                     'end_date_start': config.get('end_date_start'),
+                                     'end_date_end': config.get('end_date_end'),
+                                     'interest_country': config.get('interest_country'),
+                                     'sql_type': config.get('sql_type')})
         try:
             all_products_results, all_metrics_results, pdf_path = portfolioAnalysis.execute_full_analysis_workflow(
                 config["end_date_start"],
@@ -232,6 +241,8 @@ if __name__ == "__main__":
                 portfolioAnalysisTest.prepare_sql
             )
 
+            job_logger.end_job_success(records_processed=len(all_products_results) if all_products_results else 0)
+
             logger.info(f"✅ 第 {idx} 个报表生成成功: {pdf_path}")
 
         except Exception as e:
@@ -240,6 +251,7 @@ if __name__ == "__main__":
             import traceback
 
             logger.error(traceback.format_exc())
+            job_logger.end_job_failed(str(e), traceback.format_exc())
             continue
 
     logger.info("\n" + "=" * 80)
