@@ -21,11 +21,12 @@ class CommonParameters():
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
     reportPath = os.path.join(outBoundPath, 'report')
     portfolioAnalysisReportPath = os.path.join(reportPath, 'PortfolioAnalysis')
+    SystemBatchStatusReportPath = os.path.join(reportPath, 'SystemBatchStatus')
 
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.184'
+    clickhouseHostName='192.168.98.187'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {

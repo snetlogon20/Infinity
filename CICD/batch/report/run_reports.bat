@@ -50,6 +50,18 @@ REM Run SHIBOR Forward Rate Analysis Report
 call "%SCRIPT_DIR%\run_ShiborForwardRateReport.bat"
 echo.
 
+REM Run Convertible Bond Manager Report
+call "%SCRIPT_DIR%\run_ConvertibleBondManagerReport.bat"
+echo.
+
+REM Run Bond Yield Comparator Report
+call "%SCRIPT_DIR%\run_BondYieldComparator.bat"
+echo.
+
+REM Run System Batch Status Report
+call "%SCRIPT_DIR%\run_SystemBatchStatusReport.bat"
+echo.
+
 echo ========================================
 echo All Reports Execution Completed!
 echo Finished: %date% %time%
