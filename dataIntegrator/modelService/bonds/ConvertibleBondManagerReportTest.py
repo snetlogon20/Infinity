@@ -22,4 +22,4 @@ if __name__ == "__main__":
     pd.set_option('display.max_colwidth', None)
 
     report = ConvertibleBondManagerReport()
-    report.run("20260101", "20260522")
+    report.run("20260101", "20260611")

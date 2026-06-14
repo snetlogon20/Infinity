@@ -746,8 +746,53 @@ class ConvertibleBondManagerReport:
         })
         pool = pool.drop_duplicates(subset=['ts_code']).reset_index(drop=True)
 
+        # ==================== Step 1.5: 诊断 & Excel 导出原始数据 ====================
+        import os
+        from datetime import datetime as dt
+        # --- 诊断：检查 m.* 原始值（fillna之前）---
+        m_raw_cols = [c for c in latest.columns if c.startswith('m.')]
+        logger.info(f"[三步筛选] Step1.5 - m.* 列原始值诊断（共 {len(latest)} 行）:")
+        for col in sorted(m_raw_cols):
+            s = latest[col]
+            null_cnt = int(s.isna().sum())
+            non_null = s.dropna()
+            if len(non_null) > 0:
+                try:
+                    logger.info(f"  {col}: NULL={null_cnt}/{len(s)}, "
+                                f"非空范围=[{float(non_null.min()):.6f}, {float(non_null.max()):.6f}]")
+                except (ValueError, TypeError):
+                    # 非数值列（如 ts_code, trade_date, description），只打印 NULL 计数
+                    logger.info(f"  {col}: NULL={null_cnt}/{len(s)}, 非数值列(跳过范围)")
+            else:
+                logger.info(f"  {col}: NULL={null_cnt}/{len(s)}, 全部为NULL!!!")
+
+        # --- 导出 pool 原始数据到 Excel ---
+        output_dir = r'D:\workspace_python\infinity_data\outbound\report\ConvertibleBondAnalysis'
+        os.makedirs(output_dir, exist_ok=True)
+        start_date_str = dfm['d.trade_date'].min().strftime('%Y%m%d') if not dfm.empty else 'unknown'
+        end_date_str = dfm['d.trade_date'].max().strftime('%Y%m%d') if not dfm.empty else 'unknown'
+        now_str = dt.now().strftime('%Y%m%d_%H%M%S')
+        excel_path = os.path.join(output_dir, f'cb_excel_{start_date_str}-{end_date_str}_{now_str}.xlsx')
+        pool.to_excel(excel_path, index=False, engine='openpyxl')
+        logger.info(f"[三步筛选] Step1.5 - 已导出 pool 原始数据: {excel_path} (共 {len(pool)} 行)")
+
         # ==================== Step 2: 硬过滤 ====================
         reason = pd.Series('', index=pool.index)
+
+        # --- 诊断日志：各过滤字段的值分布 ---
+        _diag_fields = {
+            'rem_years':   '剩余年限(年)',
+            'remain_size': '剩余规模',
+            'close':       '收盘价',
+            'var_pct':     'VaR99(%)',
+            'es_pct':      'ES99(%)',
+        }
+        logger.info(f"[三步筛选] Step2 硬过滤 - 字段分布诊断（共 {len(pool)} 只）:")
+        for col, label in _diag_fields.items():
+            s = pool[col].fillna(0).astype(float)
+            logger.info(f"  {label} ({col}): min={s.min():.4f}, max={s.max():.4f}, "
+                        f"mean={s.mean():.4f}, median={s.median():.4f}, "
+                        f"zeros={int((s == 0).sum())}")
 
         mask_rem       = pool['rem_years'] >= 0.01
         reason[~mask_rem]       = reason[~mask_rem] + '剩余年限不足;'
@@ -767,11 +812,29 @@ class ConvertibleBondManagerReport:
         mask_es        = pool['es_pct'] <= 6
         reason[~mask_es]        = reason[~mask_es] + f'ES99={pool.loc[~mask_es,"es_pct"].round(2).values}%超6%;'
 
+        # --- 诊断日志：每个过滤条件的通过/淘汰数量 ---
+        filter_stats = [
+            ('剩余年限>=0.01',     mask_rem,   'rem'),
+            ('剩余规模>=10000',    mask_size,  'size'),
+            ('正股不含退',         mask_stk,   'stk'),
+            ('收盘价<=130',        mask_close, 'close'),
+            ('VaR99<=3%',          mask_var,   'var'),
+            ('ES99<=6%',           mask_es,    'es'),
+        ]
+        for label, mask, _ in filter_stats:
+            pass_cnt = int(mask.sum())
+            fail_cnt = int((~mask).sum())
+            logger.info(f"  [诊断] {label}: 通过={pass_cnt}, 淘汰={fail_cnt}")
+
         passed = mask_rem & mask_size & mask_stk & mask_close & mask_var & mask_es
 
         retained = pool[passed].copy()
         eliminated = pool[~passed].copy()
         eliminated['淘汰原因'] = reason[~passed].values
+        # 打印前10条淘汰原因样本
+        if len(eliminated) > 0:
+            sample = eliminated[['ts_code', 'bond_name', '淘汰原因']].head(10)
+            logger.info(f"  [诊断] 淘汰样本 (前10条):\n{sample.to_string(index=False)}")
 
         logger.info(f"[三步筛选] Step2 硬过滤: {len(retained)}/{len(pool)} 通过 (淘汰 {len(eliminated)} 只)")
 
