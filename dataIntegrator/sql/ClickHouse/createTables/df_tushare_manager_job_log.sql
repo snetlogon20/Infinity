@@ -15,6 +15,7 @@ CREATE TABLE indexsysdb.df_tushare_manager_job_log
     start_date_param   String,
     end_date_param     String,
     extra_params       String,
+    comment            String,
     create_time        DateTime DEFAULT now()
 )
 ENGINE = MergeTree()

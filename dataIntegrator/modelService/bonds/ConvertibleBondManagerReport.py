@@ -10,6 +10,7 @@ import pandas as pd
 
 from dataIntegrator import CommonLib
 from dataIntegrator.common.CommonParameters import CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -144,7 +145,8 @@ class ConvertibleBondManagerReport:
                 m.pct_price_chg_p50bp,
                 m.pct_price_chg_m50bp,
                 m.pct_price_chg_p100bp,
-                m.pct_price_chg_m100bp
+                m.pct_price_chg_m100bp,
+                m.lookback_days
             FROM indexsysdb.df_tushare_cb_daily d
             LEFT JOIN indexsysdb.df_tushare_cb_basic b
                 ON d.ts_code = b.ts_code
@@ -322,24 +324,24 @@ class ConvertibleBondManagerReport:
         for line in lines:
             if line.startswith('##'):
                 y -= 0.01
-                ax.text(0.08, y, line[2:].strip(), transform=ax.transAxes, fontsize=14,
+                ax.text(0.12, y, line[2:].strip(), transform=ax.transAxes, fontsize=14,
                         fontweight='bold', color='#16213e')
                 y -= 0.045
             elif line.startswith('###'):
-                ax.text(0.08, y, line[3:].strip(), transform=ax.transAxes, fontsize=12,
+                ax.text(0.12, y, line[3:].strip(), transform=ax.transAxes, fontsize=12,
                         fontweight='bold', color='#0f3460')
                 y -= 0.04
             elif line == '---':
                 y -= 0.01
-                ax.plot([0.08, 0.92], [y, y], color='#cccccc', linewidth=0.5,
+                ax.plot([0.12, 0.88], [y, y], color='#cccccc', linewidth=0.5,
                         transform=ax.transAxes)
                 y -= 0.02
             elif line.strip() == '':
                 y -= 0.01
             else:
-                wrapped = textwrap.wrap(line, width=90)
+                wrapped = textwrap.wrap(line, width=65)
                 for w in wrapped:
-                    ax.text(0.08, y, w, transform=ax.transAxes, fontsize=10,
+                    ax.text(0.12, y, w, transform=ax.transAxes, fontsize=10,
                             color='#333333', linespacing=1.3)
                     y -= 0.03
                 y -= 0.005
@@ -373,7 +375,7 @@ class ConvertibleBondManagerReport:
 
         return pivot
 
-    def _generate_data_table_fig(self, pivot, y_label, title_suffix):
+    def _generate_data_table_fig(self, pivot, y_label, title_suffix, lookback_map=None):
         """生成一条折线图对应的数据明细表 Figure"""
         if pivot is None or pivot.empty:
             return None
@@ -386,8 +388,10 @@ class ConvertibleBondManagerReport:
                 continue
             last_date = series.index[-1]
             date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
+            lb_days = int(lookback_map.get(col, 0)) if lookback_map else 0
             raw_data.append((
                 col,
+                lb_days,
                 date_str,
                 float(series.iloc[-1]),
                 float(series.mean()),
@@ -400,27 +404,28 @@ class ConvertibleBondManagerReport:
             return None
 
         # 按最新值的绝对值降序排列，极值标的最显眼
-        raw_data.sort(key=lambda x: abs(x[2]), reverse=True)
+        raw_data.sort(key=lambda x: abs(x[3]), reverse=True)
 
         # 格式化成展示字符串
         table_data = []
         for item in raw_data:
             table_data.append([
                 item[0],
-                item[1],
-                f"{item[2]:.4f}",
+                str(item[1]),
+                item[2],
                 f"{item[3]:.4f}",
                 f"{item[4]:.4f}",
                 f"{item[5]:.4f}",
                 f"{item[6]:.4f}",
+                f"{item[7]:.4f}",
             ])
 
-        col_labels = ['代码/名称', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
+        col_labels = ['代码/名称', '回溯天数', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
         n_rows = len(table_data)
         zero_count = 0
         for row in table_data:
             try:
-                if abs(float(row[2])) < 1e-8:
+                if abs(float(row[3])) < 1e-8:
                     zero_count += 1
             except ValueError:
                 pass
@@ -437,7 +442,7 @@ class ConvertibleBondManagerReport:
             colLabels=col_labels,
             cellLoc='center',
             loc='center',
-            colWidths=[0.28, 0.11, 0.12, 0.12, 0.12, 0.12, 0.13]
+            colWidths=[0.25, 0.06, 0.10, 0.12, 0.12, 0.12, 0.12, 0.11]
         )
         table.auto_set_font_size(False)
         table.set_fontsize(8)
@@ -737,6 +742,7 @@ class ConvertibleBondManagerReport:
             'var_price_hist': _f('m.var_price_hist_99'),
             'pct_p50bp':      _f('m.pct_price_chg_p50bp'),
             'pct_m50bp':      _f('m.pct_price_chg_m50bp'),
+            'lookback_days':  _f('m.lookback_days'),
         })
         pool = pool.drop_duplicates(subset=['ts_code']).reset_index(drop=True)
 
@@ -852,6 +858,7 @@ class ConvertibleBondManagerReport:
                     'dv01': row['dv01'], 'pvbp': row['pvbp'],
                     'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
                     'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'lookback_days': row['lookback_days'],
                     'dim_tags': dims_tag, 'dim_count': len(hits),
                 })
                 seen.add(code)
@@ -874,6 +881,7 @@ class ConvertibleBondManagerReport:
                     'dv01': row['dv01'], 'pvbp': row['pvbp'],
                     'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
                     'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'lookback_days': row['lookback_days'],
                     'dim_tags': label, 'dim_count': 1,
                 })
                 seen.add(top_code)
@@ -1356,6 +1364,9 @@ class ConvertibleBondManagerReport:
             )
 
             # ===== 逐一生成图表页 =====
+            # 构建 series_name -> lookback_days 映射，供数据明细表使用
+            lb_map = df[['series_name', 'm.lookback_days']].drop_duplicates().set_index('series_name')['m.lookback_days'].to_dict()
+
             for value_col, y_label, title_suffix in self.CHART_FIELDS:
                 logger.info(f"生成图表: {title_suffix}")
 
@@ -1372,7 +1383,7 @@ class ConvertibleBondManagerReport:
 
                 # 数据明细表
                 logger.info(f"生成数据表: {title_suffix}")
-                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix)
+                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix, lookback_map=lb_map)
                 if table_fig:
                     pdf.savefig(table_fig)
                     plt.close(table_fig)
@@ -1394,7 +1405,7 @@ class ConvertibleBondManagerReport:
                             pdf.savefig(low_fig)
                             plt.close(low_fig)
                         logger.info(f"生成数据表: {low_title}")
-                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title)
+                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title, lookback_map=lb_map)
                         if low_table_fig:
                             pdf.savefig(low_table_fig)
                             plt.close(low_table_fig)
@@ -1625,14 +1636,17 @@ class ConvertibleBondManagerReport:
             return None
 
         # 提取必要列
-        ai_bonds = dim4[['ts_code', 'bond_name', 'ytm', 'mod_dur', 'dv01', 'close', 'es_price']].copy()
+        ai_bonds = dim4[['ts_code', 'bond_name', 'ytm', 'mod_dur', 'dv01', 'close',
+                         'es_price', 'cur_yield', 'eff_conv']].copy()
 
-        # 保留 2 位小数，节省 token
+        # 保留小数位，节省 token
         ai_bonds['ytm'] = ai_bonds['ytm'].round(2)
         ai_bonds['mod_dur'] = ai_bonds['mod_dur'].round(2)
         ai_bonds['dv01'] = ai_bonds['dv01'].round(4)
         ai_bonds['close'] = ai_bonds['close'].round(2)
         ai_bonds['es_price'] = ai_bonds['es_price'].round(2)
+        ai_bonds['cur_yield'] = ai_bonds['cur_yield'].round(2)
+        ai_bonds['eff_conv'] = ai_bonds['eff_conv'].round(2)
 
         # 构建每行数据
         data_lines = []
@@ -1641,19 +1655,26 @@ class ConvertibleBondManagerReport:
                 f"{row['ts_code']}, {row['bond_name']}, "
                 f"ytm={row['ytm']:+.2f}, duration={row['mod_dur']:.2f}, "
                 f"dv01={row['dv01']:.4f}, price={row['close']:.2f}, "
-                f"es_price_99={row['es_price']:.2f}"
+                f"es_price_99={row['es_price']:.2f}, "
+                f"current_yield={row['cur_yield']:.2f}, "
+                f"effective_convexity={row['eff_conv']:.2f}"
             )
 
         n = len(ai_bonds)
         data_block = "\n".join(data_lines)
 
         prompt = f"""你是一个资深的银行债券交易员。
-以下是 {n} 只可转债的量化数据（ts_code, name, ytm, duration, dv01, price, es_price_99）：
+以下是 {n} 只可转债的量化数据（ts_code, name, ytm, duration, dv01, price, es_price_99, current_yield, effective_convexity）：
 
 {data_block}
 
 请从这 {n} 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。
 只需要输出选出的 5 只债券的 ts_code 和理由，不需要计算组合权重。"""
+
+        # ---------- 输出 prompt 便于调试 ----------
+        logger.info(f"=============== AI 分析报告 Prompt（{n} 只债券）===============")
+        logger.info(prompt)
+        logger.info("=" * 60)
 
         if CommonParameters.IF_ENABLE_MOCKED_AI:
             logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析报告")
@@ -1673,27 +1694,38 @@ class ConvertibleBondManagerReport:
     # ==================== 一键流程 ====================
 
     def run(self, start_date, end_date):
+        job_logger = ReportJobLogger()
+        job_logger.start_job('ConvertibleBondManagerReport', 'ConvertibleBond',
+                             params={'start_date': start_date, 'end_date': end_date})
+
         logger.info(f"====== ConvertibleBondManagerReport 开始执行 ======")
         logger.info(f"日期范围: {start_date} ~ {end_date}")
 
-        # 1) 查询
-        df = self.query_panorama(start_date, end_date)
-        if df.empty:
-            logger.warning("查询结果为空，流程终止")
-            return
+        try:
+            # 1) 查询
+            df = self.query_panorama(start_date, end_date)
+            if df.empty:
+                logger.warning("查询结果为空，流程终止")
+                job_logger.end_job_failed("查询结果为空")
+                return
 
-        # 2) 保存原始数据
-        self.save_to_file(df, f"panorama_{start_date}_{end_date}")
+            # 2) 保存原始数据
+            self.save_to_file(df, f"panorama_{start_date}_{end_date}")
 
-        # 3) 数据预处理（添加 series_name、转换日期）
-        df = self._prepare_data(df)
+            # 3) 数据预处理（添加 series_name、转换日期）
+            df = self._prepare_data(df)
 
-        # 4) 统计计算
-        stats = self._compute_analysis_stats(df)
-        logger.info(f"统计完成：{stats['total_bonds']} 只可转债，"
-                     f"区间涨跌 {stats.get('period_return', 0):+.2f}%")
+            # 4) 统计计算
+            stats = self._compute_analysis_stats(df)
+            logger.info(f"统计完成：{stats['total_bonds']} 只可转债，"
+                         f"区间涨跌 {stats.get('period_return', 0):+.2f}%")
 
-        # 5) 生成 PDF 策略报告
-        self._generate_pdf_report(df, stats, start_date, end_date)
+            # 5) 生成 PDF 策略报告
+            self._generate_pdf_report(df, stats, start_date, end_date)
 
-        logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")
+            logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")
+            job_logger.end_job_success(records_processed=stats.get('total_bonds', 0))
+        except Exception as e:
+            import traceback
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise

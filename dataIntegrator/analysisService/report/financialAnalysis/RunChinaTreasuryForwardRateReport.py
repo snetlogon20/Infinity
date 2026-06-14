@@ -6,6 +6,7 @@
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.forwards.ChinaTreasuryForwardRateCalculator import ChinaTreasuryForwardRateCalculator
 
 logger = CommonLib.logger
@@ -16,6 +17,7 @@ class RunChinaTreasuryForwardRateReport:
 
     def __init__(self):
         self.calculator = ChinaTreasuryForwardRateCalculator()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, start_date=None, end_date=None, case_name=None):
         """
@@ -93,13 +95,15 @@ class RunChinaTreasuryForwardRateReport:
             logger.info(f"   报告名称: {config['name']}")
             logger.info("=" * 80)
 
+            start_date = config.get("start_date")
+            end_date = config.get("end_date")
+            if end_date is None:
+                end_date = CommonParameters.today
+
+            self.job_logger.start_job('ChinaTreasuryForwardRateReport', 'ForwardRate',
+                                      params={'report_name': config['name'],
+                                              'start_date': start_date, 'end_date': end_date})
             try:
-                start_date = config.get("start_date")
-                end_date = config.get("end_date")
-
-                if end_date is None:
-                    end_date = CommonParameters.today
-
                 result = self.generate_report(
                     start_date=start_date,
                     end_date=end_date,
@@ -107,6 +111,7 @@ class RunChinaTreasuryForwardRateReport:
                 )
 
                 all_results.append(result)
+                self.job_logger.end_job_success(records_processed=result.get('data_points', 0))
 
                 logger.info(f"\n✅ 第 {idx} 个案例分析完成")
                 logger.info(f"   数据点数: {result['data_points']}")
@@ -117,6 +122,7 @@ class RunChinaTreasuryForwardRateReport:
                 logger.error(f"   错误信息: {str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
+                self.job_logger.end_job_failed(str(e), traceback.format_exc())
                 continue
 
         # 总结

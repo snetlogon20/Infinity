@@ -8,26 +8,45 @@ logger = CommonLib.logger
 class AkShareJobLogger:
     """AkShare任务执行日志记录器"""
     
+    # 需要提取为 comment 的关键字段（按优先级排列）
+    _COMMENT_KEYS = ['symbol', 'ts_code', 'trade_date', 'start_date', 'end_date',
+                     'exchange', 'fut_type', 'classify', 'adjust', 'city_first',
+                     'city_second', 'file_suffix']
+    
     def __init__(self):
         self.clickhouseService = ClickhouseService()
         self.job_start_time = None
         self.job_name = None
         self.params = None
+        self.comment = ''
+    
+    @staticmethod
+    def _build_comment(params):
+        """从 params 中提取关键字段，构建可读的 comment 字符串"""
+        if not params:
+            return ''
+        parts = []
+        for key in AkShareJobLogger._COMMENT_KEYS:
+            val = params.get(key)
+            if val is not None and str(val).strip() != '':
+                parts.append(f'{key}={val}')
+        return ', '.join(parts)
         
     def start_job(self, job_name, params=None):
         """开始记录任务"""
         self.job_name = job_name
         self.job_start_time = datetime.now()
         self.params = params
+        self.comment = self._build_comment(params)
         
         logger.info(f"📝 开始记录任务: {job_name}")
         
         # 插入运行中状态的记录
         sql = """
         INSERT INTO indexsysdb.df_akshare_manager_job_log 
-        (job_name, job_status, start_time, end_time, start_date_param, end_date_param, extra_params)
+        (job_name, job_status, start_time, end_time, start_date_param, end_date_param, extra_params, comment)
         VALUES
-        ('%(job_name)s', 'RUNNING', '%(start_time)s', NULL, '%(start_date)s', '%(end_date)s', '%(extra_params)s')
+        ('%(job_name)s', 'RUNNING', '%(start_time)s', NULL, '%(start_date)s', '%(end_date)s', '%(extra_params)s', '%(comment)s')
         """
 
         try:
@@ -41,7 +60,8 @@ class AkShareJobLogger:
                 'start_time': self.job_start_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'start_date': start_date,
                 'end_date': end_date,
-                'extra_params': extra_params.replace("'", "\\'")
+                'extra_params': extra_params.replace("'", "\\'"),
+                'comment': self.comment.replace("'", "\\'")
             })
         except Exception as e:
             logger.warning(f"⚠️ 记录任务开始状态失败: {e}")
@@ -57,9 +77,9 @@ class AkShareJobLogger:
         
         sql = """
         INSERT INTO indexsysdb.df_akshare_manager_job_log 
-        (job_name, job_status, start_time, end_time, duration_seconds, records_processed)
+        (job_name, job_status, start_time, end_time, duration_seconds, records_processed, comment)
         VALUES
-        ('%(job_name)s', 'SUCCESS', '%(start_time)s', '%(end_time)s', %(duration)s, %(records)s)
+        ('%(job_name)s', 'SUCCESS', '%(start_time)s', '%(end_time)s', %(duration)s, %(records)s, '%(comment)s')
         """
         
         try:
@@ -68,7 +88,8 @@ class AkShareJobLogger:
                 'start_time': self.job_start_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'end_time': end_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'duration': duration,
-                'records': records_processed
+                'records': records_processed,
+                'comment': self.comment.replace("'", "\\'")
             })
             logger.info(f"✅ 任务 {self.job_name} 执行成功，耗时 {duration:.2f} 秒，处理 {records_processed} 条记录")
         except Exception as e:
@@ -85,9 +106,9 @@ class AkShareJobLogger:
         
         sql = """
         INSERT INTO indexsysdb.df_akshare_manager_job_log 
-        (job_name, job_status, start_time, end_time, duration_seconds, error_message, error_traceback)
+        (job_name, job_status, start_time, end_time, duration_seconds, error_message, error_traceback, comment)
         VALUES
-        ('%(job_name)s', 'FAILED', '%(start_time)s', '%(end_time)s', %(duration)s, '%(error_msg)s', '%(error_tb)s')
+        ('%(job_name)s', 'FAILED', '%(start_time)s', '%(end_time)s', %(duration)s, '%(error_msg)s', '%(error_tb)s', '%(comment)s')
         """
         
         try:
@@ -97,7 +118,8 @@ class AkShareJobLogger:
                 'end_time': end_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'duration': duration,
                 'error_msg': str(error_message).replace("'", "\\'"),
-                'error_tb': (error_traceback or '').replace("'", "\\'")
+                'error_tb': (error_traceback or '').replace("'", "\\'"),
+                'comment': self.comment.replace("'", "\\'")
             })
             logger.error(f"❌ 任务 {self.job_name} 执行失败，耗时 {duration:.2f} 秒: {error_message}")
         except Exception as e:

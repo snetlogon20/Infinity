@@ -21,11 +21,12 @@ class CommonParameters():
     logFilePath = os.path.join(dataPath,'log','dataIntegrater.log')
     reportPath = os.path.join(outBoundPath, 'report')
     portfolioAnalysisReportPath = os.path.join(reportPath, 'PortfolioAnalysis')
+    SystemBatchStatusReportPath = os.path.join(reportPath, 'SystemBatchStatus')
 
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.98.184'
+    clickhouseHostName='192.168.98.187'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
@@ -69,8 +70,8 @@ class CommonParameters():
     IS_STREAMLIT_ON = False
     # IS_STREAMLIT_ON = True
 
-    # IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
-    IF_ENABLE_MOCKED_AI = False  # use real AI answer
+    IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    # IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
     STOCK_LIST=[
             {'ts_code': '002093.SZ', 'name': '国脉科技'},

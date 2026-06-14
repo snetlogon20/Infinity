@@ -12,6 +12,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 
 logger = CommonLib.logger
 
@@ -22,6 +23,7 @@ class TreynorRatioAnalysisReport:
     def __init__(self):
         self.reportlab_font = self._register_chinese_font()
         self._ensure_output_directory()
+        self.job_logger = ReportJobLogger()
 
     def _ensure_output_directory(self):
         """确保输出目录存在"""
@@ -150,29 +152,29 @@ class TreynorRatioAnalysisReport:
     def generate_treynor_analysis_pdf(self, chart_paths, report_name, market_type="CN", start_date=None, end_date=None, output_path=None):
         """
         生成特雷诺比率分析专用 PDF 报告
-
-        参数:
-        - chart_paths: 特雷诺比率图表路径列表 [(path, title), ...]
-        - report_name: 报告名称
-        - market_type: 市场类型
-        - start_date: 开始日期
-        - end_date: 结束日期
-        - output_path: 输出路径
-
-        返回:
-        - pdf_path: PDF 文件路径
         """
-        report_title = '特雷诺比率 (Treynor Ratio) 分析报告'
-        report_subtitle = f'报告名称: {report_name}\n市场类型: {market_type}'
-        if start_date and end_date:
-            report_subtitle += f'\n日期范围: {start_date} 至 {end_date}'
+        self.job_logger.start_job('TreynorRatioAnalysisReport', 'Treynor',
+                                  params={'report_name': report_name, 'market_type': market_type,
+                                          'start_date': start_date, 'end_date': end_date,
+                                          'chart_count': len(chart_paths) if chart_paths else 0})
+        try:
+            report_title = '特雷诺比率 (Treynor Ratio) 分析报告'
+            report_subtitle = f'报告名称: {report_name}\n市场类型: {market_type}'
+            if start_date and end_date:
+                report_subtitle += f'\n日期范围: {start_date} 至 {end_date}'
 
-        return self.generate_multi_chart_pdf(
-            chart_paths=chart_paths,
-            report_title=report_title,
-            report_subtitle=report_subtitle,
-            output_path=output_path
-        )
+            result = self.generate_multi_chart_pdf(
+                chart_paths=chart_paths,
+                report_title=report_title,
+                report_subtitle=report_subtitle,
+                output_path=output_path
+            )
+            self.job_logger.end_job_success(records_processed=len(chart_paths) if chart_paths else 0)
+            return result
+        except Exception as e:
+            import traceback
+            self.job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise
 
     def generate_comprehensive_pdf(self, all_results, report_title="特雷诺比率 (Treynor Ratio) 综合分析研究报告", output_path=None):
         """

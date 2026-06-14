@@ -6,6 +6,7 @@
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsWithCommoditiesTest import PortfolioMetricsWithCommoditiesTest
 from dataIntegrator.modelService.financialAnalysis.PortfolioMetricsAnalysisReport import PortfolioMetricsAnalysisReport
 
@@ -18,9 +19,10 @@ class RunPortfolioMetricsAnalysisReport:
     def __init__(self):
         self.portfolioMetricsTest = PortfolioMetricsWithCommoditiesTest()
         self.portfolioMetricsAnalysisReport = PortfolioMetricsAnalysisReport()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, stock_type="cn_blue_chip", start_date=None, end_date=None,
-                       case_name=None):
+                       case_name=None, interest_country=None):
         """
         生成单个投资组合指标分析报告
 
@@ -29,6 +31,7 @@ class RunPortfolioMetricsAnalysisReport:
         - start_date: 开始日期 (格式: 'YYYYMMDD')
         - end_date: 结束日期 (格式: 'YYYYMMDD')
         - case_name: 案例名称
+        - interest_country: 利率国家 ('US' 或 'CN')
 
         返回:
         - results: 分析结果字典
@@ -37,13 +40,15 @@ class RunPortfolioMetricsAnalysisReport:
             end_date = CommonParameters.today
 
         # 执行滚动回测分析
-        results_df = self.portfolioMetricsAnalysisTest.run_portfolio_metrics_analysis(
+        results_df = self.portfolioMetricsTest.run_portfolio_metrics_with_commodities(
             stock_type=stock_type,
             start_date_fixed=None,
             end_date_start=start_date,
             end_date_end=end_date,
             window_days=360,
-            risk_free_rate=None
+            risk_free_rate=None,
+            interest_country=interest_country,
+            case_name=case_name
         )
 
         return {
@@ -74,21 +79,26 @@ class RunPortfolioMetricsAnalysisReport:
             logger.info(f"   报告名称: {config['name']}")
             logger.info("=" * 80)
 
+            start_date = config.get("start_date")
+            end_date = config.get("end_date")
+            if end_date is None:
+                end_date = CommonParameters.today
+
+            self.job_logger.start_job('PortfolioMetricsAnalysisReport', 'PortfolioMetrics',
+                                      params={'report_name': config['name'],
+                                              'stock_type': config.get('stock_type'),
+                                              'start_date': start_date, 'end_date': end_date})
             try:
-                start_date = config.get("start_date")
-                end_date = config.get("end_date")
-
-                if end_date is None:
-                    end_date = CommonParameters.today
-
                 result = self.generate_report(
                     stock_type=config["stock_type"],
                     start_date=start_date,
                     end_date=end_date,
-                    case_name=config["name"]
+                    case_name=config["name"],
+                    interest_country=config.get("interest_country")
                 )
 
                 all_results.append(result)
+                self.job_logger.end_job_success(records_processed=result['total_records'])
 
                 logger.info(f"✅ 第 {idx} 个案例分析完成")
                 logger.info(f"   总记录数: {result['total_records']}")
@@ -98,6 +108,7 @@ class RunPortfolioMetricsAnalysisReport:
                 logger.error(f"   错误信息: {str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
+                self.job_logger.end_job_failed(str(e), traceback.format_exc())
                 continue
 
         # 生成综合报告
