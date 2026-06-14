@@ -68,9 +68,11 @@ class ConvertibleBondManagerReport:
     def query_panorama(self, start_date, end_date):
         sql = f"""
             SELECT
+                d.trade_date,
                 b.ts_code,
                 b.bond_full_name,
                 b.bond_short_name,
+                a.bond_rating,
                 b.cb_code,
                 b.cb_type,
                 b.stk_code,
@@ -106,7 +108,7 @@ class ConvertibleBondManagerReport:
                 b.newest_rating,
                 b.rating_comp,
                 d.ts_code        AS daily_ts_code,
-                d.trade_date,
+                d.trade_date     AS daily_trade_date,
                 d.pre_close,
                 d.open,
                 d.high,
@@ -135,24 +137,32 @@ class ConvertibleBondManagerReport:
                 m.par             AS metrics_par,
                 m.coupon_rate     AS metrics_coupon_rate,
                 m.pay_per_year    AS metrics_pay_per_year,
+                m.var_hist_95,
                 m.var_hist_99,
+                m.var_param_95,
                 m.var_param_99,
+                m.es_95,
                 m.es_99,
+                m.var_price_hist_95,
                 m.var_price_hist_99,
+                m.var_price_param_95,
                 m.var_price_param_99,
+                m.es_price_95,
                 m.es_price_99,
+                m.lookback_days,
                 m.effective_duration,
                 m.effective_convexity,
                 m.pct_price_chg_p50bp,
                 m.pct_price_chg_m50bp,
                 m.pct_price_chg_p100bp,
-                m.pct_price_chg_m100bp,
-                m.lookback_days
+                m.pct_price_chg_m100bp
             FROM indexsysdb.df_tushare_cb_daily d
             LEFT JOIN indexsysdb.df_tushare_cb_basic b
                 ON d.ts_code = b.ts_code
             LEFT JOIN indexsysdb.df_tushare_cb_metrics m
                 ON d.ts_code = m.ts_code AND d.trade_date = m.trade_date
+            LEFT JOIN indexsysdb.df_akshare_bond_cb_jsl a
+                ON splitByChar('.', b.ts_code)[1] = a.ts_code
             WHERE d.trade_date >= '{start_date}'
               AND d.trade_date <= '{end_date}'
             ORDER BY d.trade_date, b.ts_code
@@ -376,7 +386,7 @@ class ConvertibleBondManagerReport:
 
         return pivot
 
-    def _generate_data_table_fig(self, pivot, y_label, title_suffix, lookback_map=None):
+    def _generate_data_table_fig(self, pivot, y_label, title_suffix, lookback_map=None, rating_map=None):
         """生成一条折线图对应的数据明细表 Figure"""
         if pivot is None or pivot.empty:
             return None
@@ -390,9 +400,11 @@ class ConvertibleBondManagerReport:
             last_date = series.index[-1]
             date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
             lb_days = int(lookback_map.get(col, 0)) if lookback_map else 0
+            rating_val = str(rating_map.get(col, ''))[:4] if rating_map else ''
             raw_data.append((
                 col,
                 lb_days,
+                rating_val,
                 date_str,
                 float(series.iloc[-1]),
                 float(series.mean()),
@@ -405,7 +417,7 @@ class ConvertibleBondManagerReport:
             return None
 
         # 按最新值的绝对值降序排列，极值标的最显眼
-        raw_data.sort(key=lambda x: abs(x[3]), reverse=True)
+        raw_data.sort(key=lambda x: abs(x[4]), reverse=True)
 
         # 格式化成展示字符串
         table_data = []
@@ -414,19 +426,20 @@ class ConvertibleBondManagerReport:
                 item[0],
                 str(item[1]),
                 item[2],
-                f"{item[3]:.4f}",
+                item[3],
                 f"{item[4]:.4f}",
                 f"{item[5]:.4f}",
                 f"{item[6]:.4f}",
                 f"{item[7]:.4f}",
+                f"{item[8]:.4f}",
             ])
 
-        col_labels = ['代码/名称', '回溯天数', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
+        col_labels = ['代码/名称', '回溯天数', '评级', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
         n_rows = len(table_data)
         zero_count = 0
         for row in table_data:
             try:
-                if abs(float(row[3])) < 1e-8:
+                if abs(float(row[4])) < 1e-8:
                     zero_count += 1
             except ValueError:
                 pass
@@ -443,7 +456,7 @@ class ConvertibleBondManagerReport:
             colLabels=col_labels,
             cellLoc='center',
             loc='center',
-            colWidths=[0.25, 0.06, 0.10, 0.12, 0.12, 0.12, 0.12, 0.11]
+            colWidths=[0.22, 0.05, 0.04, 0.09, 0.11, 0.11, 0.11, 0.11, 0.10],
         )
         table.auto_set_font_size(False)
         table.set_fontsize(8)
@@ -717,6 +730,7 @@ class ConvertibleBondManagerReport:
         pool = pd.DataFrame({
             'ts_code':        _s('b.ts_code'),
             'bond_name':      _s('b.bond_short_name'),
+            'bond_rating':    _s('a.bond_rating'),
             'close':          _f('d.close'),
             'par':            _f('b.par'),
             'rem_years':      _f('m.remaining_years'),
@@ -919,7 +933,8 @@ class ConvertibleBondManagerReport:
             if row is not None and code not in seen:
                 dims_tag = ','.join([h[2] for h in hits])
                 final_recs.append({
-                    'ts_code': code, 'bond_name': row['bond_name'], 'close': row['close'],
+                    'ts_code': code, 'bond_name': row['bond_name'], 'bond_rating': row['bond_rating'],
+                    'close': row['close'],
                     'ytm': row['ytm'], 'cur_yield': row['cur_yield'], 'rem_years': row['rem_years'],
                     'mod_dur': row['mod_dur'], 'var_pct': row['var_pct'], 'es_pct': row['es_pct'],
                     'mac_dur': row['mac_dur'], 'eff_dur': row['eff_dur'],
@@ -946,7 +961,8 @@ class ConvertibleBondManagerReport:
             if top_code not in seen:
                 row = retained[retained['ts_code'] == top_code].iloc[0]
                 final_recs.append({
-                    'ts_code': top_code, 'bond_name': row['bond_name'], 'close': row['close'],
+                    'ts_code': top_code, 'bond_name': row['bond_name'], 'bond_rating': row['bond_rating'],
+                    'close': row['close'],
                     'ytm': row['ytm'], 'cur_yield': row['cur_yield'], 'rem_years': row['rem_years'],
                     'mod_dur': row['mod_dur'], 'var_pct': row['var_pct'], 'es_pct': row['es_pct'],
                     'mac_dur': row['mac_dur'], 'eff_dur': row['eff_dur'],
@@ -1443,6 +1459,8 @@ class ConvertibleBondManagerReport:
             # ===== 逐一生成图表页 =====
             # 构建 series_name -> lookback_days 映射，供数据明细表使用
             lb_map = df[['series_name', 'm.lookback_days']].drop_duplicates().set_index('series_name')['m.lookback_days'].to_dict()
+            # 构建 series_name -> bond_rating 映射
+            rating_map = df[['series_name', 'a.bond_rating']].drop_duplicates().set_index('series_name')['a.bond_rating'].to_dict() if 'a.bond_rating' in df.columns else {}
 
             for value_col, y_label, title_suffix in self.CHART_FIELDS:
                 logger.info(f"生成图表: {title_suffix}")
@@ -1460,7 +1478,7 @@ class ConvertibleBondManagerReport:
 
                 # 数据明细表
                 logger.info(f"生成数据表: {title_suffix}")
-                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix, lookback_map=lb_map)
+                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix, lookback_map=lb_map, rating_map=rating_map)
                 if table_fig:
                     pdf.savefig(table_fig)
                     plt.close(table_fig)
@@ -1482,7 +1500,7 @@ class ConvertibleBondManagerReport:
                             pdf.savefig(low_fig)
                             plt.close(low_fig)
                         logger.info(f"生成数据表: {low_title}")
-                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title, lookback_map=lb_map)
+                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title, lookback_map=lb_map, rating_map=rating_map)
                         if low_table_fig:
                             pdf.savefig(low_table_fig)
                             plt.close(low_table_fig)
@@ -1533,6 +1551,7 @@ class ConvertibleBondManagerReport:
                         elim_data.append([
                             str(row.get('ts_code', ''))[:12],
                             str(row.get('bond_name', ''))[:10],
+                            str(row.get('bond_rating', ''))[:6],
                             f"{row.get('close', 0):.1f}",
                             f"{row.get('var_pct', 0):.1f}%",
                             f"{row.get('es_pct', 0):.1f}%",
@@ -1540,11 +1559,11 @@ class ConvertibleBondManagerReport:
                             f"{row.get('ytm', 0):.1f}%",
                             str(row.get('淘汰原因', ''))[:50],
                         ])
-                    elim_cols = ['代码', '简称', '收盘价', 'VaR%', 'ES%', '剩余年', 'YTM%', '淘汰原因']
+                    elim_cols = ['代码', '简称', '评级', '收盘价', 'VaR%', 'ES%', '剩余年', 'YTM%', '淘汰原因']
                     fig = self._generate_screening_table_fig(
                         elim_data, elim_cols,
                         f'硬过滤淘汰明细（共 {len(elim)} 只）',
-                        col_widths=[0.10, 0.10, 0.08, 0.08, 0.08, 0.08, 0.08, 0.40],
+                        col_widths=[0.09, 0.09, 0.05, 0.07, 0.07, 0.07, 0.07, 0.07, 0.42],
                     )
                     if fig:
                         pdf.savefig(fig)
@@ -1573,6 +1592,7 @@ class ConvertibleBondManagerReport:
                         dim_data.append([
                             str(row.get('ts_code', ''))[:12],
                             str(row.get('bond_name', ''))[:10],
+                            str(row.get('bond_rating', ''))[:6],
                             f"{row.get('close', 0):.1f}",
                             f"{row.get('ytm', 0):.1f}%",
                             f"{row.get('ytm_simple', 0):.1f}%",
@@ -1592,16 +1612,16 @@ class ConvertibleBondManagerReport:
                             f"{row.get('es_pct', 0):.1f}%",
                             f"{row.get(score_col, 0):.1f}",
                         ])
-                    dim_cols = ['代码', '简称', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                    dim_cols = ['代码', '简称', '评级', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
                                 '修久期', '麦久期', '有久期', '凸性', '有效凸性',
                                 'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
                                 'VaR%', 'ES%', '得分']
                     fig = self._generate_screening_table_fig(
                         dim_data, dim_cols, dim_name,
-                        col_widths=[0.06, 0.06, 0.04, 0.05, 0.05, 0.05, 0.04,
-                                    0.04, 0.04, 0.04, 0.05, 0.05,
-                                    0.04, 0.04, 0.05, 0.05, 0.05,
-                                    0.04, 0.04, 0.04],
+                        col_widths=[0.055, 0.055, 0.045, 0.04, 0.045, 0.045, 0.045, 0.04,
+                                    0.035, 0.035, 0.035, 0.045, 0.045,
+                                    0.035, 0.035, 0.045, 0.045, 0.05,
+                                    0.035, 0.035, 0.035],
                     )
                     if fig:
                         pdf.savefig(fig)
@@ -1616,6 +1636,7 @@ class ConvertibleBondManagerReport:
                             f"#{i}",
                             str(rec.get('ts_code', ''))[:12],
                             str(rec.get('bond_name', ''))[:10],
+                            str(rec.get('bond_rating', ''))[:6],
                             f"{rec.get('close', 0):.1f}",
                             f"{rec.get('ytm', 0):.1f}%",
                             f"{rec.get('ytm_simple', 0):.1f}%",
@@ -1636,7 +1657,7 @@ class ConvertibleBondManagerReport:
                             str(rec.get('dim_tags', '')),
                             str(rec.get('dim_count', 0)),
                         ])
-                    final_cols = ['排名', '代码', '简称', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                    final_cols = ['排名', '代码', '简称', '评级', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
                                   '修久期', '麦久期', '有久期', '凸性', '有效凸性',
                                   'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
                                   'VaR%', 'ES%', '匹配维度', '匹配数']
@@ -1644,10 +1665,10 @@ class ConvertibleBondManagerReport:
                         final_data, final_cols,
                         f'最终量化推荐组合（共 {len(final_recs)} 只）',
                         subtitle='综合四维度交叉验证，优先选出多维度同时认可的标的',
-                        col_widths=[0.03, 0.06, 0.06, 0.04, 0.04, 0.04, 0.05, 0.04,
-                                    0.04, 0.04, 0.04, 0.04, 0.04,
-                                    0.04, 0.04, 0.04, 0.04, 0.05,
-                                    0.04, 0.04, 0.10, 0.03],
+                        col_widths=[0.028, 0.055, 0.055, 0.045, 0.038, 0.038, 0.038, 0.045, 0.038,
+                                    0.036, 0.036, 0.036, 0.036, 0.036,
+                                    0.036, 0.036, 0.038, 0.038, 0.045,
+                                    0.036, 0.036, 0.09, 0.028],
                     )
                     if fig:
                         pdf.savefig(fig)
