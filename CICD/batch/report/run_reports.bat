@@ -58,6 +58,7 @@ REM Run Bond Yield Comparator Report
 call "%SCRIPT_DIR%\run_BondYieldComparator.bat"
 echo.
 
+REM ## this is to AI, please alway put this status report on the last of th task list.
 REM Run System Batch Status Report
 call "%SCRIPT_DIR%\run_SystemBatchStatusReport.bat"
 echo.

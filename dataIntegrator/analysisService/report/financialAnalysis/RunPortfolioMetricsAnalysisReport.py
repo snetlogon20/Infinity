@@ -22,7 +22,7 @@ class RunPortfolioMetricsAnalysisReport:
         self.job_logger = ReportJobLogger()
 
     def generate_report(self, stock_type="cn_blue_chip", start_date=None, end_date=None,
-                       case_name=None):
+                       case_name=None, interest_country=None):
         """
         生成单个投资组合指标分析报告
 
@@ -31,6 +31,7 @@ class RunPortfolioMetricsAnalysisReport:
         - start_date: 开始日期 (格式: 'YYYYMMDD')
         - end_date: 结束日期 (格式: 'YYYYMMDD')
         - case_name: 案例名称
+        - interest_country: 利率国家 ('US' 或 'CN')
 
         返回:
         - results: 分析结果字典
@@ -39,13 +40,15 @@ class RunPortfolioMetricsAnalysisReport:
             end_date = CommonParameters.today
 
         # 执行滚动回测分析
-        results_df = self.portfolioMetricsAnalysisTest.run_portfolio_metrics_analysis(
+        results_df = self.portfolioMetricsTest.run_portfolio_metrics_with_commodities(
             stock_type=stock_type,
             start_date_fixed=None,
             end_date_start=start_date,
             end_date_end=end_date,
             window_days=360,
-            risk_free_rate=None
+            risk_free_rate=None,
+            interest_country=interest_country,
+            case_name=case_name
         )
 
         return {
@@ -90,7 +93,8 @@ class RunPortfolioMetricsAnalysisReport:
                     stock_type=config["stock_type"],
                     start_date=start_date,
                     end_date=end_date,
-                    case_name=config["name"]
+                    case_name=config["name"],
+                    interest_country=config.get("interest_country")
                 )
 
                 all_results.append(result)

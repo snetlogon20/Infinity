@@ -1,22 +1,47 @@
 @echo off
-chcp 65001 >nul
+chcp 65001
 echo.
+REM System Batch Status Report batch file (with logging)
+
+REM Set paths
+set PYTHON_PATH=C:\Users\ASUS\Anaconda3\envs\py312\python.exe
+set PROJECT_PATH=D:\workspace_python\infinity
+set LOG_PATH=D:\workspace_python\infinity_data\log
+set INFINITY_LOG_FILE=%LOG_PATH%\system_batch_status.log
+
+REM Create log directory
+if not exist "%LOG_PATH%" mkdir "%LOG_PATH%"
+
+REM Set Python path
+set PYTHONPATH=%PROJECT_PATH%;%PYTHONPATH%
+
+REM Change to project directory
+cd /d %PROJECT_PATH%
+
+REM Set environment variable for Python
+set PYTHONIOENCODING=utf-8
+
+REM Display start information
 echo ========================================
-echo Running System Batch Status Report
+echo System Batch Status Report started: %date% %time%
+echo Log file: %INFINITY_LOG_FILE%
 echo ========================================
 echo.
 
-set SCRIPT_DIR=D:\workspace_python\infinity\CICD\batch\report
-cd /d D:\workspace_python\infinity
+REM Execute System Batch Status report
+"%PYTHON_PATH%" "%PROJECT_PATH%\dataIntegrator\analysisService\report\systemSupport\RunSystemBatchStatusReport.py"
 
-python -m dataIntegrator.analysisService.report.systemSupport.RunSystemBatchStatusReport
-if %ERRORLEVEL% NEQ 0 (
-    echo System Batch Status Report FAILED with error code %ERRORLEVEL%
-    exit /b %ERRORLEVEL%
+REM Check execution result
+if %ERRORLEVEL% EQU 0 (
+    echo.
+    echo ========================================
+    echo System Batch Status Report executed successfully!
+    echo ========================================
+) else (
+    echo.
+    echo ========================================
+    echo System Batch Status Report execution failed, error code: %ERRORLEVEL%
+    echo ========================================
 )
 
-echo.
-echo ========================================
-echo System Batch Status Report Completed
-echo ========================================
 echo.
