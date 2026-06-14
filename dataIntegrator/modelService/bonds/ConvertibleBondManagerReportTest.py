@@ -1,15 +1,6 @@
-import os
-import textwrap
-from datetime import datetime
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from matplotlib.backends.backend_pdf import PdfPages
-import numpy as np
 import pandas as pd
 
 from dataIntegrator import CommonLib
-from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.bonds.ConvertibleBondManagerReport import ConvertibleBondManagerReport
 
 logger = CommonLib.logger

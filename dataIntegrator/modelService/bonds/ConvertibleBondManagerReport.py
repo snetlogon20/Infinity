@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from dataIntegrator import CommonLib
+from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
 from dataIntegrator.common.CommonParameters import CommonParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -741,8 +742,13 @@ class ConvertibleBondManagerReport:
             'ytm_simple':     _f('m.simple_ytm'),
             'var_price_hist': _f('m.var_price_hist_99'),
             'pct_p50bp':      _f('m.pct_price_chg_p50bp'),
+            'pct_p100bp':     _f('m.pct_price_chg_p100bp'),
+            'pct_m100bp':     _f('m.pct_price_chg_m100bp'),
             'pct_m50bp':      _f('m.pct_price_chg_m50bp'),
             'lookback_days':  _f('m.lookback_days'),
+            'var_param_99':   _f('m.var_param_99'),
+            'var_price_param_99': _f('m.var_price_param_99'),
+            'effective_duration': _f('m.effective_duration'),
         })
         pool = pool.drop_duplicates(subset=['ts_code']).reset_index(drop=True)
 
@@ -921,7 +927,11 @@ class ConvertibleBondManagerReport:
                     'dv01': row['dv01'], 'pvbp': row['pvbp'],
                     'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
                     'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'pct_p100bp': row['pct_p100bp'], 'pct_m100bp': row['pct_m100bp'],
                     'lookback_days': row['lookback_days'],
+                    'var_param_99': row['var_param_99'],
+                    'var_price_param_99': row['var_price_param_99'],
+                    'effective_duration': row['effective_duration'],
                     'dim_tags': dims_tag, 'dim_count': len(hits),
                 })
                 seen.add(code)
@@ -944,7 +954,11 @@ class ConvertibleBondManagerReport:
                     'dv01': row['dv01'], 'pvbp': row['pvbp'],
                     'ytm_simple': row['ytm_simple'], 'var_price_hist': row['var_price_hist'],
                     'pct_p50bp': row['pct_p50bp'], 'pct_m50bp': row['pct_m50bp'],
+                    'pct_p100bp': row['pct_p100bp'], 'pct_m100bp': row['pct_m100bp'],
                     'lookback_days': row['lookback_days'],
+                    'var_param_99': row['var_param_99'],
+                    'var_price_param_99': row['var_price_param_99'],
+                    'effective_duration': row['effective_duration'],
                     'dim_tags': label, 'dim_count': 1,
                 })
                 seen.add(top_code)
@@ -1732,7 +1746,7 @@ class ConvertibleBondManagerReport:
 {data_block}
 
 请从这 {n} 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。
-只需要输出选出的 5 只债券的 ts_code 和理由，不需要计算组合权重。"""
+再输出选出的 5 只债券的 ts_code，评级 和理由后，增加推荐的组合权重。"""
 
         # ---------- 输出 prompt 便于调试 ----------
         logger.info(f"=============== AI 分析报告 Prompt（{n} 只债券）===============")
@@ -1747,7 +1761,8 @@ class ConvertibleBondManagerReport:
 
         logger.info(f"正在调用 SparkX2 生成 AI 分析报告，输入 {n} 只债券数据")
         try:
-            result = SparkX2.inquiry(prompt, "")
+            #result = SparkX2.inquiry(prompt, "")
+            result = ZhipuGLM4.inquiry(prompt, "")
             logger.info("SparkX2 AI 分析报告生成成功")
             return result
         except Exception as e:
