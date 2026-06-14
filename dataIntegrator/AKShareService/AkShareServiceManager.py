@@ -6,6 +6,7 @@ from dataIntegrator.AKShareService.AkShareMacroChinaShrzgmService import AkShare
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
 from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
+from dataIntegrator.AKShareService.AkShareBondCbJslService import AkShareBondCbJslService
 from dataIntegrator.AKShareService.AkShareJobLogger import AkShareJobLogger
 from dataIntegrator.common.FileType import FileType
 
@@ -255,6 +256,63 @@ class AkShareServiceManager():
         logger.info("callAllAkShareStockUsDailyService completed")
 
     @classmethod
+    def callAkShareBondCbJslService(self, cookie=None):
+        """调用 AkShare 集思录可转债实时数据服务
+
+        每次拉取全量当前交易数据，全量刷新模式
+
+        Args:
+            cookie (str, optional): 集思录登录 cookie，不传默认使用 CommonParameters.JSL_COOKIE
+        """
+        logger.info("callAkShareBondCbJslService started...")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, 'akshare_bond_cb_jsl.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareBondCbJslService', {
+                'cookie_used': bool(cookie or getattr(CommonParameters, 'JSL_COOKIE', None)),
+            })
+
+            akShareService = AkShareBondCbJslService()
+
+            # 获取原始数据
+            dataFrame = akShareService.prepareDataFrame(cookie=cookie)
+
+            if dataFrame.empty:
+                logger.warning("没有获取到任何可转债数据")
+                job_logger.end_job_success(records_processed=0)
+                return
+
+            # 保存到磁盘
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+
+            # 从磁盘读取
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+
+            # 全量刷新 - 删除 ClickHouse 中所有旧数据
+            akShareService.deleteDateFromClickHouse()
+
+            # 数据转换
+            transformed_dataFrame = akShareService.transformDataFrame(dataFrame)
+
+            # 保存到 ClickHouse
+            akShareService.saveDateToClickHouse(transformed_dataFrame)
+
+            # 记录任务成功
+            records_processed = len(transformed_dataFrame) if transformed_dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareBondCbJslService ended...")
+
+    @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
@@ -272,6 +330,7 @@ class AkShareServiceManager():
             self.callAkShareMacroChinaShrzgmService()
             self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
             self.callAllAkShareStockUsDailyService(adjust='')
+            self.callAkShareBondCbJslService()
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)
