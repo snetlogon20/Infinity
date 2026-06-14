@@ -6,6 +6,7 @@
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.financialAnalysis.InformationRatioAnalysisTest import InformationRatioAnalysisTest
 from dataIntegrator.modelService.financialAnalysis.InformationRatioAnalysisReport import InformationRatioAnalysisReport
 
@@ -18,6 +19,7 @@ class RunInformationRatioAnalysisReport:
     def __init__(self):
         self.irAnalysisTest = InformationRatioAnalysisTest()
         self.irAnalysisReport = InformationRatioAnalysisReport()
+        self.job_logger = ReportJobLogger()
 
     def generate_report(self, stock_type="cn_blue_chip", start_date=None, end_date=None,
                        interest_country=None, case_name=None):
@@ -76,13 +78,17 @@ class RunInformationRatioAnalysisReport:
             logger.info(f"   报告名称: {config['name']}")
             logger.info("=" * 80)
 
+            start_date = config.get("start_date")
+            end_date = config.get("end_date")
+            if end_date is None:
+                end_date = CommonParameters.today
+
+            self.job_logger.start_job('InformationRatioAnalysisReport', 'InformationRatio',
+                                      params={'report_name': config['name'],
+                                              'stock_type': config.get('stock_type'),
+                                              'start_date': start_date, 'end_date': end_date,
+                                              'interest_country': config.get('interest_country')})
             try:
-                start_date = config.get("start_date")
-                end_date = config.get("end_date")
-
-                if end_date is None:
-                    end_date = CommonParameters.today
-
                 result = self.generate_report(
                     stock_type=config["stock_type"],
                     start_date=start_date,
@@ -92,6 +98,7 @@ class RunInformationRatioAnalysisReport:
                 )
 
                 all_results.append(result)
+                self.job_logger.end_job_success(records_processed=len(result.get('information_ratios', [])))
 
                 logger.info(f"✅ 第 {idx} 个案例分析完成")
                 logger.info(f"   图表路径: {result['chart_path']}")
@@ -101,6 +108,7 @@ class RunInformationRatioAnalysisReport:
                 logger.error(f"   错误信息: {str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
+                self.job_logger.end_job_failed(str(e), traceback.format_exc())
                 continue
 
         # 生成综合报告

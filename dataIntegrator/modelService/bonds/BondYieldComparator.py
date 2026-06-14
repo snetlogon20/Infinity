@@ -14,6 +14,7 @@ import textwrap
 from datetime import datetime
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 
 logger = CommonLib.logger
 
@@ -454,12 +455,18 @@ class BondYieldComparator:
         参数:
         - trade_dates: 交易日期列表 (格式: ['YYYYMMDD', ...])，默认为今天
         """
-        output_dir = os.path.join(CommonParameters.reportPath, 'YieldComparison')
-
         if trade_dates is None:
             trade_dates = [CommonParameters.today]
         elif isinstance(trade_dates, str):
             trade_dates = [trade_dates]
+
+        job_logger = ReportJobLogger()
+        job_logger.start_job('BondYieldComparator', 'BondYield',
+                             params={'trade_dates_count': len(trade_dates),
+                                     'start_date': trade_dates[0],
+                                     'end_date': trade_dates[-1]})
+
+        output_dir = os.path.join(CommonParameters.reportPath, 'YieldComparison')
 
         if output_dir is None:
             output_dir = self.output_dir
@@ -470,46 +477,53 @@ class BondYieldComparator:
         logger.info(f"日期列表: {trade_dates}")
         logger.info("=" * 80)
 
-        # 收集所有日期的分析结果
-        all_results = []
-        for trade_date in trade_dates:
-            logger.info(f"\n>>> 处理日期: {trade_date}")
-            try:
-                shibor_treasury_df, convertible_df, treasury_full_df = self.compare_yields(trade_date)
+        try:
+            # 收集所有日期的分析结果
+            all_results = []
+            for trade_date in trade_dates:
+                logger.info(f"\n>>> 处理日期: {trade_date}")
+                try:
+                    shibor_treasury_df, convertible_df, treasury_full_df = self.compare_yields(trade_date)
 
-                if not shibor_treasury_df.empty:
-                    logger.info(f"SHIBOR vs 国债收益率对比 ({trade_date}):")
-                    print(shibor_treasury_df.to_string(index=False))
+                    if not shibor_treasury_df.empty:
+                        logger.info(f"SHIBOR vs 国债收益率对比 ({trade_date}):")
+                        print(shibor_treasury_df.to_string(index=False))
 
-                if not convertible_df.empty:
-                    logger.info(f"可转债收益率（最高/最低）({trade_date}):")
-                    print(convertible_df.to_string(index=False))
+                    if not convertible_df.empty:
+                        logger.info(f"可转债收益率（最高/最低）({trade_date}):")
+                        print(convertible_df.to_string(index=False))
 
-                all_results.append({
-                    'trade_date': trade_date,
-                    'shibor_treasury_df': shibor_treasury_df,
-                    'convertible_df': convertible_df,
-                    'treasury_full_df': treasury_full_df
-                })
-                logger.info(f">>> {trade_date} 处理完成")
-            except Exception as e:
-                logger.error(f">>> {trade_date} 处理失败: {e}", exc_info=True)
-                continue
+                    all_results.append({
+                        'trade_date': trade_date,
+                        'shibor_treasury_df': shibor_treasury_df,
+                        'convertible_df': convertible_df,
+                        'treasury_full_df': treasury_full_df
+                    })
+                    logger.info(f">>> {trade_date} 处理完成")
+                except Exception as e:
+                    logger.error(f">>> {trade_date} 处理失败: {e}", exc_info=True)
+                    continue
 
-        if not all_results:
-            logger.error("所有日期均未获取到有效数据，无法生成报告")
-            return [], []
+            if not all_results:
+                logger.error("所有日期均未获取到有效数据，无法生成报告")
+                job_logger.end_job_failed("所有日期均未获取到有效数据")
+                return [], []
 
-        # 生成 PDF 报告
-        pdf_path = self._generate_pdf_report(all_results, output_dir)
+            # 生成 PDF 报告
+            pdf_path = self._generate_pdf_report(all_results, output_dir)
 
-        logger.info("=" * 80)
-        logger.info(f"✅ 收益率批量比较分析完成")
-        logger.info(f"📁 输出目录: {output_dir}")
-        logger.info(f"📄 PDF 报告: {pdf_path}")
-        logger.info("=" * 80)
+            logger.info("=" * 80)
+            logger.info(f"✅ 收益率批量比较分析完成")
+            logger.info(f"📁 输出目录: {output_dir}")
+            logger.info(f"📄 PDF 报告: {pdf_path}")
+            logger.info("=" * 80)
 
-        return [r['shibor_treasury_df'] for r in all_results], [r['convertible_df'] for r in all_results]
+            job_logger.end_job_success(records_processed=len(all_results))
+            return [r['shibor_treasury_df'] for r in all_results], [r['convertible_df'] for r in all_results]
+        except Exception as e:
+            import traceback
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise
 
     # ============================================================
     # PDF 报告生成

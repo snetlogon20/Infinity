@@ -15,6 +15,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 import pandas as pd
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 
 logger = CommonLib.logger
 
@@ -25,6 +26,7 @@ class PortfolioMetricsAnalysisReport:
     def __init__(self):
         self.reportlab_font = self._register_chinese_font()
         self._ensure_output_directory()
+        self.job_logger = ReportJobLogger()
 
     def _ensure_output_directory(self):
         """确保输出目录存在"""
