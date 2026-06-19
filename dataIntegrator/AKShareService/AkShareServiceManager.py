@@ -7,6 +7,7 @@ from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotH
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
 from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
 from dataIntegrator.AKShareService.AkShareBondCbJslService import AkShareBondCbJslService
+from dataIntegrator.AKShareService.AkShareStockYjbbEmService import AkShareStockYjbbEmService
 from dataIntegrator.AKShareService.AkShareJobLogger import AkShareJobLogger
 from dataIntegrator.common.FileType import FileType
 
@@ -313,6 +314,47 @@ class AkShareServiceManager():
         logger.info("callAkShareBondCbJslService ended...")
 
     @classmethod
+    def callAkShareStockYjbbEmService(self, date='20231231'):
+        """
+        调用 AkShare 东方财富-业绩报表数据服务
+
+        Args:
+            date (str): 报告期日期，如 '20231231'（年报）, '20240331'（一季报）等
+        """
+        logger.info(f"callAkShareStockYjbbEmService started... Date: {date}")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, 'akshare_stock_yjbb_em.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareStockYjbbEmService', {
+                'date': date
+            })
+
+            akShareService = AkShareStockYjbbEmService()
+
+            # 获取原始数据
+            dataFrame = akShareService.prepareDataFrame(date)
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse(date)
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info(f"callAkShareStockYjbbEmService ended... Date: {date}")
+
+    @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
@@ -331,6 +373,7 @@ class AkShareServiceManager():
             self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
             self.callAllAkShareStockUsDailyService(adjust='')
             self.callAkShareBondCbJslService()
+            self.callAkShareStockYjbbEmService(date=end_date)
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)
