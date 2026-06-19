@@ -1780,11 +1780,11 @@ class ConvertibleBondManagerReport:
 
         from dataIntegrator.LLMSuport.AiAgents.SparkAIX import SparkX2
 
-        logger.info(f"正在调用 SparkX2 生成 AI 分析报告，输入 {n} 只债券数据")
+        logger.info(f"正在调用 ZhipuGLM4 生成 AI 分析报告，输入 {n} 只债券数据")
         try:
             #result = SparkX2.inquiry(prompt, "")
             result = ZhipuGLM4.inquiry(prompt, "")
-            logger.info("SparkX2 AI 分析报告生成成功")
+            logger.info("ZhipuGLM4 AI 分析报告生成成功")
             return result
         except Exception as e:
             logger.error(f"AI 分析报告生成失败: {e}")
