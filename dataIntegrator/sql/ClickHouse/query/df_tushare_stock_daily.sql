@@ -17,3 +17,7 @@ AND
         trade_date >= '20241001' AND 
         trade_date <= '20261231'
 order by trade_date desc
+
+--股票财报
+select * from df_akshare_stock_yjbb_em
+order by eps desc

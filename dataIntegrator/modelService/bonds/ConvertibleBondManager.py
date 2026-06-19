@@ -148,6 +148,8 @@ class ConvertibleBondManager:
         calculated_bond_df['pay_per_year'] = calculated_bond_df['pay_per_year'].fillna(0).astype(int)
         if 'lookback_days' in calculated_bond_df.columns:
             calculated_bond_df['lookback_days'] = calculated_bond_df['lookback_days'].fillna(0).astype(int)
+        if 'accrued_days' in calculated_bond_df.columns:
+            calculated_bond_df['accrued_days'] = calculated_bond_df['accrued_days'].fillna(0).astype(int)
 
         # 浮点列: NaN -> 0.0
         float_columns = ['ytm', 'macaulay_duration', 'modified_duration', 'convexity',
@@ -160,7 +162,8 @@ class ConvertibleBondManager:
                          'es_price_95', 'es_price_99',
                          'effective_duration', 'effective_convexity',
                          'pct_price_chg_p50bp', 'pct_price_chg_m50bp',
-                         'pct_price_chg_p100bp', 'pct_price_chg_m100bp']
+                         'pct_price_chg_p100bp', 'pct_price_chg_m100bp',
+                         'accrued_interest', 'clean_price']
         calculated_bond_df[float_columns] = calculated_bond_df[float_columns].fillna(0.0)
 
         ClickhouseService.save_dataframe_to_clickhouse(

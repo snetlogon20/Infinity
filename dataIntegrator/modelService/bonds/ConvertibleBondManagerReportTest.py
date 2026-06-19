@@ -1,6 +1,6 @@
 import pandas as pd
 
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.modelService.bonds.ConvertibleBondManagerReport import ConvertibleBondManagerReport
 
 logger = CommonLib.logger

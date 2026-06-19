@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import calendar
 from datetime import datetime
 from scipy.optimize import fsolve
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -166,6 +167,89 @@ class ConvertibleBondAnalyst:
         remaining_years = remaining_days / 365.0
 
         return remaining_years
+
+    def calculate_accrued_interest(self, par, coupon_rate, pay_per_year,
+                                    value_date, trade_date, market_price):
+        """
+        计算应计利息、计息天数和净价
+
+        在中国可转债市场，行情显示价格（close）通常为全价（包含应计利息）。
+        全价 = 净价 + 应计利息
+
+        参数:
+        - par: 面值（默认100）
+        - coupon_rate: 票面利率（%）
+        - pay_per_year: 年付息次数
+        - value_date: 起息日 (YYYYMMDD 或 YYYY-MM-DD)
+        - trade_date: 交易日/结算日 (YYYYMMDD 或 YYYY-MM-DD)
+        - market_price: 当前市价（全价）
+
+        返回:
+        - dict: {'accrued_interest': float, 'accrued_days': int, 'clean_price': float}
+        """
+        # ---------- 解析起息日 ----------
+        if isinstance(value_date, str):
+            value_date_clean = value_date.replace('-', '')
+            value_dt = datetime.strptime(value_date_clean, '%Y%m%d')
+        else:
+            value_dt = value_date
+
+        # ---------- 解析交易日 ----------
+        if isinstance(trade_date, str):
+            trade_date_clean = trade_date.replace('-', '')
+            trade_dt = datetime.strptime(trade_date_clean, '%Y%m%d')
+        else:
+            trade_dt = trade_date
+
+        # ---------- 若起息日 >= 交易日，尚未开始计息 ----------
+        if value_dt >= trade_dt:
+            logger.info(f"起息日 {value_dt.date()} >= 交易日 {trade_dt.date()}，应计利息为 0")
+            return {
+                'accrued_interest': 0.0,
+                'accrued_days': 0,
+                'clean_price': market_price
+            }
+
+        # ---------- 计算每个付息周期的月数 ----------
+        months_per_period = 12 // pay_per_year
+
+        # ---------- 找到交易日之前的最近一次付息日 ----------
+        # 从起息日开始，按付息周期步进，直到超过交易日
+        current_dt = value_dt
+        last_coupon_dt = value_dt
+
+        while current_dt <= trade_dt:
+            last_coupon_dt = current_dt
+            # 加上一个付息周期的月数
+            new_month = current_dt.month + months_per_period
+            new_year = current_dt.year
+            if new_month > 12:
+                new_month -= 12
+                new_year += 1
+            # 处理月末边界（如 1月31日 + 6个月 → 7月30日）
+            last_day = calendar.monthrange(new_year, new_month)[1]
+            new_day = min(current_dt.day, last_day)
+            current_dt = datetime(new_year, new_month, new_day)
+
+        # ---------- 计算计息天数 ----------
+        accrued_days = (trade_dt - last_coupon_dt).days
+
+        # ---------- 计算应计利息 ----------
+        # 公式: 面值 × 票面利率 × 计息天数 / 365
+        annual_rate = coupon_rate / 100.0
+        accrued_interest = par * annual_rate * accrued_days / 365.0
+
+        # ---------- 计算净价 ----------
+        clean_price = market_price - accrued_interest
+
+        logger.info(f"应计利息计算: 上次付息日={last_coupon_dt.date()}, "
+                    f"计息天数={accrued_days}, 应计利息={accrued_interest:.6f}, 净价={clean_price:.4f}")
+
+        return {
+            'accrued_interest': round(accrued_interest, 6),
+            'accrued_days': accrued_days,
+            'clean_price': round(clean_price, 4)
+        }
 
     def calculate_current_yield(self, coupon_rate, market_price, par=100):
         """
@@ -675,6 +759,16 @@ class ConvertibleBondAnalyst:
             }
 
         try:
+            # 5.5 计算应计利息、计息天数、净价
+            value_date = basic_info.get('value_date', '')
+            accrued_info = self.calculate_accrued_interest(
+                par, coupon_rate, pay_per_year,
+                value_date, trade_date, market_price
+            )
+            accrued_interest = accrued_info['accrued_interest']
+            accrued_days = accrued_info['accrued_days']
+            clean_price = accrued_info['clean_price']
+
             # 6. 计算 YTM（到期收益率）—— 每期收益率，确保至少 1 个付息周期
             coupon_payment = par * (coupon_rate / 100.0) / pay_per_year
             periods = max(int(remaining_years * pay_per_year), 1)
@@ -758,6 +852,10 @@ class ConvertibleBondAnalyst:
                 'es_price_95': es.get(0.95, 0.0) / 100.0 * market_price,
                 'es_price_99': es.get(0.99, 0.0) / 100.0 * market_price,
                 'lookback_days': lookback_days,
+                # 应计利息 & 净价
+                'accrued_interest': accrued_interest,
+                'accrued_days': accrued_days,
+                'clean_price': clean_price,
             }
 
             logger.info(f"✅ 可转债 {ts_code} 在 {trade_date} 的指标计算完成")
@@ -777,6 +875,9 @@ class ConvertibleBondAnalyst:
             logger.info(f"   VaR 参数 95%/99%: {var_param.get(0.95, 0):.4f}% / {var_param.get(0.99, 0):.4f}%")
             logger.info(f"   ES 95%/99%:         {es.get(0.95, 0):.4f}% / {es.get(0.99, 0):.4f}%")
             logger.info(f"   lookback_days: {lookback_days}")
+            logger.info(f"   计息天数: {accrued_days} 天")
+            logger.info(f"   应计利息: {accrued_interest:.6f}")
+            logger.info(f"   净价:     {clean_price:.4f}")
 
             return result
 
