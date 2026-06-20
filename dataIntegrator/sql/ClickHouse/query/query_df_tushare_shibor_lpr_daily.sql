@@ -254,5 +254,6 @@ WHERE d.trade_date = '20260522'
   and b.ts_code in ('127033.SZ', '113037.SH', '128129.SZ', '127025.SZ', '127018.SZ', '128135.SZ', '113042.SH', '123072.SZ', '128127.SZ', '113052.SH')
   AND m.current_yield <> 0
 
-
---ALTER TABLE indexsysdb.df_tushare_cb_metrics  DELETE WHERE trade_date >= '20260101' AND trade_date <= '20260531'
+-- 集思录可转债实时数据表 (akshare bond_cb_jsl)
+--主要是为了拿评级
+select ts_code, bond_name, price, bond_rating, stk_code, stk_name, price from df_akshare_bond_cb_jsl

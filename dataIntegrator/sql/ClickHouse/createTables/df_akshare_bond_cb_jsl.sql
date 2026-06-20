@@ -1,4 +1,5 @@
 -- 集思录可转债实时数据表 (akshare bond_cb_jsl)
+--主要是为了拿评级
 -- drop table indexsysdb.df_akshare_bond_cb_jsl
 CREATE TABLE IF NOT EXISTS indexsysdb.df_akshare_bond_cb_jsl (
     `ts_code` String COMMENT '转债代码',
