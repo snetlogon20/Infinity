@@ -1,5 +1,6 @@
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.AKShareService.AkShareFinancialDataIndicatorService import AkShareFinancialDataIndicatorService
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.common.FileType import FileType
 import os
 
@@ -53,7 +54,7 @@ class AkShareFinancialDataIndicatorServiceTest:
 if __name__ == '__main__':
     akShareFinancialDataIndicatorServiceTest = AkShareFinancialDataIndicatorServiceTest()
 
-    for stock_info in CommonParameters.STOCK_LIST:
+    for stock_info in CommonDataParameters.STOCK_LIST:
         ts_code = stock_info['ts_code']      # e.g. '002093.SZ'
         name = stock_info['name']             # e.g. '国脉科技'
         symbol = ts_code.split('.')[0]        # e.g. '002093'

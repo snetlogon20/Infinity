@@ -6,6 +6,9 @@ from dataIntegrator.AKShareService.AkShareService import AkShareService
 import sys
 logger = CommonLib.logger
 
+"""
+股票财报 年报季报 - 业绩报表（含 ROE、毛利率、每股收益、每股经营现金流）
+"""
 class AkShareStockYjbbEmService(AkShareService):
 
     @classmethod
