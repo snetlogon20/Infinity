@@ -1,6 +1,6 @@
 import pandas as pd
 
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.bonds.ConvertibleBondManager import ConvertibleBondManager
 
@@ -31,5 +31,6 @@ if __name__ == "__main__":
     # 批量保存: start_date ~ end_date
     #manager.save_calculated_bonds("20260101", "20260524")
     #manager.save_calculated_bonds("20260501", "20260524")
-    manager.save_calculated_bonds("20260101", "20260430")
+    # manager.save_calculated_bonds("20260101", "20260614")
+    manager.save_calculated_bonds("20260601", CommonParameters.today)
 

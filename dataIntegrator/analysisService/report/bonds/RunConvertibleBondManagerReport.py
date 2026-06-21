@@ -7,6 +7,7 @@
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
+from dataIntegrator.modelService.bonds.ConvertibleBondManager import ConvertibleBondManager
 from dataIntegrator.modelService.bonds.ConvertibleBondManagerReport import ConvertibleBondManagerReport
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
@@ -43,7 +44,19 @@ class RunConvertibleBondManagerReport:
         self.job_logger.start_job('ConvertibleBondManagerReport', 'ConvertibleBond',
                                   params={'start_date': start_date, 'end_date': end_date})
         try:
+            # 1. 先刷新可转债指标数据（计算并入库）
+            logger.info("=" * 60)
+            logger.info(f"步骤1: 刷新可转债指标数据 ({start_date} ~ {end_date})")
+            logger.info("=" * 60)
+            manager = ConvertibleBondManager()
+            manager.save_calculated_bonds(start_date, end_date)
+
+            # 2. 再生成报表
+            logger.info("=" * 60)
+            logger.info(f"步骤2: 生成可转债量化管理报告 ({start_date} ~ {end_date})")
+            logger.info("=" * 60)
             self.report.run(start_date, end_date)
+
             self.job_logger.end_job_success()
             logger.info("可转债量化管理报告 生成成功")
         except Exception as e:

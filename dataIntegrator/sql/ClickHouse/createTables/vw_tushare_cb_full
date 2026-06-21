@@ -38,6 +38,7 @@ SELECT
     b.issue_rating,
     b.newest_rating,
     b.rating_comp,
+    j.bond_rating,
     d.pre_close,
     d.open,
     d.high,
@@ -65,6 +66,9 @@ SELECT
     m.current_yield,
     m.simple_ytm,
     m.market_price,
+    m.clean_price,
+    m.accrued_interest,
+    m.accrued_days,
     m.par,
     m.coupon_rate,
     m.pay_per_year,
@@ -86,10 +90,17 @@ SELECT
     m.pct_price_chg_p50bp,
     m.pct_price_chg_m50bp,
     m.pct_price_chg_p100bp,
-    m.pct_price_chg_m100bp
+    m.pct_price_chg_m100bp,
+    m.estimated_rating,
+    m.estimated_pd,
+    m.estimated_lgd,
+    m.estimated_el,
+    m.estimated_risk_flag
 FROM indexsysdb.df_tushare_cb_daily d
 LEFT JOIN indexsysdb.df_tushare_cb_basic b
     ON d.ts_code = b.ts_code
 LEFT JOIN indexsysdb.df_tushare_cb_metrics m
     ON d.ts_code = m.ts_code
    AND d.trade_date = m.trade_date
+LEFT JOIN indexsysdb.df_akshare_bond_cb_jsl j
+    ON splitByChar('.', b.ts_code)[1] = j.ts_code
