@@ -70,6 +70,10 @@ select ts_code,count(1) from indexsysdb.df_tushare_cb_daily
 group by ts_code
 order by count(1) desc
 
+select trade_date,count(1) from indexsysdb.df_tushare_cb_daily
+group by trade_date
+order by trade_date desc
+
 select count(*)
 from (
 select trade_date,count(1) from indexsysdb.df_tushare_cb_daily
@@ -124,8 +128,12 @@ order by trade_date
 
 --查看哪个最赚钱
 select * from indexsysdb.df_tushare_cb_metrics
-where trade_date ='20260105'
+where trade_date ='20260106'
 order by current_yield desc, modified_duration, convexity desc, dv01 desc, pvbp desc 
+
+select * from indexsysdb.df_tushare_cb_metrics
+where trade_date ='20260106'
+order by pct_price_chg_m100bp DESC
 
 -- 可转债全景视图: df_tushare_cb_daily LEFT JOIN df_tushare_cb_basic LEFT JOIN df_tushare_cb_metrics
 SELECT
@@ -208,9 +216,19 @@ WHERE d.trade_date >= '20260301' AND
 		 d.trade_date <= '20260525' 
 ORDER BY d.trade_date, d.ts_code;
 
+--看视图
+select * from indexsysdb.vw_tushare_cb_full
+where  d.trade_date = '20260122'
+
+--看percent change
+select * from indexsysdb.vw_tushare_cb_full
+where  d.trade_date = '20260122'
+order by m.pct_price_chg_m100bp DESC
 
 select * from indexsysdb.vw_tushare_cb_full
-where  d.trade_date = '20260522'
+where  d.trade_date = '20260122'
+order by m.pct_price_chg_m100bp DESC
+
 
 SELECT b.ts_code, d.bond_value, b.bond_short_name, d.trade_date, b.maturity, m.current_yield,
     m.coupon_rate,
@@ -236,5 +254,6 @@ WHERE d.trade_date = '20260522'
   and b.ts_code in ('127033.SZ', '113037.SH', '128129.SZ', '127025.SZ', '127018.SZ', '128135.SZ', '113042.SH', '123072.SZ', '128127.SZ', '113052.SH')
   AND m.current_yield <> 0
 
-
---ALTER TABLE indexsysdb.df_tushare_cb_metrics  DELETE WHERE trade_date >= '20260101' AND trade_date <= '20260531'
+-- 集思录可转债实时数据表 (akshare bond_cb_jsl)
+--主要是为了拿评级
+select ts_code, bond_name, price, bond_rating, stk_code, stk_name, price from df_akshare_bond_cb_jsl

@@ -132,22 +132,33 @@ class ConvertibleBondManager:
     # ---------- 数据持久化 ----------
 
     def _save_bonds_for_date(self, trade_date):
-        """计算并保存单个交易日的可转债指标"""
+        """计算并保存单个交易日的可转债指标（含信用风险评估）"""
         calculated_bond_df = self.calculate_all_bonds(trade_date)
 
         if calculated_bond_df.empty:
             logger.warning(f"交易日 {trade_date} 无可转债数据，跳过保存")
             return False
 
+        # ---- 信用风险评估 ----
+        ts_codes = calculated_bond_df['ts_code'].tolist()
+        rating_map = self._query_bond_ratings(ts_codes)
+        rated_count = sum(1 for v in rating_map.values() if v)
+        logger.info(f"评级查询完成: {rated_count}/{len(ts_codes)} 只有评级")
+        calculated_bond_df = self._enrich_credit_risk(calculated_bond_df, rating_map)
+
         # 清洗数据，确保类型匹配 ClickHouse 表定义
         # 字符串列: NaN -> 空字符串
         calculated_bond_df['description'] = calculated_bond_df['description'].fillna('')
+        calculated_bond_df['estimated_rating'] = calculated_bond_df['estimated_rating'].fillna('')
+        calculated_bond_df['estimated_risk_flag'] = calculated_bond_df['estimated_risk_flag'].fillna('')
 
         # 布尔/整型列: NaN -> 0, 然后转 int
         calculated_bond_df['is_feasible'] = calculated_bond_df['is_feasible'].fillna(0).astype(int)
         calculated_bond_df['pay_per_year'] = calculated_bond_df['pay_per_year'].fillna(0).astype(int)
         if 'lookback_days' in calculated_bond_df.columns:
             calculated_bond_df['lookback_days'] = calculated_bond_df['lookback_days'].fillna(0).astype(int)
+        if 'accrued_days' in calculated_bond_df.columns:
+            calculated_bond_df['accrued_days'] = calculated_bond_df['accrued_days'].fillna(0).astype(int)
 
         # 浮点列: NaN -> 0.0
         float_columns = ['ytm', 'macaulay_duration', 'modified_duration', 'convexity',
@@ -160,7 +171,9 @@ class ConvertibleBondManager:
                          'es_price_95', 'es_price_99',
                          'effective_duration', 'effective_convexity',
                          'pct_price_chg_p50bp', 'pct_price_chg_m50bp',
-                         'pct_price_chg_p100bp', 'pct_price_chg_m100bp']
+                         'pct_price_chg_p100bp', 'pct_price_chg_m100bp',
+                         'accrued_interest', 'clean_price',
+                         'estimated_pd', 'estimated_lgd', 'estimated_el']
         calculated_bond_df[float_columns] = calculated_bond_df[float_columns].fillna(0.0)
 
         ClickhouseService.save_dataframe_to_clickhouse(
@@ -169,6 +182,114 @@ class ConvertibleBondManager:
             database='indexsysdb'
         )
         return True
+
+    # ---------- 信用风险评估 ----------
+
+    # 评级 → 基准 PD 映射（来自 pd_analysis.py 逻辑）
+    RATING_PD_MAP = {
+        'AAA': 0.0005,
+        'AA+': 0.0020,
+        'AA':  0.0100,
+        'AA-': 0.0300,
+        'A+':  0.0800,
+    }
+    DEFAULT_PD = 0.15          # 未知评级的默认 PD
+    DEFAULT_LGD = 0.5          # 违约损失率
+    DEFAULT_EAD = 100.0        # 违约敞口（面值 100 元）
+    EL_HIGH_RISK_THRESHOLD = 2.0  # EL > 2 标记为高风险
+
+    @classmethod
+    def _query_bond_ratings(cls, ts_codes):
+        """
+        从 df_akshare_bond_cb_jsl 批量查询评级
+
+        参数:
+        - ts_codes: 转债代码列表（如 ['110073.SH', '110074.SH']）
+
+        返回:
+        - dict: {ts_code: bond_rating}，匹配不上的取空字符串
+        """
+        if not ts_codes:
+            return {}
+
+        clickhouse_service = ClickhouseService()
+        # 剥离后缀（.SH/.SZ），匹配 akshare 的 ts_code
+        base_codes = [c.split('.')[0] for c in ts_codes]
+        code_list = "', '".join(base_codes)
+        sql = f"""
+            SELECT ts_code, bond_rating
+            FROM indexsysdb.df_akshare_bond_cb_jsl
+            WHERE ts_code IN ('{code_list}')
+        """
+        rating_df = clickhouse_service.getDataFrameWithoutColumnsName(sql)
+        if rating_df.empty:
+            logger.warning("未从 df_akshare_bond_cb_jsl 查询到任何评级数据")
+            return {c: '' for c in ts_codes}
+
+        # 构建 base_code -> rating 的映射
+        base_to_rating = dict(zip(rating_df['ts_code'].astype(str).str.strip(),
+                                  rating_df['bond_rating'].fillna('').astype(str)))
+        result = {}
+        for code in ts_codes:
+            base = code.split('.')[0]
+            result[code] = base_to_rating.get(base, '')
+        return result
+
+    @classmethod
+    def _enrich_credit_risk(cls, metrics_df, rating_map):
+        """
+        给 metrics DataFrame 附加信用风险字段
+
+        参数:
+        - metrics_df: 包含 market_price 列的 DataFrame
+        - rating_map: {ts_code: bond_rating}
+
+        返回:
+        - 在原 DataFrame 基础上增加 estimated_rating, estimated_pd,
+          estimated_lgd, estimated_el, estimated_risk_flag 字段
+        """
+        df = metrics_df.copy()
+
+        # 1) 填入评级
+        df['estimated_rating'] = df['ts_code'].map(lambda c: rating_map.get(c, ''))
+
+        # 2) 评级 → 基准 PD
+        df['_base_pd'] = df['estimated_rating'].map(
+            lambda r: cls.RATING_PD_MAP.get(r, cls.DEFAULT_PD)
+        )
+
+        # 3) 价格修正因子（基于 market_price 即收盘价）
+        market_price = df['market_price'].fillna(0).astype(float)
+
+        def _price_factor(p):
+            if p <= 0:
+                return 1.0
+            if p < 90:
+                return 5.0
+            if p < 100:
+                return 2.0
+            return 1.0
+
+        df['_price_factor'] = market_price.apply(_price_factor)
+
+        # 4) 最终 PD
+        df['estimated_pd'] = (df['_base_pd'] * df['_price_factor']).clip(upper=1.0)
+
+        # 5) LGD 固定值
+        df['estimated_lgd'] = cls.DEFAULT_LGD
+
+        # 6) EL = PD × LGD × EAD
+        df['estimated_el'] = df['estimated_pd'] * cls.DEFAULT_LGD * cls.DEFAULT_EAD
+
+        # 7) 风险标记
+        df['estimated_risk_flag'] = df['estimated_el'].apply(
+            lambda el: 'High Risk' if el > cls.EL_HIGH_RISK_THRESHOLD else 'Normal'
+        )
+
+        # 清理中间临时列
+        df.drop(columns=['_base_pd', '_price_factor'], inplace=True)
+
+        return df
 
     @staticmethod
     def _delete_bonds_in_date_range(start_date, end_date):

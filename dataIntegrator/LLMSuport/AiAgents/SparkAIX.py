@@ -2,6 +2,7 @@ import requests
 
 from dataIntegrator import CommonLib
 from dataIntegrator.LLMSuport.AiAgents import AIAgent
+from dataIntegrator.common.MyTokens import MyTokens
 
 logger = CommonLib.logger
 
@@ -13,7 +14,7 @@ class SparkX2(AIAgent):
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer hevIycBicWmcSybTxCfP:pvgZACitEQuHNuqQmSPJ"
+            "Authorization": "Bearer %s:%s" % (MyTokens.SPARK_API_KEY, MyTokens.SPARK_API_SECRET)
         }
 
         messages = []
