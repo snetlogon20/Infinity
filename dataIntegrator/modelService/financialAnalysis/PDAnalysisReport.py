@@ -31,6 +31,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
@@ -1989,14 +1990,14 @@ class PDAnalysisReport:
 
     def generate_all_stocks_report(self) -> str:
         """
-        对 CommonParameters.STOCK_LIST 中所有股票生成一份合并的 PD 分析报告
+        对 CommonDataParameters.STOCK_LIST 中所有股票生成一份合并的 PD 分析报告
 
         Returns:
             str: 生成的 PDF 文件路径，失败返回 None
         """
         logger.info("=" * 80)
         logger.info("  批量 PD 分析组合报告生成 开始 (合并到一个PDF)")
-        logger.info(f"  股票数量: {len(CommonParameters.STOCK_LIST)}")
+        logger.info(f"  股票数量: {len(CommonDataParameters.STOCK_LIST)}")
         logger.info("=" * 80)
 
         # 先提前获取所有股票数据，确认哪些有数据
@@ -2008,12 +2009,12 @@ class PDAnalysisReport:
         all_dates = []  # 收集所有股票的日期，用于计算分析范围
         stock_industry_map = {}  # stock_label -> industry
 
-        for idx, stock_info in enumerate(CommonParameters.STOCK_LIST, 1):
+        for idx, stock_info in enumerate(CommonDataParameters.STOCK_LIST, 1):
             ts_code = stock_info['ts_code']
             name = stock_info['name']
             symbol = ts_code.split('.')[0]
 
-            logger.info(f"\n[{idx}/{len(CommonParameters.STOCK_LIST)}] 准备 {name} ({symbol}) 数据...")
+            logger.info(f"\n[{idx}/{len(CommonDataParameters.STOCK_LIST)}] 准备 {name} ({symbol}) 数据...")
 
             self.job_logger.start_job('PDAnalysisReport', symbol,
                                       params={'name': name, 'ts_code': ts_code})

@@ -5,7 +5,7 @@ PD (违约概率) 分析报告生成器
 支持按板块分组生成独立报告。
 """
 
-from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator import CommonLib
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.modelService.financialAnalysis.PDAnalysisTest import PDAnalysisTest
@@ -47,7 +47,7 @@ class RunPDAnalysisReport:
             report_path = self.pdAnalysisReport.generate_all_stocks_report()
 
             logger.info(f"\n✅ 全量股票 PD 分析综合报告生成成功: {report_path}")
-            self.job_logger.end_job_success(records_processed=len(CommonParameters.STOCK_LIST))
+            self.job_logger.end_job_success(records_processed=len(CommonDataParameters.STOCK_LIST))
 
             return report_path
 
@@ -101,7 +101,7 @@ class RunPDAnalysisReport:
         logger.info("\n" + "=" * 80)
         logger.info("🎯 PD 违约概率分析 批量报告生成 开始")
         logger.info(f"   起始年份: {start_year}")
-        logger.info(f"   股票数量: {len(CommonParameters.STOCK_LIST)}")
+        logger.info(f"   股票数量: {len(CommonDataParameters.STOCK_LIST)}")
         logger.info("=" * 80)
 
         # ---- 模式1: 全量股票综合报告 ----

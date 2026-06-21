@@ -55,7 +55,7 @@ class PDAnalysisTest:
 
     def run_all_analysis(self, start_year=None, generate_reports: bool = False):
         """
-        对 CommonParameters.STOCK_LIST 中所有股票批量执行 PD 分析
+        对 CommonDataParameters.STOCK_LIST 中所有股票批量执行 PD 分析
 
         Args:
             start_year (str|None): 起始年份（仅日志记录用）
@@ -63,7 +63,7 @@ class PDAnalysisTest:
         """
         logger.info("=" * 80)
         logger.info("  批量 PD 分析开始")
-        logger.info(f"  股票数量: {len(CommonParameters.STOCK_LIST)}")
+        logger.info(f"  股票数量: {len(CommonDataParameters.STOCK_LIST)}")
         logger.info(f"  start_year: {start_year}")
         logger.info(f"  生成报告: {generate_reports}")
         logger.info("=" * 80)
@@ -71,7 +71,7 @@ class PDAnalysisTest:
         success_count = 0
         fail_count = 0
 
-        for stock_info in CommonParameters.STOCK_LIST:
+        for stock_info in CommonDataParameters.STOCK_LIST:
             ts_code = stock_info['ts_code']      # e.g. '002093.SZ'
             name = stock_info['name']             # e.g. '国脉科技'
             symbol = ts_code.split('.')[0]        # e.g. '002093'
@@ -104,7 +104,7 @@ class PDAnalysisTest:
         """
         按股票所属板块分组，批量执行 PD 分析并为每个板块生成独立报告
 
-        1. 从 CommonParameters.STOCK_LIST 获取股票列表
+        1. 从 CommonDataParameters.STOCK_LIST 获取股票列表
         2. 通过 ClickHouse df_tushare_stock_basic 查询每只股票的 industry
         3. 按 industry 分组
         4. 对每个板块：先分析所有股票入库，再生成该板块的 PDF 报告
@@ -116,7 +116,7 @@ class PDAnalysisTest:
         """
         logger.info("=" * 80)
         logger.info("  按板块分组 PD 分析开始")
-        logger.info(f"  股票数量: {len(CommonParameters.STOCK_LIST)}")
+        logger.info(f"  股票数量: {len(CommonDataParameters.STOCK_LIST)}")
         logger.info(f"  start_year: {start_year}")
         logger.info(f"  生成报告: {generate_reports}")
         logger.info("=" * 80)
