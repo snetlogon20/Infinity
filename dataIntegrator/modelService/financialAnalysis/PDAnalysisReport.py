@@ -938,6 +938,369 @@ class PDAnalysisReport:
             leading=font_size + 4, alignment=TA_CENTER,
         )
 
+    # ========================= Z-Score 风险热力图 =========================
+
+    def _zscore_heatmap_color(self, z_score, z_min, z_max):
+        """
+        三区渐变热力图颜色:
+
+        🔴 红色区 Z ∈ [z_min, 1.8]:   深红 → 浅粉红
+        🟡 黄色区 Z ∈ (1.8, 3.0):     浅黄 → 琥珀黄
+        🟢 绿色区 Z ∈ [3.0, z_max]:   深绿 → 墨绿
+
+        Args:
+            z_score: 当前 Z-Score 值
+            z_min: 全局最小 Z-Score
+            z_max: 全局最大 Z-Score
+
+        Returns:
+            reportlab Color
+        """
+        if pd.isna(z_score):
+            return colors.HexColor('#eeeeee')
+
+        # 三区边界
+        bound_red = self.Z_GREY       # 1.8  红色区上界
+        bound_yellow = self.Z_SAFE    # 3.0  黄色区上界
+
+        if z_score <= bound_red:
+            # ── 红色区: 深红(z_min) → 浅粉红(1.8) ──
+            if bound_red <= z_min:
+                t = 0.0
+            else:
+                t = (z_score - z_min) / (bound_red - z_min)
+            t = max(0.0, min(1.0, t))
+            r = int(183 + (255 - 183) * t)  # #b71c1c → #ffcdd2
+            g = int(28 + (205 - 28) * t)
+            b = int(28 + (210 - 28) * t)
+
+        elif z_score < bound_yellow:
+            # ── 黄色区: 浅黄(1.8) → 琥珀黄(3.0) ──
+            t = (z_score - bound_red) / (bound_yellow - bound_red)
+            t = max(0.0, min(1.0, t))
+            r = int(255 + (249 - 255) * t)  # #fff9c4 → #f9a825
+            g = int(249 + (168 - 249) * t)
+            b = int(196 + (37 - 196) * t)
+
+        else:
+            # ── 绿色区: 深绿(3.0) → 墨绿(z_max) ──
+            if z_max <= bound_yellow:
+                t = 0.0
+            else:
+                t = (z_score - bound_yellow) / (z_max - bound_yellow)
+            t = max(0.0, min(1.0, t))
+            r = int(46 + (27 - 46) * t)   # #2e7d32 → #1b5e20
+            g = int(125 + (94 - 125) * t)
+            b = int(50 + (32 - 50) * t)
+
+        return colors.HexColor('#%02x%02x%02x' % (r, g, b))
+
+    def _pd_heatmap_color(self, pd_val, pd_min, pd_max):
+        """
+        三区渐变热力图颜色 (PD 违约概率):
+
+        🟢 绿色区 PD ∈ [pd_min, 0.02]:      深绿 → 浅绿  (低违约风险)
+        🟡 黄色区 PD ∈ (0.02, 0.10]:          浅黄 → 琥珀黄 (中违约风险)
+        🔴 红色区 PD ∈ (0.10, pd_max]:         浅红 → 深红   (高违约风险)
+
+        Args:
+            pd_val: 当前 PD 值 (小数，非百分比)
+            pd_min: 全局最小 PD
+            pd_max: 全局最大 PD
+
+        Returns:
+            reportlab Color
+        """
+        if pd.isna(pd_val):
+            return colors.HexColor('#eeeeee')
+
+        bound_green = 0.02   #  2% — 绿/黄分界
+        bound_yellow = 0.10  # 10% — 黄/红分界
+
+        if pd_val <= bound_green:
+            # ── 绿色区: 深绿(pd_min) → 浅绿(2%) ──
+            if bound_green <= pd_min:
+                t = 0.0
+            else:
+                t = (pd_val - pd_min) / (bound_green - pd_min)
+            t = max(0.0, min(1.0, t))
+            r = int(27 + (165 - 27) * t)    # #1b5e20 → #a5d6a7
+            g = int(94 + (214 - 94) * t)
+            b = int(32 + (167 - 32) * t)
+
+        elif pd_val < bound_yellow:
+            # ── 黄色区: 浅黄(2%) → 琥珀黄(10%) ──
+            t = (pd_val - bound_green) / (bound_yellow - bound_green)
+            t = max(0.0, min(1.0, t))
+            r = int(255 + (249 - 255) * t)  # #fff9c4 → #f9a825
+            g = int(249 + (168 - 249) * t)
+            b = int(196 + (37 - 196) * t)
+
+        else:
+            # ── 红色区: 浅红(10%) → 深红(pd_max) ──
+            if pd_max <= bound_yellow:
+                t = 0.0
+            else:
+                t = (pd_val - bound_yellow) / (pd_max - bound_yellow)
+            t = max(0.0, min(1.0, t))
+            r = int(255 + (183 - 255) * t)  # #ffcdd2 → #b71c1c
+            g = int(205 + (28 - 205) * t)
+            b = int(210 + (28 - 210) * t)
+
+        return colors.HexColor('#%02x%02x%02x' % (r, g, b))
+
+    def _build_pd_heatmap(self, stock_pd_data, all_dates_raw, stock_industry_map=None):
+        """
+        构建 PD 违约概率热力图表格
+
+        列：板块 | 股票名称 | 日期1 | 日期2 | ...
+        行按板块排序，同板块内按股票名称排序
+        颜色从绿 (低PD/低违约风险) 渐变到红 (高PD/高违约风险)
+
+        Args:
+            stock_pd_data: dict of stock_label -> (date_series, pd_series)，pd 为小数
+            all_dates_raw: 所有日期字符串的列表
+            stock_industry_map: dict of stock_label -> industry（可选）
+
+        Returns:
+            ReportLab Table 或 None
+        """
+        if len(stock_pd_data) < 2:
+            return None
+
+        # 排序去重日期
+        unique_dates = sorted(set(all_dates_raw))
+        if not unique_dates:
+            return None
+
+        # 构建查表: stock_label -> {date: pd_value}
+        stock_date_pd = {}
+        for stock_label, (date_series, pd_series) in stock_pd_data.items():
+            stock_date_pd[stock_label] = dict(zip(date_series, pd_series))
+
+        # 全局 PD 范围（用于颜色映射）
+        all_pd = []
+        for pd_map in stock_date_pd.values():
+            for p in pd_map.values():
+                if pd.notna(p):
+                    all_pd.append(p)
+        pd_min = min(all_pd) if all_pd else 0
+        pd_max = max(all_pd) if all_pd else 0.20
+
+        # 板块映射（未提供则标记为 "-"）
+        if stock_industry_map is None:
+            stock_industry_map = {label: '-' for label in stock_date_pd}
+
+        # 按板块排序：先板块名，再股票名
+        sorted_labels = sorted(stock_date_pd.keys(),
+                               key=lambda lb: (stock_industry_map.get(lb, '未知'), lb))
+
+        # ---------- 表头 ----------
+        header = [
+            Paragraph('<b><font color="white">板块</font></b>',
+                      ParagraphStyle('pdhm_hdr_s', fontName=REPORTLAB_FONT, fontSize=5,
+                                     leading=6, alignment=TA_CENTER, textColor=colors.white)),
+            Paragraph('<b><font color="white">股票名称</font></b>',
+                      ParagraphStyle('pdhm_hdr_s', fontName=REPORTLAB_FONT, fontSize=5,
+                                     leading=6, alignment=TA_CENTER, textColor=colors.white)),
+        ]
+
+        for d in unique_dates:
+            date_str = str(d)
+            # 格式化: YYYYMMDD → YYMM
+            if len(date_str) >= 6:
+                short_date = date_str[2:6]
+            else:
+                short_date = date_str
+            header.append(Paragraph(
+                f'<b><font color="white">{short_date}</font></b>',
+                ParagraphStyle('pdhm_hdr', fontName=REPORTLAB_FONT, fontSize=5,
+                               leading=6, alignment=TA_CENTER, textColor=colors.white)
+            ))
+
+        data_rows = [header]
+
+        # ---------- 数据行 ----------
+        for stock_label in sorted_labels:
+            industry = stock_industry_map.get(stock_label, '-')
+            row = [
+                Paragraph(industry,
+                          ParagraphStyle('pdhm_ind', fontName=REPORTLAB_FONT, fontSize=6,
+                                         leading=8, alignment=TA_CENTER)),
+                Paragraph(stock_label,
+                          ParagraphStyle('pdhm_stock', fontName=REPORTLAB_FONT, fontSize=6,
+                                         leading=8, alignment=TA_LEFT)),
+            ]
+            for d in unique_dates:
+                p = stock_date_pd[stock_label].get(d)
+                if p is not None and pd.notna(p):
+                    row.append(Paragraph(f'{p*100:.2f}%', self._cell_style(font_size=5)))
+                else:
+                    row.append(Paragraph('-', self._cell_style(font_size=5)))
+            data_rows.append(row)
+
+        # ---------- 列宽 ----------
+        industry_col_width = 2.2 * cm
+        stock_col_width = 3.5 * cm
+        label_total = industry_col_width + stock_col_width
+        n_date_cols = len(unique_dates)
+        date_col_width = max(0.9 * cm, (26.0 * cm - label_total) / n_date_cols)
+        col_widths = [industry_col_width, stock_col_width] + [date_col_width] * n_date_cols
+
+        table = Table(data_rows, colWidths=col_widths, repeatRows=1)
+
+        # ---------- 基础样式 ----------
+        style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#bdc3c7')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (1, 1), (1, -1), 3),
+        ]
+
+        # ---------- 按 PD 逐格着色（日期列从 col 2 开始）----------
+        for row_idx, stock_label in enumerate(sorted_labels, start=1):
+            for col_idx, d in enumerate(unique_dates, start=2):
+                p = stock_date_pd[stock_label].get(d)
+                if p is not None and pd.notna(p):
+                    bg_color = self._pd_heatmap_color(p, pd_min, pd_max)
+                    style_cmds.append(('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), bg_color))
+                    # 深色背景用白字
+                    if p > 0.08:  # PD > 8% 深色区
+                        style_cmds.append(('TEXTCOLOR', (col_idx, row_idx), (col_idx, row_idx), colors.white))
+
+        table.setStyle(TableStyle(style_cmds))
+        return table
+
+    def _build_zscore_heatmap(self, stock_zscore_data, all_dates_raw, stock_industry_map=None):
+        """
+        构建 Z-Score 风险热力图表格
+
+        列：板块 | 股票名称 | 日期1 | 日期2 | ...
+        行按板块排序，同板块内按股票名称排序
+        颜色从红 (低Z/高风险) 渐变到绿 (高Z/低风险)
+
+        Args:
+            stock_zscore_data: dict of stock_label -> (date_series, z_score_series)
+            all_dates_raw: 所有日期字符串的列表
+            stock_industry_map: dict of stock_label -> industry（可选）
+
+        Returns:
+            ReportLab Table 或 None
+        """
+        if len(stock_zscore_data) < 2:
+            return None
+
+        # 排序去重日期
+        unique_dates = sorted(set(all_dates_raw))
+        if not unique_dates:
+            return None
+
+        # 构建查表: stock_label -> {date: z_score}
+        stock_date_z = {}
+        for stock_label, (date_series, z_series) in stock_zscore_data.items():
+            stock_date_z[stock_label] = dict(zip(date_series, z_series))
+
+        # 全局 Z-Score 范围（用于颜色映射）
+        all_z = []
+        for z_map in stock_date_z.values():
+            for z in z_map.values():
+                if pd.notna(z):
+                    all_z.append(z)
+        z_min = min(all_z) if all_z else 0
+        z_max = max(all_z) if all_z else 6
+
+        # 板块映射（未提供则标记为 "-"）
+        if stock_industry_map is None:
+            stock_industry_map = {label: '-' for label in stock_date_z}
+
+        # 按板块排序：先板块名，再股票名
+        sorted_labels = sorted(stock_date_z.keys(),
+                               key=lambda lb: (stock_industry_map.get(lb, '未知'), lb))
+
+        # ---------- 表头 ----------
+        header_style = self._header_cell_style()
+        header = [
+            Paragraph('<b><font color="white">板块</font></b>',
+                      ParagraphStyle('hm_hdr_s', fontName=REPORTLAB_FONT, fontSize=5,
+                                     leading=6, alignment=TA_CENTER, textColor=colors.white)),
+            Paragraph('<b><font color="white">股票名称</font></b>',
+                      ParagraphStyle('hm_hdr_s', fontName=REPORTLAB_FONT, fontSize=5,
+                                     leading=6, alignment=TA_CENTER, textColor=colors.white)),
+        ]
+
+        for d in unique_dates:
+            date_str = str(d)
+            # 格式化: YYYYMMDD → YYMM（去掉斜杠避免换行）
+            if len(date_str) >= 6:
+                short_date = date_str[2:6]
+            else:
+                short_date = date_str
+            header.append(Paragraph(
+                f'<b><font color="white">{short_date}</font></b>',
+                ParagraphStyle('hm_hdr', fontName=REPORTLAB_FONT, fontSize=5,
+                               leading=6, alignment=TA_CENTER, textColor=colors.white)
+            ))
+
+        data_rows = [header]
+
+        # ---------- 数据行 ----------
+        for stock_label in sorted_labels:
+            industry = stock_industry_map.get(stock_label, '-')
+            row = [
+                Paragraph(industry,
+                          ParagraphStyle('hm_ind', fontName=REPORTLAB_FONT, fontSize=6,
+                                         leading=8, alignment=TA_CENTER)),
+                Paragraph(stock_label,
+                          ParagraphStyle('hm_stock', fontName=REPORTLAB_FONT, fontSize=6,
+                                         leading=8, alignment=TA_LEFT)),
+            ]
+            for d in unique_dates:
+                z = stock_date_z[stock_label].get(d)
+                if z is not None and pd.notna(z):
+                    row.append(Paragraph(f'{z:.2f}', self._cell_style(font_size=5)))
+                else:
+                    row.append(Paragraph('-', self._cell_style(font_size=5)))
+            data_rows.append(row)
+
+        # ---------- 列宽 ----------
+        industry_col_width = 2.2 * cm
+        stock_col_width = 3.5 * cm
+        label_total = industry_col_width + stock_col_width
+        n_date_cols = len(unique_dates)
+        # 横版 A4 可用宽度约 26cm
+        date_col_width = max(0.9 * cm, (26.0 * cm - label_total) / n_date_cols)
+        col_widths = [industry_col_width, stock_col_width] + [date_col_width] * n_date_cols
+
+        table = Table(data_rows, colWidths=col_widths, repeatRows=1)
+
+        # ---------- 基础样式 ----------
+        style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#bdc3c7')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (1, 1), (1, -1), 3),
+        ]
+
+        # ---------- 按 Z-Score 逐格着色（日期列从 col 2 开始）----------
+        for row_idx, stock_label in enumerate(sorted_labels, start=1):
+            for col_idx, d in enumerate(unique_dates, start=2):
+                z = stock_date_z[stock_label].get(d)
+                if z is not None and pd.notna(z):
+                    bg_color = self._zscore_heatmap_color(z, z_min, z_max)
+                    style_cmds.append(('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), bg_color))
+                    # 深色背景用白字，提升可读性
+                    if z < self.Z_GREY + 0.5:
+                        style_cmds.append(('TEXTCOLOR', (col_idx, row_idx), (col_idx, row_idx), colors.white))
+
+        table.setStyle(TableStyle(style_cmds))
+        return table
+
     # ========================= 专业评论 =========================
 
     def _generate_professional_commentary(self, df: pd.DataFrame, stock_label: str) -> str:
@@ -1443,6 +1806,48 @@ class PDAnalysisReport:
                 if para:
                     full_story.append(Paragraph(para, pd_commentary_style))
 
+        # ======================== PD 违约概率热力图 ========================
+        if len(stock_pd_data) >= 2:
+            full_story.append(PageBreak())
+            full_story.append(Paragraph(f'<b>{industry}板块  PD 违约概率热力图</b>', comparison_title_style))
+            full_story.append(Spacer(1, 0.3 * cm))
+
+            # 板块报告内所有股票行业相同
+            pd_stock_industry_map = {lb: industry for lb in stock_pd_data}
+            pd_heatmap_table = self._build_pd_heatmap(stock_pd_data, all_dates, pd_stock_industry_map)
+            if pd_heatmap_table:
+                full_story.append(pd_heatmap_table)
+                full_story.append(Spacer(1, 0.3 * cm))
+                full_story.append(Paragraph(
+                    '<i>热力图说明：绿色 = 低违约风险 (PD&lt;2%)，黄色 = 中违约风险 (2%≤PD&lt;10%)，红色 = 高违约风险 (PD≥10%)；'
+                    '颜色越深表示风险程度越极端</i>',
+                    ParagraphStyle('PDHeatmapNote', fontName=REPORTLAB_FONT, fontSize=7, leading=10,
+                                   textColor=colors.HexColor('#95a5a6'), alignment=TA_CENTER)
+                ))
+            else:
+                full_story.append(Paragraph('PD 热力图生成失败', self._cell_style(10)))
+
+        # ======================== Z-Score 风险热力图 ========================
+        if len(stock_zscore_data) >= 2:
+            full_story.append(PageBreak())
+            full_story.append(Paragraph(f'<b>{industry}板块  Z-Score 风险热力图</b>', comparison_title_style))
+            full_story.append(Spacer(1, 0.3 * cm))
+
+            # 板块报告内所有股票行业相同
+            stock_industry_map = {lb: industry for lb in stock_zscore_data}
+            heatmap_table = self._build_zscore_heatmap(stock_zscore_data, all_dates, stock_industry_map)
+            if heatmap_table:
+                full_story.append(heatmap_table)
+                full_story.append(Spacer(1, 0.3 * cm))
+                full_story.append(Paragraph(
+                    '<i>热力图说明：绿色 = 安全区 (Z≥3.0)，黄色 = 灰色区 (1.8≤Z&lt;3.0)，红色 = 危机区 (Z&lt;1.8)；'
+                    '颜色越深表示风险程度越极端</i>',
+                    ParagraphStyle('HeatmapNote', fontName=REPORTLAB_FONT, fontSize=7, leading=10,
+                                   textColor=colors.HexColor('#95a5a6'), alignment=TA_CENTER)
+                ))
+            else:
+                full_story.append(Paragraph('热力图生成失败', self._cell_style(10)))
+
         if len(stock_ai_data) >= 1:
             full_story.append(PageBreak())
             full_story.append(Paragraph(f'<b>{industry}板块  AI 交易员 综合评估</b>', comparison_title_style))
@@ -1601,6 +2006,7 @@ class PDAnalysisReport:
         stock_ai_data = {}  # stock_label -> {symbol, name, latest_date, pd_latest, z_latest, el_latest, risk_level}
         no_data_stocks = []
         all_dates = []  # 收集所有股票的日期，用于计算分析范围
+        stock_industry_map = {}  # stock_label -> industry
 
         for idx, stock_info in enumerate(CommonParameters.STOCK_LIST, 1):
             ts_code = stock_info['ts_code']
@@ -1631,6 +2037,10 @@ class PDAnalysisReport:
                 # 收集 PD 时间序列（用于 PD 对比图）
                 stock_pd_data[stock_label] = (df['date'], df['pd'])
                 all_dates.extend(df['date'].tolist())  # 收集日期范围
+
+                # 记录板块信息（优先从 df 中取，回退到 STOCK_LIST）
+                df_industry = df['industry'].iloc[0] if 'industry' in df.columns and pd.notna(df['industry'].iloc[0]) else stock_info.get('industry', '未知')
+                stock_industry_map[stock_label] = df_industry
 
                 # 收集 AI 分析所需的数据
                 latest = df.sort_values('date', ascending=False).iloc[0]
@@ -1800,6 +2210,44 @@ class PDAnalysisReport:
                 para = para.strip()
                 if para:
                     full_story.append(Paragraph(para, pd_commentary_style))
+
+        # ======================== PD 违约概率热力图 ========================
+        if len(stock_pd_data) >= 2:
+            full_story.append(PageBreak())
+            full_story.append(Paragraph('<b>PD 违约概率热力图（全股票 × 全日期）</b>', comparison_title_style))
+            full_story.append(Spacer(1, 0.3 * cm))
+
+            pd_heatmap_table = self._build_pd_heatmap(stock_pd_data, all_dates, stock_industry_map)
+            if pd_heatmap_table:
+                full_story.append(pd_heatmap_table)
+                full_story.append(Spacer(1, 0.3 * cm))
+                full_story.append(Paragraph(
+                    '<i>热力图说明：绿色 = 低违约风险 (PD&lt;2%)，黄色 = 中违约风险 (2%≤PD&lt;10%)，红色 = 高违约风险 (PD≥10%)；'
+                    '颜色越深表示风险程度越极端</i>',
+                    ParagraphStyle('PDHeatmapNote', fontName=REPORTLAB_FONT, fontSize=7, leading=10,
+                                   textColor=colors.HexColor('#95a5a6'), alignment=TA_CENTER)
+                ))
+            else:
+                full_story.append(Paragraph('PD 热力图生成失败', self._cell_style(10)))
+
+        # ======================== Z-Score 风险热力图 ========================
+        if len(stock_zscore_data) >= 2:
+            full_story.append(PageBreak())
+            full_story.append(Paragraph('<b>Z-Score 风险热力图（全股票 × 全日期）</b>', comparison_title_style))
+            full_story.append(Spacer(1, 0.3 * cm))
+
+            heatmap_table = self._build_zscore_heatmap(stock_zscore_data, all_dates, stock_industry_map)
+            if heatmap_table:
+                full_story.append(heatmap_table)
+                full_story.append(Spacer(1, 0.3 * cm))
+                full_story.append(Paragraph(
+                    '<i>热力图说明：绿色 = 安全区 (Z≥3.0)，黄色 = 灰色区 (1.8≤Z&lt;3.0)，红色 = 危机区 (Z&lt;1.8)；'
+                    '颜色越深表示风险程度越极端</i>',
+                    ParagraphStyle('HeatmapNote', fontName=REPORTLAB_FONT, fontSize=7, leading=10,
+                                   textColor=colors.HexColor('#95a5a6'), alignment=TA_CENTER)
+                ))
+            else:
+                full_story.append(Paragraph('热力图生成失败', self._cell_style(10)))
 
         # ======================== AI 综合评估章节 ========================
         if len(stock_ai_data) >= 1:
