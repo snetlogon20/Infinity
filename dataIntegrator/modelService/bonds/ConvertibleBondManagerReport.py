@@ -155,7 +155,12 @@ class ConvertibleBondManagerReport:
                 m.pct_price_chg_p50bp,
                 m.pct_price_chg_m50bp,
                 m.pct_price_chg_p100bp,
-                m.pct_price_chg_m100bp
+                m.pct_price_chg_m100bp,
+                m.estimated_rating,
+                m.estimated_pd,
+                m.estimated_lgd,
+                m.estimated_el,
+                m.estimated_risk_flag
             FROM indexsysdb.df_tushare_cb_daily d
             LEFT JOIN indexsysdb.df_tushare_cb_basic b
                 ON d.ts_code = b.ts_code
@@ -172,15 +177,6 @@ class ConvertibleBondManagerReport:
         df = self.clickhouse_service.getDataFrameWithoutColumnsName(sql)
         logger.info(f"查询完成，共 {len(df)} 条记录")
         return df
-
-    # ==================== 数据落盘 ====================
-
-    def save_to_file(self, df, file_name_prefix):
-        os.makedirs(self.REPORT_DIR, exist_ok=True)
-        file_path = os.path.join(self.REPORT_DIR, f"{file_name_prefix}.parquet")
-        df.to_parquet(file_path, index=False)
-        logger.info(f"数据已保存: {file_path}")
-        return file_path
 
     # ==================== 数据准备 ====================
 
@@ -386,12 +382,12 @@ class ConvertibleBondManagerReport:
 
         return pivot
 
-    def _generate_data_table_fig(self, pivot, y_label, title_suffix, lookback_map=None, rating_map=None):
+    def _generate_data_table_fig(self, pivot, y_label, title_suffix, lookback_map=None, rating_map=None, pd_map=None):
         """生成一条折线图对应的数据明细表 Figure"""
         if pivot is None or pivot.empty:
             return None
 
-        # 先收集原始数值，按 |最新值| 降序排列，方便交易员快速定位极值标的
+        # 先收集原始数值
         raw_data = []
         for col in pivot.columns:
             series = pivot[col].dropna()
@@ -401,10 +397,12 @@ class ConvertibleBondManagerReport:
             date_str = last_date.strftime('%Y-%m-%d') if hasattr(last_date, 'strftime') else str(last_date)[:10]
             lb_days = int(lookback_map.get(col, 0)) if lookback_map else 0
             rating_val = str(rating_map.get(col, ''))[:4] if rating_map else ''
+            pd_val = float(pd_map.get(col, 0)) if pd_map else 0.0
             raw_data.append((
                 col,
                 lb_days,
                 rating_val,
+                pd_val,
                 date_str,
                 float(series.iloc[-1]),
                 float(series.mean()),
@@ -416,8 +414,8 @@ class ConvertibleBondManagerReport:
         if not raw_data:
             return None
 
-        # 按最新值的绝对值降序排列，极值标的最显眼
-        raw_data.sort(key=lambda x: abs(x[4]), reverse=True)
+        # 按评级从高到低排序 (AAA → D)
+        raw_data.sort(key=lambda x: self._rating_rank(x[2]))
 
         # 格式化成展示字符串
         table_data = []
@@ -426,20 +424,21 @@ class ConvertibleBondManagerReport:
                 item[0],
                 str(item[1]),
                 item[2],
-                item[3],
-                f"{item[4]:.4f}",
+                f"{item[3]:.4f}" if item[3] > 0 else 'N/A',
+                item[4],
                 f"{item[5]:.4f}",
                 f"{item[6]:.4f}",
                 f"{item[7]:.4f}",
                 f"{item[8]:.4f}",
+                f"{item[9]:.4f}",
             ])
 
-        col_labels = ['代码/名称', '回溯天数', '评级', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
+        col_labels = ['代码/名称', '回溯天数', '评级', 'PD', '最新日期', '最新值', '均值', '标准差', '最小值', '最大值']
         n_rows = len(table_data)
         zero_count = 0
         for row in table_data:
             try:
-                if abs(float(row[4])) < 1e-8:
+                if abs(float(row[5])) < 1e-8:
                     zero_count += 1
             except ValueError:
                 pass
@@ -456,7 +455,7 @@ class ConvertibleBondManagerReport:
             colLabels=col_labels,
             cellLoc='center',
             loc='center',
-            colWidths=[0.22, 0.05, 0.04, 0.09, 0.11, 0.11, 0.11, 0.11, 0.10],
+            colWidths=[0.20, 0.05, 0.04, 0.06, 0.09, 0.10, 0.10, 0.10, 0.10, 0.10],
         )
         table.auto_set_font_size(False)
         table.set_fontsize(8)
@@ -763,6 +762,7 @@ class ConvertibleBondManagerReport:
             'var_param_99':   _f('m.var_param_99'),
             'var_price_param_99': _f('m.var_price_param_99'),
             'effective_duration': _f('m.effective_duration'),
+            'estimated_pd':     _f('m.estimated_pd'),
         })
         pool = pool.drop_duplicates(subset=['ts_code']).reset_index(drop=True)
 
@@ -947,6 +947,7 @@ class ConvertibleBondManagerReport:
                     'var_param_99': row['var_param_99'],
                     'var_price_param_99': row['var_price_param_99'],
                     'effective_duration': row['effective_duration'],
+                    'estimated_pd': row['estimated_pd'],
                     'dim_tags': dims_tag, 'dim_count': len(hits),
                 })
                 seen.add(code)
@@ -975,6 +976,7 @@ class ConvertibleBondManagerReport:
                     'var_param_99': row['var_param_99'],
                     'var_price_param_99': row['var_price_param_99'],
                     'effective_duration': row['effective_duration'],
+                    'estimated_pd': row['estimated_pd'],
                     'dim_tags': label, 'dim_count': 1,
                 })
                 seen.add(top_code)
@@ -1401,6 +1403,295 @@ class ConvertibleBondManagerReport:
 
         return lines
 
+    # ==================== 信用风险评估图表 ====================
+
+    # 评级排序（AAA 最好 → 以下降序）
+    RATING_ORDER = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-',
+                    'BBB+', 'BBB', 'BBB-', 'BB+', 'BB', 'BB-',
+                    'B+', 'B', 'B-', 'CCC', 'CC', 'C', 'D']
+
+    @classmethod
+    def _rating_rank(cls, rating):
+        """评级 → 排序序号，未知排最后"""
+        try:
+            return cls.RATING_ORDER.index(rating)
+        except ValueError:
+            return len(cls.RATING_ORDER)
+
+    @classmethod
+    def _get_rating_color(cls, rating):
+        """评级 → 颜色：优质绿 → 黄 → 差红"""
+        if rating in ('AAA', 'AA+'):
+            return '#2ecc71'
+        elif rating in ('AA', 'AA-'):
+            return '#27ae60'
+        elif rating and rating.startswith('A'):
+            return '#f1c40f'
+        elif rating and rating.startswith('BBB'):
+            return '#e67e22'
+        else:
+            return '#e74c3c'
+
+    def _generate_credit_risk_pages(self, df):
+        """生成 3 页信用风险分析图表，返回 [(title, fig), ...] 列表
+
+        需要 df 包含 'm.estimated_rating', 'm.estimated_pd', 'm.estimated_el', 'd.close'
+        若数据缺失则返回空列表
+        """
+        required_cols = ['m.estimated_rating', 'm.estimated_pd', 'm.estimated_el']
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            logger.warning(f"信用风险字段缺失 {missing}，跳过信用风险图表（请先执行 ALTER TABLE 添加 estimated_* 列并写入数据）")
+            return []
+
+        # ---- 准备数据：只取最新交易日，过滤无评级/无效 PD ----
+        date_col = 'd.trade_date'
+        if date_col not in df.columns:
+            date_col = 'trade_date'
+        latest_date = df[date_col].max()
+        snapshot = df[df[date_col] == latest_date].copy()
+
+        # 过滤：必须有评级 + PD>0
+        snapshot = snapshot[
+            snapshot['m.estimated_rating'].fillna('').astype(str).str.strip().ne('') &
+            snapshot['m.estimated_pd'].fillna(0).astype(float).gt(0)
+        ].copy()
+        if snapshot.empty:
+            logger.warning("信用风险数据为空（所有标的均无评级或PD=0），跳过图表")
+            return []
+
+        # 提取数值列
+        rating_series = snapshot['m.estimated_rating'].fillna('').astype(str)
+        pd_series = snapshot['m.estimated_pd'].fillna(0).astype(float)
+        el_series = snapshot['m.estimated_el'].fillna(0).astype(float)
+
+        # 价格用于散点大小（优先 close，其次 market_price）
+        price_col = 'd.close' if 'd.close' in snapshot.columns else 'm.market_price'
+        price = snapshot[price_col].fillna(100).astype(float) if price_col in snapshot.columns else pd.Series(100, index=snapshot.index)
+
+        # 评级颜色 & 排序
+        snapshot['_color'] = rating_series.apply(self._get_rating_color)
+        snapshot['_rank'] = rating_series.apply(self._rating_rank)
+
+        # ---- 评级分组汇总 ----
+        summary = snapshot.groupby(
+            rating_series, sort=False
+        ).agg(
+            avg_el=('m.estimated_el', 'mean'),
+            avg_pd=('m.estimated_pd', 'mean'),
+            count=('m.estimated_pd', 'count'),
+            avg_price=(price_col if price_col in snapshot.columns else 'm.estimated_pd', lambda x: snapshot.loc[x.index, price_col].mean() if price_col in snapshot.columns else 100),
+        ).reset_index()
+        summary.columns = ['bond_rating', 'avg_el', 'avg_pd', 'count', 'avg_price']
+        summary['rating_rank'] = summary['bond_rating'].apply(self._rating_rank)
+        summary = summary.sort_values('rating_rank')
+
+        # 预计算颜色列表
+        bar_colors = [self._get_rating_color(r) for r in summary['bond_rating']]
+        x_pos = np.arange(len(summary))
+        bar_width = 0.6
+
+        results = []
+
+        # ===== 第1页: PD vs EL 散点图 =====
+        fig1, ax1 = plt.subplots(figsize=(18, 10), dpi=200)
+        fig1.set_dpi(200)
+        fig1.suptitle('可转债信用风险分析', fontsize=18, fontweight='bold')
+
+        # 按评级分组绘制散点
+        rating_label_map = {}
+        for rating in self.RATING_ORDER:
+            subset = snapshot[rating_series == rating]
+            if subset.empty:
+                continue
+            n = len(subset)
+            rating_label_map[rating] = f'{rating} (n={n})'
+
+        for rating in self.RATING_ORDER:
+            subset = snapshot[rating_series == rating]
+            if subset.empty:
+                continue
+            ax1.scatter(
+                subset['m.estimated_pd'].astype(float),
+                subset['m.estimated_el'].astype(float),
+                c=subset['_color'],
+                label=rating_label_map[rating],
+                s=price.loc[subset.index].clip(30, 280),
+                alpha=0.7, edgecolors='black', linewidth=0.3,
+            )
+
+        # 标注每个评级簇的中心点和数量
+        for rating in self.RATING_ORDER:
+            subset = snapshot[rating_series == rating]
+            if subset.empty:
+                continue
+            cx = subset['m.estimated_pd'].astype(float).mean()
+            cy = subset['m.estimated_el'].astype(float).mean()
+            n = len(subset)
+            offset_y = max(snapshot['m.estimated_el'].astype(float).max() * 0.04, 0.3)
+            ax1.annotate(
+                f'{rating}\nn={n}', xy=(cx, cy),
+                xytext=(cx + 0.03, cy + offset_y),
+                fontsize=7.5, color='black',
+                ha='center', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='gray', linewidth=0.5),
+                zorder=10,
+            )
+
+        ax1.set_xlabel('Estimated PD (违约概率)', fontsize=13)
+        ax1.set_ylabel('EL (预期损失, 元/张)', fontsize=13)
+        ax1.set_title(f'PD vs EL 散点图 — 快照日期 {latest_date}', fontsize=14)
+        ax1.legend(loc='upper left', fontsize=8, ncol=3, framealpha=0.85)
+        ax1.grid(True, alpha=0.3)
+
+        # 高风险线
+        ax1.axhline(y=2.0, color='red', linestyle='--', linewidth=1, alpha=0.5, label='EL=2.0 高风险线')
+
+        # 底部说明
+        ax1.text(0.02, -0.1, '说明：点大小=转债价格（元），颜色=评级（绿=高评级，红=低评级）；EL>2.0 标记为 High Risk',
+                 transform=ax1.transAxes, fontsize=9, color='#666666')
+
+        plt.tight_layout(rect=[0, 0.02, 1, 0.96])
+        results.append(('PD vs EL 散点图', fig1))
+
+        # ===== 第1页附表: 按评级分组汇总表 =====
+        summary_rows = []
+        for _, row in summary.iterrows():
+            risk_count = int(snapshot[
+                (rating_series == row['bond_rating']) &
+                (snapshot['m.estimated_risk_flag'].fillna('').astype(str).str.strip().ne(''))
+            ].shape[0]) if 'm.estimated_risk_flag' in snapshot.columns else 0
+            summary_rows.append([
+                row['bond_rating'],
+                str(int(row['count'])),
+                f"{row['avg_pd']:.4f}",
+                f"{snapshot[snapshot['m.estimated_lgd'].notna() & (rating_series == row['bond_rating'])]['m.estimated_lgd'].astype(float).mean():.4f}" if 'm.estimated_lgd' in snapshot.columns and not snapshot[snapshot['m.estimated_lgd'].notna() & (rating_series == row['bond_rating'])].empty else 'N/A',
+                f"{row['avg_el']:.4f}",
+                f"{row['avg_price']:.2f}",
+                str(risk_count),
+            ])
+        summary_cols = ['评级', '数量', '平均PD', '平均LGD', '平均EL', '平均价格', '风险标的']
+        summary_col_w = [0.10, 0.07, 0.15, 0.15, 0.15, 0.15, 0.10]
+        tbl_fig1 = self._generate_screening_table_fig(
+            summary_rows, summary_cols,
+            f'按评级分组信用风险汇总 — 快照 {latest_date}',
+            subtitle='风险标的 = risk_flag 非空的转债数量；LGD 仅统计有值的标的',
+            col_widths=summary_col_w,
+        )
+        if tbl_fig1:
+            results.append(('按评级分组信用风险汇总表', tbl_fig1))
+
+        # ===== 第2页: 按评级分组 — 平均 EL =====
+        fig2, ax2 = plt.subplots(figsize=(16, 8), dpi=200)
+        fig2.set_dpi(200)
+
+        ax2.bar(x_pos, summary['avg_el'], bar_width,
+                color=bar_colors, edgecolor='black', linewidth=0.5, alpha=0.85)
+        for i, (_, row) in enumerate(summary.iterrows()):
+            y_offset = max(summary['avg_el'].max() * 0.03, 0.2)
+            ax2.text(i, row['avg_el'] + y_offset,
+                     f"n={int(row['count'])}", ha='center', fontsize=9,
+                     fontweight='bold')
+
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(summary['bond_rating'], rotation=45, fontsize=10)
+        ax2.set_ylabel('Average EL (预期损失, 元/张)', fontsize=13)
+        ax2.set_title(f'按评级分组：平均 EL（预期损失） — 快照 {latest_date}', fontsize=14)
+        ax2.grid(True, alpha=0.3, axis='y')
+
+        # 高风险阈值线
+        ax2.axhline(y=2.0, color='red', linestyle='--', linewidth=1, alpha=0.6, label='EL=2.0 高风险线')
+        ax2.legend(loc='upper left', fontsize=9)
+
+        plt.tight_layout()
+        results.append(('按评级分组：平均EL', fig2))
+
+        # ===== 第2页附表: Top 30 高 EL 转债明细 =====
+        el_detail_snapshot = snapshot.sort_values(['_rank', 'm.estimated_el'], ascending=[True, False]).head(30)
+        el_rows = []
+        for _, row in el_detail_snapshot.iterrows():
+            ts_code = str(row.get('b.ts_code', row.get('daily_ts_code', '')))
+            name = str(row.get('b.bond_short_name', row.get('b.bond_full_name', '')))
+            rating = str(row.get('m.estimated_rating', ''))
+            pd_val = float(row.get('m.estimated_pd', 0))
+            lgd_val = float(row.get('m.estimated_lgd', 0)) if pd.notna(row.get('m.estimated_lgd')) else float('nan')
+            el_val = float(row.get('m.estimated_el', 0))
+            risk_flag = str(row.get('m.estimated_risk_flag', ''))
+            price_val = float(row.get('d.close', row.get('m.market_price', 0)))
+            el_rows.append([
+                ts_code, name, rating,
+                f"{pd_val:.4f}",
+                f"{lgd_val:.4f}" if not pd.isna(lgd_val) else 'N/A',
+                f"{el_val:.4f}",
+                risk_flag if risk_flag != 'nan' else '',
+                f"{price_val:.2f}",
+            ])
+        el_cols = ['转债代码', '转债名称', '评级', 'PD', 'LGD', 'EL(元)', '风险标记', '价格(元)']
+        el_col_w = [0.15, 0.22, 0.07, 0.11, 0.11, 0.11, 0.10, 0.11]
+        tbl_fig2 = self._generate_screening_table_fig(
+            el_rows, el_cols,
+            f'Top 30 高预期损失(EL) 转债明细 — 快照 {latest_date}',
+            subtitle='按 EL 降序排列，EL 越高信用风险越大',
+            col_widths=el_col_w,
+        )
+        if tbl_fig2:
+            results.append(('Top 30 高 EL 转债明细表', tbl_fig2))
+
+        # ===== 第3页: 按评级分组 — 平均 PD =====
+        fig3, ax3 = plt.subplots(figsize=(16, 8), dpi=200)
+        fig3.set_dpi(200)
+
+        ax3.bar(x_pos, summary['avg_pd'], bar_width,
+                color=bar_colors, edgecolor='black', linewidth=0.5, alpha=0.85)
+        for i, (_, row) in enumerate(summary.iterrows()):
+            y_offset = max(summary['avg_pd'].max() * 0.03, 0.005)
+            ax3.text(i, row['avg_pd'] + y_offset,
+                     f"n={int(row['count'])}", ha='center', fontsize=9,
+                     fontweight='bold')
+
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(summary['bond_rating'], rotation=45, fontsize=10)
+        ax3.set_ylabel('Average PD (违约概率)', fontsize=13)
+        ax3.set_title(f'按评级分组：平均 PD（违约概率） — 快照 {latest_date}', fontsize=14)
+        ax3.grid(True, alpha=0.3, axis='y')
+
+        plt.tight_layout()
+        results.append(('按评级分组：平均PD', fig3))
+
+        # ===== 第3页附表: Top 30 高 PD 转债明细 =====
+        pd_detail_snapshot = snapshot.sort_values(['_rank', 'm.estimated_pd'], ascending=[True, False]).head(30)
+        pd_rows = []
+        for _, row in pd_detail_snapshot.iterrows():
+            ts_code = str(row.get('b.ts_code', row.get('daily_ts_code', '')))
+            name = str(row.get('b.bond_short_name', row.get('b.bond_full_name', '')))
+            rating = str(row.get('m.estimated_rating', ''))
+            pd_val = float(row.get('m.estimated_pd', 0))
+            lgd_val = float(row.get('m.estimated_lgd', 0)) if pd.notna(row.get('m.estimated_lgd')) else float('nan')
+            el_val = float(row.get('m.estimated_el', 0))
+            risk_flag = str(row.get('m.estimated_risk_flag', ''))
+            price_val = float(row.get('d.close', row.get('m.market_price', 0)))
+            pd_rows.append([
+                ts_code, name, rating,
+                f"{pd_val:.4f}",
+                f"{lgd_val:.4f}" if not pd.isna(lgd_val) else 'N/A',
+                f"{el_val:.4f}",
+                risk_flag if risk_flag != 'nan' else '',
+                f"{price_val:.2f}",
+            ])
+        pd_cols = ['转债代码', '转债名称', '评级', 'PD', 'LGD', 'EL(元)', '风险标记', '价格(元)']
+        pd_col_w = [0.15, 0.22, 0.07, 0.11, 0.11, 0.11, 0.10, 0.11]
+        tbl_fig3 = self._generate_screening_table_fig(
+            pd_rows, pd_cols,
+            f'Top 30 高违约概率(PD) 转债明细 — 快照 {latest_date}',
+            subtitle='按 PD 降序排列，PD 越高违约概率越大',
+            col_widths=pd_col_w,
+        )
+        if tbl_fig3:
+            results.append(('Top 30 高 PD 转债明细表', tbl_fig3))
+
+        logger.info(f"信用风险图表生成完成: {len(results)} 页")
+        return results
+
     def _generate_pdf_report(self, df, stats, start_date, end_date):
         """生成完整 PDF 策略报告"""
         os.makedirs(self.REPORT_DIR, exist_ok=True)
@@ -1461,6 +1752,13 @@ class ConvertibleBondManagerReport:
             lb_map = df[['series_name', 'm.lookback_days']].drop_duplicates().set_index('series_name')['m.lookback_days'].to_dict()
             # 构建 series_name -> bond_rating 映射
             rating_map = df[['series_name', 'a.bond_rating']].drop_duplicates().set_index('series_name')['a.bond_rating'].to_dict() if 'a.bond_rating' in df.columns else {}
+            # 构建 series_name -> estimated_pd 映射（取每条最新日期的 PD 值）
+            pd_map = {}
+            if 'm.estimated_pd' in df.columns:
+                date_col = 'd.trade_date'
+                latest_date = df[date_col].max()
+                latest_snap = df[df[date_col] == latest_date][['series_name', 'm.estimated_pd']].drop_duplicates(subset=['series_name']).set_index('series_name')
+                pd_map = latest_snap['m.estimated_pd'].fillna(0).astype(float).to_dict()
 
             for value_col, y_label, title_suffix in self.CHART_FIELDS:
                 logger.info(f"生成图表: {title_suffix}")
@@ -1478,7 +1776,7 @@ class ConvertibleBondManagerReport:
 
                 # 数据明细表
                 logger.info(f"生成数据表: {title_suffix}")
-                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix, lookback_map=lb_map, rating_map=rating_map)
+                table_fig = self._generate_data_table_fig(pivot, y_label, title_suffix, lookback_map=lb_map, rating_map=rating_map, pd_map=pd_map)
                 if table_fig:
                     pdf.savefig(table_fig)
                     plt.close(table_fig)
@@ -1500,10 +1798,18 @@ class ConvertibleBondManagerReport:
                             pdf.savefig(low_fig)
                             plt.close(low_fig)
                         logger.info(f"生成数据表: {low_title}")
-                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title, lookback_map=lb_map, rating_map=rating_map)
+                        low_table_fig = self._generate_data_table_fig(low_pivot, y_label, low_title, lookback_map=lb_map, rating_map=rating_map, pd_map=pd_map)
                         if low_table_fig:
                             pdf.savefig(low_table_fig)
                             plt.close(low_table_fig)
+
+            # ============ 信用风险评估图表 ============
+            logger.info("生成信用风险评估图表...")
+            credit_pages = self._generate_credit_risk_pages(df)
+            for title, fig in credit_pages:
+                logger.info(f"添加信用风险图表: {title}")
+                pdf.savefig(fig)
+                plt.close(fig)
 
             # ============ 量化组合推荐（交易员三步筛选法） ============
             logger.info("开始量化组合推荐（三步法）...")
@@ -1546,12 +1852,16 @@ class ConvertibleBondManagerReport:
                 # ---------- 淘汰明细表 ----------
                 elim = screening['eliminated']
                 if not elim.empty:
+                    # 按评级从高到低排序
+                    elim['_rank'] = elim['bond_rating'].fillna('').astype(str).apply(self._rating_rank)
+                    elim_sorted = elim.sort_values('_rank')
                     elim_data = []
-                    for _, row in elim.iterrows():
+                    for _, row in elim_sorted.iterrows():
                         elim_data.append([
                             str(row.get('ts_code', ''))[:12],
                             str(row.get('bond_name', ''))[:10],
                             str(row.get('bond_rating', ''))[:6],
+                            f"{row.get('estimated_pd', 0):.4f}",
                             f"{row.get('close', 0):.1f}",
                             f"{row.get('var_pct', 0):.1f}%",
                             f"{row.get('es_pct', 0):.1f}%",
@@ -1559,11 +1869,11 @@ class ConvertibleBondManagerReport:
                             f"{row.get('ytm', 0):.1f}%",
                             str(row.get('淘汰原因', ''))[:50],
                         ])
-                    elim_cols = ['代码', '简称', '评级', '收盘价', 'VaR%', 'ES%', '剩余年', 'YTM%', '淘汰原因']
+                    elim_cols = ['代码', '简称', '评级', 'PD', '收盘价', 'VaR%', 'ES%', '剩余年', 'YTM%', '淘汰原因']
                     fig = self._generate_screening_table_fig(
                         elim_data, elim_cols,
                         f'硬过滤淘汰明细（共 {len(elim)} 只）',
-                        col_widths=[0.09, 0.09, 0.05, 0.07, 0.07, 0.07, 0.07, 0.07, 0.42],
+                        col_widths=[0.08, 0.08, 0.05, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.42],
                     )
                     if fig:
                         pdf.savefig(fig)
@@ -1585,6 +1895,9 @@ class ConvertibleBondManagerReport:
                 ]):
                     if dim_df is None or dim_df.empty:
                         continue
+                    # 按评级从高到低排序
+                    dim_df['_rank'] = dim_df['bond_rating'].fillna('').astype(str).apply(self._rating_rank)
+                    dim_df = dim_df.sort_values('_rank')
                     logger.info(f"生成 {dim_name} 表格 ({len(dim_df)} 只)")
 
                     dim_data = []
@@ -1593,6 +1906,7 @@ class ConvertibleBondManagerReport:
                             str(row.get('ts_code', ''))[:12],
                             str(row.get('bond_name', ''))[:10],
                             str(row.get('bond_rating', ''))[:6],
+                            f"{row.get('estimated_pd', 0):.4f}",
                             f"{row.get('close', 0):.1f}",
                             f"{row.get('ytm', 0):.1f}%",
                             f"{row.get('ytm_simple', 0):.1f}%",
@@ -1612,16 +1926,16 @@ class ConvertibleBondManagerReport:
                             f"{row.get('es_pct', 0):.1f}%",
                             f"{row.get(score_col, 0):.1f}",
                         ])
-                    dim_cols = ['代码', '简称', '评级', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                    dim_cols = ['代码', '简称', '评级', 'PD', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
                                 '修久期', '麦久期', '有久期', '凸性', '有效凸性',
                                 'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
                                 'VaR%', 'ES%', '得分']
                     fig = self._generate_screening_table_fig(
                         dim_data, dim_cols, dim_name,
-                        col_widths=[0.055, 0.055, 0.045, 0.04, 0.045, 0.045, 0.045, 0.04,
-                                    0.035, 0.035, 0.035, 0.045, 0.045,
-                                    0.035, 0.035, 0.045, 0.045, 0.05,
-                                    0.035, 0.035, 0.035],
+                        col_widths=[0.050, 0.050, 0.042, 0.055, 0.038, 0.042, 0.042, 0.042, 0.038,
+                                    0.033, 0.033, 0.033, 0.042, 0.042,
+                                    0.033, 0.033, 0.042, 0.042, 0.048,
+                                    0.033, 0.033, 0.033],
                     )
                     if fig:
                         pdf.savefig(fig)
@@ -1630,6 +1944,8 @@ class ConvertibleBondManagerReport:
                 # ---------- 最终综合推荐 ----------
                 final_recs = screening['final_recs']
                 if final_recs:
+                    # 按评级从高到低排序
+                    final_recs.sort(key=lambda r: self._rating_rank(r.get('bond_rating', '')))
                     final_data = []
                     for i, rec in enumerate(final_recs, 1):
                         final_data.append([
@@ -1637,6 +1953,7 @@ class ConvertibleBondManagerReport:
                             str(rec.get('ts_code', ''))[:12],
                             str(rec.get('bond_name', ''))[:10],
                             str(rec.get('bond_rating', ''))[:6],
+                            f"{rec.get('estimated_pd', 0):.4f}",
                             f"{rec.get('close', 0):.1f}",
                             f"{rec.get('ytm', 0):.1f}%",
                             f"{rec.get('ytm_simple', 0):.1f}%",
@@ -1657,7 +1974,7 @@ class ConvertibleBondManagerReport:
                             str(rec.get('dim_tags', '')),
                             str(rec.get('dim_count', 0)),
                         ])
-                    final_cols = ['排名', '代码', '简称', '评级', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
+                    final_cols = ['排名', '代码', '简称', '评级', 'PD', '收盘', 'YTM%', '简式YTM%', '当期收%', '剩余年',
                                   '修久期', '麦久期', '有久期', '凸性', '有效凸性',
                                   'DV01', 'PVBP', '+50bp%', '-50bp%', 'HistVaR价',
                                   'VaR%', 'ES%', '匹配维度', '匹配数']
@@ -1665,10 +1982,10 @@ class ConvertibleBondManagerReport:
                         final_data, final_cols,
                         f'最终量化推荐组合（共 {len(final_recs)} 只）',
                         subtitle='综合四维度交叉验证，优先选出多维度同时认可的标的',
-                        col_widths=[0.028, 0.055, 0.055, 0.045, 0.038, 0.038, 0.038, 0.045, 0.038,
-                                    0.036, 0.036, 0.036, 0.036, 0.036,
-                                    0.036, 0.036, 0.038, 0.038, 0.045,
-                                    0.036, 0.036, 0.09, 0.028],
+                        col_widths=[0.026, 0.052, 0.052, 0.042, 0.055, 0.036, 0.036, 0.036, 0.042, 0.036,
+                                    0.034, 0.034, 0.034, 0.034, 0.034,
+                                    0.034, 0.034, 0.036, 0.036, 0.042,
+                                    0.034, 0.034, 0.085, 0.026],
                     )
                     if fig:
                         pdf.savefig(fig)
@@ -1724,7 +2041,7 @@ class ConvertibleBondManagerReport:
         """从维度4（风险调整收益）的债券中提取数据，调用 AI 生成可转债组合推荐分析报告
 
         Args:
-            dim4: 维度4 DataFrame，包含 ts_code, bond_name, ytm, mod_dur, dv01, close, es_price 等列
+            dim4: 维度4 DataFrame，包含 ts_code, bond_name, bond_rating, estimated_pd, ytm, mod_dur, dv01, close, es_price 等列
 
         Returns:
             AI 分析报告字符串，失败时返回错误信息
@@ -1734,10 +2051,12 @@ class ConvertibleBondManagerReport:
             return None
 
         # 提取必要列
-        ai_bonds = dim4[['ts_code', 'bond_name', 'ytm', 'mod_dur', 'dv01', 'close',
+        ai_bonds = dim4[['ts_code', 'bond_name', 'bond_rating', 'estimated_pd',
+                         'ytm', 'mod_dur', 'dv01', 'close',
                          'es_price', 'cur_yield', 'eff_conv']].copy()
 
         # 保留小数位，节省 token
+        ai_bonds['estimated_pd'] = ai_bonds['estimated_pd'].round(6)
         ai_bonds['ytm'] = ai_bonds['ytm'].round(2)
         ai_bonds['mod_dur'] = ai_bonds['mod_dur'].round(2)
         ai_bonds['dv01'] = ai_bonds['dv01'].round(4)
@@ -1751,6 +2070,7 @@ class ConvertibleBondManagerReport:
         for _, row in ai_bonds.iterrows():
             data_lines.append(
                 f"{row['ts_code']}, {row['bond_name']}, "
+                f"rating={row['bond_rating']}, pd={row['estimated_pd']:.6f}, "
                 f"ytm={row['ytm']:+.2f}, duration={row['mod_dur']:.2f}, "
                 f"dv01={row['dv01']:.4f}, price={row['close']:.2f}, "
                 f"es_price_99={row['es_price']:.2f}, "
@@ -1762,11 +2082,12 @@ class ConvertibleBondManagerReport:
         data_block = "\n".join(data_lines)
 
         prompt = f"""你是一个资深的银行债券交易员。
-以下是 {n} 只可转债的量化数据（ts_code, name, ytm, duration, dv01, price, es_price_99, current_yield, effective_convexity）：
+以下是 {n} 只可转债的量化数据（ts_code, name, rating, pd, ytm, duration, dv01, price, es_price_99, current_yield, effective_convexity）：
 
 {data_block}
 
 请从这 {n} 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。
+评级(AAA最优，D最差)越高信用风险越低；pd(违约概率)越低越安全。请结合评级和pd综合判断信用风险。
 再输出选出的 5 只债券的 ts_code，评级 和理由后，增加推荐的组合权重。"""
 
         # ---------- 输出 prompt 便于调试 ----------
@@ -1777,8 +2098,6 @@ class ConvertibleBondManagerReport:
         if CommonParameters.IF_ENABLE_MOCKED_AI:
             logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析报告")
             return "（模拟 AI 分析报告）mocked AI analysis..."
-
-        from dataIntegrator.LLMSuport.AiAgents.SparkAIX import SparkX2
 
         logger.info(f"正在调用 ZhipuGLM4 生成 AI 分析报告，输入 {n} 只债券数据")
         try:
@@ -1808,18 +2127,15 @@ class ConvertibleBondManagerReport:
                 job_logger.end_job_failed("查询结果为空")
                 return
 
-            # 2) 保存原始数据
-            self.save_to_file(df, f"panorama_{start_date}_{end_date}")
-
-            # 3) 数据预处理（添加 series_name、转换日期）
+            # 2) 数据预处理（添加 series_name、转换日期）
             df = self._prepare_data(df)
 
-            # 4) 统计计算
+            # 3) 统计计算
             stats = self._compute_analysis_stats(df)
             logger.info(f"统计完成：{stats['total_bonds']} 只可转债，"
                          f"区间涨跌 {stats.get('period_return', 0):+.2f}%")
 
-            # 5) 生成 PDF 策略报告
+            # 4) 生成 PDF 策略报告
             self._generate_pdf_report(df, stats, start_date, end_date)
 
             logger.info(f"====== ConvertibleBondManagerReport 执行完成 ======")

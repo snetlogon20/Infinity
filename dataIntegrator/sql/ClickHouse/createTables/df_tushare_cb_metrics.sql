@@ -40,7 +40,12 @@ CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_cb_metrics
     `pct_price_chg_p50bp` Float64 COMMENT '收益率+50bp价格变动(%)',
     `pct_price_chg_m50bp` Float64 COMMENT '收益率-50bp价格变动(%)',
     `pct_price_chg_p100bp` Float64 COMMENT '收益率+100bp价格变动(%)',
-    `pct_price_chg_m100bp` Float64 COMMENT '收益率-100bp价格变动(%)'
+    `pct_price_chg_m100bp` Float64 COMMENT '收益率-100bp价格变动(%)',
+    `estimated_rating` String COMMENT '估算评级(来自集思录)',
+    `estimated_pd` Float64 COMMENT '估算违约概率PD',
+    `estimated_lgd` Float64 COMMENT '估算违约损失率LGD',
+    `estimated_el` Float64 COMMENT '估算预期损失EL(PD*LGD*EAD)',
+    `estimated_risk_flag` String COMMENT '风险标记(High Risk/Normal)'
 )
 ENGINE = MergeTree()
 ORDER BY (ts_code, trade_date)
