@@ -159,101 +159,101 @@ class RunPortfolioAnalysisReport():
         return sql
 
 
-if __name__ == "__main__":
+    def run(self):
+        """批量生成 Portfolio Analysis 报表 - 无参数入口"""
+        portfolioAnalysis = PortfolioAnalysis()
+        report_configs = [
+            {
+                "name": "报表1：选定的美国股票",
+                "end_date_start": "20260301",
+                "end_date_end": "20260331",
+                "interest_country": "US",
+                "sql_type": "us_stocks"
+            },
+            {
+                "name": "报表2：选定的美国股票 + 黄金",
+                "end_date_start": "20260301",
+                "end_date_end": "20260411",
+                "interest_country": "US",
+                "sql_type": "us_stocks_gold"
+            },
+            {
+                "name": "测试案例：AI选定的中国股票",
+                "end_date_start": "20251001",
+                "end_date_end": "20260331",
+                "interest_country": "CN",
+                "sql_type": "ai_selected"
+            },
+            {
+                "name": "测试案例：人选定的中国股票",
+                "end_date_start": "20260301",
+                "end_date_end": "20260411",
+                "interest_country": "CN",
+                "sql_type": "china_self_selected"
+            },
+            {
+                "name": "测试案例：美国大宗商品（包括黄金）",
+                "end_date_start": "20260101",
+                "end_date_end": "20260411",
+                "interest_country": "US",
+                "sql_type": "commodities-gold"
+            },
+            {
+                "name": "测试案例：美国大宗商品（非黄金）",
+                "end_date_start": "20260101",
+                "end_date_end": "20260411",
+                "interest_country": "US",
+                "sql_type": "commodities-nongold"
+            },
+            {
+                "name": "测试案例：外币",
+                "end_date_start": "20260101",
+                "end_date_end": "20260411",
+                "interest_country": "US",
+                "sql_type": "fx"
+            }
+        ]
 
-    portfolioAnalysisTest = RunPortfolioAnalysisReport()
-    portfolioAnalysis = PortfolioAnalysis()
+        job_logger = ReportJobLogger()
 
-    # 定义所有报表配置参数列表
-    report_configs = [
-        {
-            "name": "报表1：选定的美国股票",
-            "end_date_start": "20260301",
-            "end_date_end": "20260331",
-            "interest_country": "US",
-            "sql_type": "us_stocks"
-        },
-        {
-            "name": "报表2：选定的美国股票 + 黄金",
-            "end_date_start": "20260301",
-            "end_date_end": "20260411",
-            "interest_country": "US",
-            "sql_type": "us_stocks_gold"
-        },
-        {
-            "name": "测试案例：AI选定的中国股票",
-            "end_date_start": "20251001",
-            "end_date_end": "20260331",
-            "interest_country": "CN",
-            "sql_type": "ai_selected"
-        },
-        {
-            "name": "测试案例：人选定的中国股票",
-            "end_date_start": "20260301",
-            "end_date_end": "20260411",
-            "interest_country": "CN",
-            "sql_type": "china_self_selected"
-        },
-        {
-            "name": "测试案例：美国大宗商品（包括黄金）",
-            "end_date_start": "20260101",
-            "end_date_end": "20260411",
-            "interest_country": "US",
-            "sql_type": "commodities-gold"
-        },
-        {
-            "name": "测试案例：美国大宗商品（非黄金）",
-            "end_date_start": "20260101",
-            "end_date_end": "20260411",
-            "interest_country": "US",
-            "sql_type": "commodities-nongold"
-        },
-        {
-            "name": "测试案例：外币",
-            "end_date_start": "20260101",
-            "end_date_end": "20260411",
-            "interest_country": "US",
-            "sql_type": "fx"
-        }
-    ]
+        for idx, config in enumerate(report_configs, 1):
+            logger.info("\n" + "=" * 80)
+            logger.info(f"   开始生成第 {idx}/{len(report_configs)} 个报表")
+            logger.info(f"   报表名称: {config['name']}")
+            logger.info("=" * 80)
 
-    # 循环执行所有报表
-    job_logger = ReportJobLogger()
+            job_logger.start_job('PortfolioAnalysisReport', 'PortfolioAnalysis',
+                                 params={'report_name': config['name'],
+                                         'end_date_start': config.get('end_date_start'),
+                                         'end_date_end': config.get('end_date_end'),
+                                         'interest_country': config.get('interest_country'),
+                                         'sql_type': config.get('sql_type')})
+            try:
+                all_products_results, all_metrics_results, pdf_path = portfolioAnalysis.execute_full_analysis_workflow(
+                    config["end_date_start"],
+                    config["end_date_end"],
+                    config["interest_country"],
+                    config["sql_type"],
+                    self.prepare_sql
+                )
 
-    for idx, config in enumerate(report_configs, 1):
+                job_logger.end_job_success(records_processed=len(all_products_results) if all_products_results else 0)
+
+                logger.info(f"   第 {idx} 个报表生成成功: {pdf_path}")
+
+            except Exception as e:
+                logger.error(f"   第 {idx} 个报表生成失败: {config['name']}")
+                logger.error(f"   错误信息: {str(e)}")
+                import traceback
+
+                logger.error(traceback.format_exc())
+                job_logger.end_job_failed(str(e), traceback.format_exc())
+                continue
+
         logger.info("\n" + "=" * 80)
-        logger.info(f"📊 开始生成第 {idx}/{len(report_configs)} 个报表")
-        logger.info(f"   报表名称: {config['name']}")
+        logger.info("   所有报表生成完毕！")
         logger.info("=" * 80)
 
-        job_logger.start_job('PortfolioAnalysisReport', 'PortfolioAnalysis',
-                             params={'report_name': config['name'],
-                                     'end_date_start': config.get('end_date_start'),
-                                     'end_date_end': config.get('end_date_end'),
-                                     'interest_country': config.get('interest_country'),
-                                     'sql_type': config.get('sql_type')})
-        try:
-            all_products_results, all_metrics_results, pdf_path = portfolioAnalysis.execute_full_analysis_workflow(
-                config["end_date_start"],
-                config["end_date_end"],
-                config["interest_country"],
-                config["sql_type"],
-                portfolioAnalysisTest.prepare_sql
-            )
 
-            job_logger.end_job_success(records_processed=len(all_products_results) if all_products_results else 0)
-
-            logger.info(f"✅ 第 {idx} 个报表生成成功: {pdf_path}")
-
-        except Exception as e:
-            logger.error(f"❌ 第 {idx} 个报表生成失败: {config['name']}")
-            logger.error(f"   错误信息: {str(e)}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-            job_logger.end_job_failed(str(e), traceback.format_exc())
-            continue
-
-    logger.info("\n" + "=" * 80)
-    logger.info("🎉 所有报表生成完毕！")
-    logger.info("=" * 80)
+if __name__ == "__main__":
+    RunPortfolioAnalysisReport().run()

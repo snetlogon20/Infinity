@@ -142,87 +142,82 @@ class RunCMLAnalysisReport:
         return all_results
 
 
+    def run(self):
+        """批量生成 CML 分析报告（纯股票，不含商品）- 无参数入口"""
+        report_configs = [
+            {
+                "name": "美国科技股",
+                "stock_type": "us_tech",
+                "start_date": "20250101",
+                "end_date": None,
+                "interest_country": "US"
+            },
+            {
+                "name": "美国金融股",
+                "stock_type": "us_finance",
+                "start_date": "20250101",
+                "end_date": None,
+                "interest_country": "US"
+            },
+            {
+                "name": "美国混合股票",
+                "stock_type": "us_mixed",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "US"
+            },
+            {
+                "name": "美国自定义组合",
+                "stock_type": "us_custom",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "US"
+            },
+            {
+                "name": "中国蓝筹股组合",
+                "stock_type": "cn_blue_chip",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            },
+            {
+                "name": "中国科技股组合",
+                "stock_type": "cn_tech",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            },
+            {
+                "name": "中国大消费组合",
+                "stock_type": "cn_consumer",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            },
+            {
+                "name": "中国金融股组合",
+                "stock_type": "cn_financial",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            },
+            {
+                "name": "中国能源与制造业组合",
+                "stock_type": "cn_energy",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            },
+            {
+                "name": "中国自定义股票组合",
+                "stock_type": "cn_custom",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today,
+                "interest_country": "CN"
+            }
+        ]
+        self.run_batch_reports(report_configs)
+
+
 if __name__ == "__main__":
-    """
-    使用示例 - 批量生成 CML 分析报告（纯股票，不含商品）
-    """
-    runReport = RunCMLAnalysisReport()
-
-    # ========================================
-    # 配置测试案例（纯股票组合）
-    # ========================================
-    report_configs = [
-        {
-            "name": "美国科技股",
-            "stock_type": "us_tech",
-            "start_date": "20250101",
-            "end_date": None,
-            "interest_country": "US"
-        },
-        {
-            "name": "美国金融股",
-            "stock_type": "us_finance",
-            "start_date": "20250101",
-            "end_date": None,
-            "interest_country": "US"
-        },
-        {
-            "name": "美国混合股票",
-            "stock_type": "us_mixed",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US"
-        },
-        {
-            "name": "美国自定义组合",
-            "stock_type": "us_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "US"
-        },
-        {
-            "name": "中国蓝筹股组合",
-            "stock_type": "cn_blue_chip",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        },
-        {
-            "name": "中国科技股组合",
-            "stock_type": "cn_tech",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        },
-        {
-            "name": "中国大消费组合",
-            "stock_type": "cn_consumer",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        },
-        {
-            "name": "中国金融股组合",
-            "stock_type": "cn_financial",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        },
-        {
-            "name": "中国能源与制造业组合",
-            "stock_type": "cn_energy",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        },
-        {
-            "name": "中国自定义股票组合",
-            "stock_type": "cn_custom",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today,
-            "interest_country": "CN"
-        }
-    ]
-
-    # 执行批量报告生成
-    all_results = runReport.run_batch_reports(report_configs)
+    RunCMLAnalysisReport().run()

@@ -120,15 +120,10 @@ class RunPDAnalysisReport:
         logger.info("=" * 80)
 
 
+    def run(self):
+        """批量生成 PD (违约概率) 分析报告 - 无参数入口"""
+        self.run_batch_reports(start_year="2020")
+
+
 if __name__ == "__main__":
-    """
-    批量生成 PD (违约概率) 分析报告
-
-    执行流程:
-    1. 全量股票综合报告 — 所有股票合并为一个 PDF
-    2. 按板块分组报告 — 每个板块（高科技、银行、化工...）生成独立 PDF
-    """
-    runReport = RunPDAnalysisReport()
-
-    # 执行批量报告生成
-    runReport.run_batch_reports(start_year="2020")
+    RunPDAnalysisReport().run()
