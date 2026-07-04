@@ -70,8 +70,8 @@ class CommonParameters():
     IS_STREAMLIT_ON = False
     # IS_STREAMLIT_ON = True
 
-    # IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
-    IF_ENABLE_MOCKED_AI = False  # use real AI answer
+    IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    # IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
     # STOCK_LIST=[
     #         {'ts_code': '002093.SZ', 'name': '国脉科技'},
@@ -126,6 +126,10 @@ class CommonParameters():
         {'ts_code': '300212.SZ', 'name': '易华录', 'industry': 'IT'},
         {'ts_code': '688088.SH', 'name': '虹软科技', 'industry': 'IT'},
         {'ts_code': '300496.SZ', 'name': '中科创达', 'industry': 'IT'},
+
+        {'ts_code': '600522.SH', 'name': '中天科技', 'industry': 'IT'},
+
+
     ]
 
     #US_STOCK_LIST=["SPY", "C", "JPM", "AAPL","NVDA","GS","MS","GE"]

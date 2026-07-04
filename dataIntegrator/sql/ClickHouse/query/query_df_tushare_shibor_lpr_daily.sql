@@ -218,7 +218,7 @@ ORDER BY d.trade_date, d.ts_code;
 
 --看视图
 select * from indexsysdb.vw_tushare_cb_full
-where  d.trade_date = '20260122'
+where  d.trade_date = '20260601'
 
 --看percent change
 select * from indexsysdb.vw_tushare_cb_full
@@ -256,4 +256,5 @@ WHERE d.trade_date = '20260522'
 
 -- 集思录可转债实时数据表 (akshare bond_cb_jsl)
 --主要是为了拿评级
-select ts_code, bond_name, price, bond_rating, stk_code, stk_name, price from df_akshare_bond_cb_jsl
+select ts_code, bond_name, price, bond_rating, stk_code, stk_name, price 
+from df_akshare_bond_cb_jsl

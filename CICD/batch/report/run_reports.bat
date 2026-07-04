@@ -31,7 +31,7 @@ call "%SCRIPT_DIR%\run_InformationRatioAnalysisReport.bat"
 echo.
 
 REM Run Portfolio Metrics Analysis Report
-call "%SCRIPT_DIR%\run_PortfolioMetricsAnalysisReport.bat"
+call "%SCRIPT_DIR%\co.bat"
 echo.
 
 REM Run SOR Analysis Report
