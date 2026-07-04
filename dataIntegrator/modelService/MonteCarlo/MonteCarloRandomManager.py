@@ -31,12 +31,13 @@ class MonteCarloRandomManager:
     封装多线 算法
     '''
     @classmethod
-    def simulation_multi_series(cls, dataFrame, simulat_params):
+    def simulation_multi_series(cls, dataFrame, simulat_params, return_step_stats=False):
         monteCarloRandom = MonteCarloRandom()
-        return monteCarloRandom.simulation_multi_series(dataFrame, simulat_params)
+        return monteCarloRandom.simulation_multi_series(dataFrame, simulat_params, return_step_stats)
 
     @classmethod
-    def draw_plot(cls, all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value):
+    def draw_plot(cls, all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value,
+                  step_stats_list=None):
 
         S = stats["Init_Value"][0]
         times = simulat_params["times"]
@@ -51,19 +52,6 @@ class MonteCarloRandomManager:
         end_date = simulat_params.get("end_date", "Unknown")
 
         from matplotlib import pyplot as plt
-        # # 图表标注
-        # plt.axhline(var, color='red', linestyle='--',
-        #             label=f'VaR ({alpha * 100}%): {var:.2f}')
-        # plt.title(f"Monte Carlo Simulation ({dist_type})\n"
-        #           f'Stock: {market}-{stock} Between:{start_date} ~ {end_date}\n'
-        #           f"Paths: {series}, Steps: {times}, Initial Value: {S:.2f}, Mean: {stats['Mean'][0]:.6f}, SDV: {stats['Std_Dev'][0]:.6f}"
-        #           )
-        # plt.legend()
-        # plt.show()
-        #
-        # # 转换为DataFrame
-        # df = pandas.DataFrame(all_lines, columns=['Path', 'Step', 'Value'])
-        # return df
 
         paths = {}
         for line_id, x, y in all_lines:
@@ -91,6 +79,23 @@ class MonteCarloRandomManager:
         # 添加median_value
         plt.axhline(y=median_value, color='green', linestyle='--', linewidth=2,
                     label=f'VaR MEDIAN ({alpha * 100:.0f}%): {median_value:.2f}')
+
+        # 绘制逐步分位数曲线（step_stats_list）
+        if step_stats_list and len(step_stats_list) > 0:
+            steps = [s['step'] for s in step_stats_list]
+            step_lowers = [s['var_lower_bound'] for s in step_stats_list]
+            step_uppers = [s['var_upper_bound'] for s in step_stats_list]
+            step_avgs = [s['average'] for s in step_stats_list]
+            step_meds = [s['median_value'] for s in step_stats_list]
+
+            plt.plot(steps, step_lowers, color='darkred', linestyle=':', linewidth=2,
+                     marker='o', label='Step VaR Lower')
+            plt.plot(steps, step_uppers, color='darkgreen', linestyle=':', linewidth=2,
+                     marker='o', label='Step VaR Upper')
+            plt.plot(steps, step_avgs, color='darkblue', linestyle='-.', linewidth=2,
+                     marker='s', label='Step Average')
+            plt.plot(steps, step_meds, color='purple', linestyle='-.', linewidth=2,
+                     marker='d', label='Step Median')
 
         plt.xlabel('Time Step')
         plt.ylabel('Value')

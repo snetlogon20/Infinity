@@ -62,7 +62,7 @@ class MonteCarloRandom:
         return x, y
 
     @classmethod
-    def simulation_multi_series(cls, dataFrame, simulat_params):
+    def simulation_multi_series(cls, dataFrame, simulat_params, return_step_stats=False):
         # 参数解析
         analysis_column = simulat_params["analysis_column"]
         init_value_col = simulat_params["init_value"]
@@ -87,6 +87,8 @@ class MonteCarloRandom:
         # 结果存储
         all_lines = []
         final_values = []
+        # 收集每个预测步（跳过初始值步0）的所有路径值，用于计算逐步分位数
+        step_values = [[] for _ in range(times - 1)]
         #plt.figure(figsize=(20, 8))
 
         # 模拟主循环
@@ -111,9 +113,13 @@ class MonteCarloRandom:
             # 存储结果
             all_lines.extend(zip([line] * len(x), x, y))
             final_values.append(y[-1])
+            # 收集每个预测步的值（y[0]=初始值，y[1..]为各步预测值）
+            for step_idx in range(1, len(y)):
+                if step_idx - 1 < len(step_values):
+                    step_values[step_idx - 1].append(y[step_idx])
             #plt.plot(x, y, alpha=0.5)
 
-        # 风险值计算
+        # 风险值计算（终值统计，保持向后兼容）
         final_values = sorted(final_values)
         var_index = int(alpha * series)
         var_lower_bound = final_values[var_index]
@@ -122,10 +128,27 @@ class MonteCarloRandom:
         upper_alpha = 1 - alpha
         var_upper_index = int(upper_alpha * series)
         var_upper_bound = final_values[var_upper_index]
-        # 计算均数和中位数
+        # 计算均数和中位数（终值）
         average = sum(final_values) / len(final_values)
         median_value = statistics.median(final_values)
 
-        return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value
+        # ===== 关键新增：计算每个预测步的逐步分位数统计量 =====
+        step_stats_list = []
+        for step_idx in range(len(step_values)):
+            vals = sorted(step_values[step_idx])
+            n = len(vals)
+            if n > 0:
+                step_stats_list.append({
+                    'step': step_idx + 1,
+                    'var_lower_bound': vals[int(alpha * n)],
+                    'var_upper_bound': vals[int((1 - alpha) * n)],
+                    'average': sum(vals) / n,
+                    'median_value': vals[n // 2]
+                })
+
+        if return_step_stats:
+            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list
+        else:
+            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value
 
 

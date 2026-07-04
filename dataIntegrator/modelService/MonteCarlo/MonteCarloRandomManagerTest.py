@@ -472,6 +472,9 @@ class MonteCarloRandomTest:
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
 
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
+
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
@@ -653,6 +656,9 @@ class MonteCarloRandomTest:
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
 
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
+
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
@@ -726,8 +732,8 @@ class MonteCarloRandomTest:
         original_dataFrame = inquiryManager.get_sql_dataset(get_original_data_sql)
 
         if output_path is None:
-            output_path = FileUtility.generate_filename_by_timestamp(
-                rf"{CommonParameters.outBoundPath}\MonteCarloRandomManager_original_dataFrame", "xlsx")
+            output_path = FileUtility.get_full_filename_by_timestamp(
+                "MonteCarloRandomManager_original_dataFrame", "xlsx")
         original_dataFrame.to_excel(output_path)
 
         # 获取原始数据中的日期，作为循环条件
@@ -780,9 +786,9 @@ class MonteCarloRandomTest:
                 current_date += timedelta(days=1)
                 continue
 
-            # Step 2.3 设置蒙特卡洛模拟参数
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(
-                dataFrame, simulat_params)
+            # Step 2.3 设置蒙特卡洛模拟参数（return_step_stats=True 获取逐步分位数统计）
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list = monteCarloRandomManager.simulation_multi_series(
+                dataFrame, simulat_params, return_step_stats=True)
 
             # Step 2.4 计算 predict_date = 当前日期 + n 工作日，
             calendarService = CalendarService()
@@ -795,20 +801,45 @@ class MonteCarloRandomTest:
                 logger.warning(f"No next working date found for date: {current_date}")
             predict_date = next_n_working_date
 
-            # Step 2.5 插入新值，
-            new_row = pd.DataFrame([{
-                'trade_date': formatted_date,
-                'predict_date': predict_date,
-                'var_lower_bound': var_lower_bound,
-                'var_upper_bound': var_upper_bound,
-                'average': average,
-                'median_value': median_value
-            }])
-            logger.info(f"next row: {new_row}")
-            if results_df is None:
-                results_df = new_row  # 第一次赋值
+            # Step 2.5 将逐步分位数统计展开为逐步预测行（每步对应不同的 predict_date）
+            if step_stats_list and len(step_stats_list) > 0:
+                for step_stat in step_stats_list:
+                    step_num = step_stat['step']
+                    # 计算第 step_num 步对应的预测日期
+                    step_predict_date = calendarService.find_data_by_given_dataframe_and_date_offset(
+                        past_calendar_dataFrame, current_date, step_num)
+                    if step_predict_date is None:
+                        continue
+
+                    step_row = pd.DataFrame([{
+                        'trade_date': formatted_date,
+                        'predict_date': step_predict_date,
+                        'step_num': step_num,
+                        'var_lower_bound': step_stat['var_lower_bound'],
+                        'var_upper_bound': step_stat['var_upper_bound'],
+                        'average': step_stat['average'],
+                        'median_value': step_stat['median_value']
+                    }])
+                    if results_df is None:
+                        results_df = step_row  # 第一次赋值
+                    else:
+                        results_df = pd.concat([results_df, step_row])  # 后续拼接
             else:
-                results_df = pd.concat([results_df, new_row])  # 后续拼接
+                # 向后兼容：如果没有 step_stats，使用原始的单行方式
+                new_row = pd.DataFrame([{
+                    'trade_date': formatted_date,
+                    'predict_date': predict_date,
+                    'step_num': next_n_working_days,
+                    'var_lower_bound': var_lower_bound,
+                    'var_upper_bound': var_upper_bound,
+                    'average': average,
+                    'median_value': median_value
+                }])
+                logger.info(f"next row: {new_row}")
+                if results_df is None:
+                    results_df = new_row  # 第一次赋值
+                else:
+                    results_df = pd.concat([results_df, new_row])  # 后续拼接
 
             # Step 2.6 到末尾，结束
             if current_date > end_date:
@@ -860,7 +891,7 @@ class MonteCarloRandomTest:
             'init_value': 'close',
             'analysis_column': 'pct_change',
             't': 0.01,
-            'times': 5,
+            'times': 10,
             'series': 5000,
             'alpha': 0.05,
             'distribution_type': 'historical'
@@ -1141,6 +1172,9 @@ class MonteCarloRandomTest:
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
 
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
+
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
@@ -1271,6 +1305,9 @@ class MonteCarloRandomTest:
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
 
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
+
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
@@ -1381,6 +1418,9 @@ class MonteCarloRandomTest:
         final_result = monteCarloRandomAssistant.generate_forecast_dataframes(original_dataFrame, results_df)
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
+
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
@@ -1543,8 +1583,8 @@ class MonteCarloRandomTest:
         original_dataFrame = inquiryManager.get_sql_dataset(get_original_data_sql)
 
         if output_path is None:
-            output_path = FileUtility.generate_filename_by_timestamp(
-                rf"D:\workspace_python\infinity_data\data\outbound\MonteCarloRandomManager_original_dataFrame", "xlsx")
+            output_path = FileUtility.get_full_filename_by_timestamp(
+                "MonteCarloRandomManager_original_dataFrame", "xlsx")
         original_dataFrame.to_excel(output_path)
 
         # 获取原始数据中的日期，作为循环条件
@@ -1579,9 +1619,9 @@ class MonteCarloRandomTest:
                 current_date += timedelta(days=1)
                 continue
 
-            # Step 2.3 设置蒙特卡洛模拟参数
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(
-                dataFrame, simulat_params)
+            # Step 2.3 设置蒙特卡洛模拟参数（return_step_stats=True 获取逐步分位数统计）
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list = monteCarloRandomManager.simulation_multi_series(
+                dataFrame, simulat_params, return_step_stats=True)
 
             # Step 2.4 计算 predict_date = 当前日期 + n 工作日，
             calendarService = CalendarService()
@@ -1594,20 +1634,45 @@ class MonteCarloRandomTest:
                 logger.warning(f"No next working date found for date: {current_date}")
             predict_date = next_n_working_date
 
-            # Step 2.5 插入新值，
-            new_row = pd.DataFrame([{
-                'trade_date': formatted_date,
-                'predict_date': predict_date,
-                'var_lower_bound': var_lower_bound,
-                'var_upper_bound': var_upper_bound,
-                'average': average,
-                'median_value': median_value
-            }])
-            logger.info(f"next row: {new_row}")
-            if results_df is None:
-                results_df = new_row  # 第一次赋值
+            # Step 2.5 将逐步分位数统计展开为逐步预测行（每步对应不同的 predict_date）
+            if step_stats_list and len(step_stats_list) > 0:
+                for step_stat in step_stats_list:
+                    step_num = step_stat['step']
+                    # 计算第 step_num 步对应的预测日期
+                    step_predict_date = calendarService.find_data_by_given_dataframe_and_date_offset(
+                        past_calendar_dataFrame, current_date, step_num)
+                    if step_predict_date is None:
+                        continue
+
+                    step_row = pd.DataFrame([{
+                        'trade_date': formatted_date,
+                        'predict_date': step_predict_date,
+                        'step_num': step_num,
+                        'var_lower_bound': step_stat['var_lower_bound'],
+                        'var_upper_bound': step_stat['var_upper_bound'],
+                        'average': step_stat['average'],
+                        'median_value': step_stat['median_value']
+                    }])
+                    if results_df is None:
+                        results_df = step_row  # 第一次赋值
+                    else:
+                        results_df = pd.concat([results_df, step_row])  # 后续拼接
             else:
-                results_df = pd.concat([results_df, new_row])  # 后续拼接
+                # 向后兼容：如果没有 step_stats，使用原始的单行方式
+                new_row = pd.DataFrame([{
+                    'trade_date': formatted_date,
+                    'predict_date': predict_date,
+                    'step_num': next_n_working_days,
+                    'var_lower_bound': var_lower_bound,
+                    'var_upper_bound': var_upper_bound,
+                    'average': average,
+                    'median_value': median_value
+                }])
+                logger.info(f"next row: {new_row}")
+                if results_df is None:
+                    results_df = new_row  # 第一次赋值
+                else:
+                    results_df = pd.concat([results_df, new_row])  # 后续拼接
 
             # Step 2.6 到末尾，结束
             if current_date > end_date:
@@ -1624,6 +1689,9 @@ class MonteCarloRandomTest:
         final_result['upper_lower_gap'] = final_result['var_upper_bound'] - final_result['var_lower_bound']
 
         final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
+
+        # 预计算 analysis_column 的 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
 
         # Step 2.7 输出excel
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
@@ -1686,13 +1754,13 @@ class MonteCarloRandomTest:
         # 绘制 lower_close_gap (VaR 下界与收盘价的差距)
         if 'lower_close_gap' in plot_data.columns and not plot_data['lower_close_gap'].isna().all():
             plt.plot(x_data, plot_data['lower_close_gap'],
-                     linewidth=2.5, label='lower_close_gap (VaR 下界 - 收盘价)',
+                     linewidth=1.0, label='lower_close_gap (VaR 下界 - 收盘价)',
                      color='blue', linestyle='-', zorder=1)
 
         # 绘制 upper_lower_gap (VaR 上下界的差距)
         if 'upper_lower_gap' in plot_data.columns and not plot_data['upper_lower_gap'].isna().all():
             plt.plot(x_data, plot_data['upper_lower_gap'],
-                     linewidth=2.5, label='upper_lower_gap (VaR 上界 - VaR 下界)',
+                     linewidth=1.0, label='upper_lower_gap (VaR 上界 - VaR 下界)',
                      color='red', linestyle='--', zorder=2)
 
         # 设置图表属性
@@ -1708,8 +1776,22 @@ class MonteCarloRandomTest:
         # 格式化 x 轴日期显示
         if len(plot_data) > 0:
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-            plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))
-            plt.xticks(rotation=90, fontsize=8)
+            n = len(plot_data)
+            if n <= 30:
+                interval = 1
+                rotation = 90
+            elif n <= 90:
+                interval = 7
+                rotation = 45
+            elif n <= 180:
+                interval = 14
+                rotation = 45
+            else:
+                interval = 30
+                rotation = 45
+            plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=interval))
+            plt.xticks(rotation=rotation, fontsize=8)
+
 
         # 调整布局
         plt.tight_layout()
