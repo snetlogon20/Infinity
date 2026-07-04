@@ -939,6 +939,158 @@ class MonteCarloRandomTest:
         )
 
 
+    def test_multi_series_lognormal_distribution_GC_rolling(
+            self,
+            symbol='GC',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='close',
+            analysis_column_label='收盘价',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'GC'  # 交易标的代码：纽约金
+        start_date = '2026-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'close'  # 分析列名：收盘价
+        analysis_column_label = '收盘价'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'close',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': 10,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'lognormal'  # 使用对数正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_trade_date_sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_past_calendar_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' order by date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        date as trade_date,
+                        open,
+                        close,
+                        low,
+                        high,
+                        pct_change
+                    from indexsysdb.df_akshare_futures_foreign_hist
+                    where symbol = '{symbol}' and date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：纽约金
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：收盘价
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (lognormal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
+
+    def test_multi_series_normal_distribution_GC_rolling(
+            self,
+            symbol='GC',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='close',
+            analysis_column_label='收盘价',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'GC'  # 交易标的代码：纽约金
+        start_date = '2026-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'close'  # 分析列名：收盘价
+        analysis_column_label = '收盘价'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'close',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': 10,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'normal'  # 使用正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_trade_date_sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_past_calendar_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' order by date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        date as trade_date,
+                        open,
+                        close,
+                        low,
+                        high,
+                        pct_change
+                    from indexsysdb.df_akshare_futures_foreign_hist
+                    where symbol = '{symbol}' and date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：纽约金
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：收盘价
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (normal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
+
     def test_multi_series_historical_distribution_XAU_rolling(self):
         """多线模拟 - Historical Distribution - XAU (伦敦金) - Rolling"""
 
@@ -1180,6 +1332,158 @@ class MonteCarloRandomTest:
         monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
 
         return
+
+    def test_multi_series_lognormal_distribution_GC_pctchang_rolling(
+            self,
+            symbol='GC',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='pct_change',
+            analysis_column_label='涨跌幅',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'GC'  # 交易标的代码：纽约金
+        start_date = '2026-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'pct_change'  # 分析列名：涨跌幅
+        analysis_column_label = '涨跌幅'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'pct_change',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': next_n_working_days,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'lognormal'  # 使用对数正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_trade_date_sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_past_calendar_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' order by date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        date as trade_date,
+                        open,
+                        close,
+                        low,
+                        high,
+                        pct_change
+                    from indexsysdb.df_akshare_futures_foreign_hist
+                    where symbol = '{symbol}' and date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：纽约金
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：涨跌幅
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (lognormal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
+
+    def test_multi_series_normal_distribution_GC_pctchang_rolling(
+            self,
+            symbol='GC',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='pct_change',
+            analysis_column_label='涨跌幅',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'GC'  # 交易标的代码：纽约金
+        start_date = '2026-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'pct_change'  # 分析列名：涨跌幅
+        analysis_column_label = '涨跌幅'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'pct_change',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': next_n_working_days,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'normal'  # 使用正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_trade_date_sql = f"select date as trade_date from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
+        get_past_calendar_sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='{symbol}' and date>='{formatted_start_date}' order by date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        date as trade_date,
+                        open,
+                        close,
+                        low,
+                        high,
+                        pct_change
+                    from indexsysdb.df_akshare_futures_foreign_hist
+                    where symbol = '{symbol}' and date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：纽约金
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：涨跌幅
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (normal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
 
     def test_multi_series_historical_distribution_XAU_pctchange_rolling(self):
         """多线模拟 - Historical Distribution - XAU (伦敦金) - pct_change - Rolling"""
@@ -1847,11 +2151,19 @@ if __name__ == "__main__":
     -- XAU - 伦敦金
     -- XAG - 白银
     """
-    monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
+    # GC-history * 3 (normal/lognormal/historical)
+    # monteCarloTest.test_multi_series_normal_distribution_GC_rolling()
+    # monteCarloTest.test_multi_series_lognormal_distribution_GC_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
+
+    # GC-pctchange * 3 (normal/lognormal/historical)
+    # monteCarloTest.test_multi_series_normal_distribution_GC_pctchang_rolling()
+    # monteCarloTest.test_multi_series_lognormal_distribution_GC_pctchang_rolling()
+    monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
+
+    ## XAU-history * 3 (normal/lognormal/historical)
     # monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
-
-    # monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAU_pctchange_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAG_pctchange_rolling()
 

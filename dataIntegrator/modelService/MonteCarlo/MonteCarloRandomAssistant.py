@@ -214,7 +214,7 @@ class MonteCarloRandomAssistant:
 
         # 绘制分析列（涨跌幅或收盘价）
         if analysis_column in plot_data.columns and not plot_data[analysis_column].isna().all():
-            plt.plot(x_data, plot_data[analysis_column], linewidth=1.2, label=analysis_column_label, color='blue',
+            plt.plot(x_data, plot_data[analysis_column], linewidth=0.6, label=analysis_column_label, color='blue',
                      zorder=1)
             line_count += 1
 
@@ -240,14 +240,14 @@ class MonteCarloRandomAssistant:
             # 绘制平均值
             if 'average' in plot_data.columns and not plot_data['average'].isna().all():
                 plt.plot(x_data, plot_data['average'],
-                         linewidth=1.2, label='平均值',
+                         linewidth=0.6, label='平均值',
                          color='red', linestyle='-', zorder=3)
                 line_count += 1
 
             # 绘制中位数
             if 'median_value' in plot_data.columns and not plot_data['median_value'].isna().all():
                 plt.plot(x_data, plot_data['median_value'],
-                         linewidth=1.2, label='中位数',
+                         linewidth=0.6, label='中位数',
                          color='purple', linestyle='-', zorder=3)
                 line_count += 1
 
