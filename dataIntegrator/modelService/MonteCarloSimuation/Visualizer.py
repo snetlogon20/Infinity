@@ -12,12 +12,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Fix Unicode minus sign (use ASCII '-' instead of '\u2212')
+# Fix Unicode minus sign: must be set BEFORE any font configuration
 plt.rcParams['axes.unicode_minus'] = False
 
-# Configure Chinese font (if available)
+# Configure fonts: DejaVu Sans first to avoid \u2212 glyph issues,
+# then Chinese fonts for CJK support
 try:
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial']
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Microsoft YaHei', 'Arial']
+    plt.rcParams['font.family'] = 'sans-serif'
 except Exception:
     pass
 
