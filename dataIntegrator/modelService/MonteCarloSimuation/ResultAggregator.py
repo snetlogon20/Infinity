@@ -4,7 +4,7 @@ ResultAggregator — builds final DataFrames from raw data, risk stats, and pred
 
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -117,26 +117,37 @@ class ResultAggregator:
     @staticmethod
     def build_prediction_results(
         dates: List[str],
-        predict_values: List[float],
+        predict_p10: List[float],
+        predict_p50: List[float],
+        predict_p90: List[float],
+        predict_p05: Optional[List[float]] = None,
+        predict_p01: Optional[List[float]] = None,
         analysis_column: str = 'pct_change',
     ) -> pd.DataFrame:
         """
         Build prediction results DataFrame.
 
-        Columns: trade_date, analysis_column, predict_value
+        Columns: trade_date, analysis_column, predict_p10, predict_p50, predict_p90, predict_p05, predict_p01
         """
-        return pd.DataFrame({
+        result = pd.DataFrame({
             'trade_date': dates,
             'analysis_column': analysis_column,
-            'predict_value': predict_values,
+            'predict_p10': predict_p10,
+            'predict_p50': predict_p50,
+            'predict_p90': predict_p90,
         })
+        if predict_p05 is not None:
+            result['predict_p05'] = predict_p05
+        if predict_p01 is not None:
+            result['predict_p01'] = predict_p01
+        return result
 
     @staticmethod
     def merge_results(original_df: pd.DataFrame, prediction_df: pd.DataFrame) -> pd.DataFrame:
         """
         Merge original analysis and prediction results, sorted by trade_date.
 
-        For prediction rows, only trade_date, analysis_column, predict_value, step_num are populated.
+        For prediction rows, only trade_date, analysis_column, predict_p10/p50/p90, step_num are populated.
         """
         # Add step_num to prediction
         if 'step_num' not in prediction_df.columns:

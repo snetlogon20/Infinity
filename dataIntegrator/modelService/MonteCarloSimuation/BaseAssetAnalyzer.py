@@ -317,21 +317,33 @@ class BaseAssetAnalyzer(ABC):
         future_dates = self.get_future_working_days(last_date, next_n)
 
         # Use the most recent limit_date returns for prediction.
-        # Daily returns are independently drawn from the fitted distribution,
-        # not accumulated as a GBM path.
+        # For each future day, independently simulate 5000 paths and take
+        # p10/p50/p90 percentiles to avoid random-seed perturbation.
         engine_pred = MonteCarloEngine(pd.Series(returns_array[-limit:]), self.simulate_params)
         engine_pred.fit_distribution()
         engine_pred.calculate_sigma()
-        simulated_pred = engine_pred.simulate_single_step()
 
-        predict_values = np.random.choice(simulated_pred, size=next_n, replace=True).tolist()
+        p10_list, p50_list, p90_list, p05_list, p01_list = [], [], [], [], []
+        for step in range(next_n):
+            simulated = engine_pred.simulate_single_step()
+            p10_list.append(float(np.percentile(simulated, 10)))
+            p50_list.append(float(np.percentile(simulated, 50)))
+            p90_list.append(float(np.percentile(simulated, 90)))
+            p05_list.append(float(np.percentile(simulated, 5)))
+            p01_list.append(float(np.percentile(simulated, 1)))
+            logger.info(f"  Step {step + 1}/{next_n}: p01={p01_list[-1]:.6f}, "
+                        f"p05={p05_list[-1]:.6f}, p10={p10_list[-1]:.6f}, "
+                        f"p50={p50_list[-1]:.6f}, p90={p90_list[-1]:.6f}")
 
         prediction_df = ResultAggregator.build_prediction_results(
             dates=future_dates,
-            predict_values=predict_values,
+            predict_p10=p10_list,
+            predict_p50=p50_list,
+            predict_p90=p90_list,
+            predict_p05=p05_list,
+            predict_p01=p01_list,
             analysis_column=analysis_col,
         )
-        logger.info(f"  Predictions: {predict_values}")
 
         # --- Merge ---
         final_df = ResultAggregator.merge_results(original_df, prediction_df)

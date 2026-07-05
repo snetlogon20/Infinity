@@ -44,6 +44,31 @@ class Visualizer:
             return pd.to_datetime(s, errors='coerce')
 
     @staticmethod
+    def _pick_annotate_indices(series: pd.Series | np.ndarray, max_labels: int = 6) -> list:
+        """Select indices to annotate: first, last, evenly spaced, and local extrema."""
+        values = np.asarray(series)
+        n = len(values)
+        if n == 0:
+            return []
+        if n <= max_labels:
+            return list(range(n))
+
+        idx_set = {0, n - 1}  # first and last
+
+        # evenly spaced middle points
+        step = max(1, n // max_labels)
+        for i in range(step, n - 1, step):
+            idx_set.add(i)
+
+        # local extrema (peaks and valleys)
+        for i in range(1, n - 1):
+            if (values[i] > values[i - 1] and values[i] > values[i + 1]) or \
+               (values[i] < values[i - 1] and values[i] < values[i + 1]):
+                idx_set.add(i)
+
+        return sorted(idx_set)
+
+    @staticmethod
     def _format_date_axis(ax, dates, is_datetime):
         """Auto-scale date ticks by data size; always include year."""
         if not is_datetime:
@@ -201,7 +226,7 @@ class Visualizer:
 
         X轴 = trade_date
         Y1轴 = analysis_column
-        Y2轴 = predict_value
+        Y2轴 = predict_p10 / predict_p50 / predict_p90
         Title: 开始日期：{prediction_df最小date} 结束日期：{prediction_df最大date}
         """
         df = df.copy()
@@ -215,30 +240,82 @@ class Visualizer:
         fig.suptitle(full_title, fontsize=14, fontweight='bold')
 
         # Y1 (left): analysis_column as line
-        line1 = None
         if 'analysis_column' in df.columns:
-            line1 = ax1.plot(dates, df['analysis_column'], 'b-', linewidth=1.2,
-                             alpha=0.8, label=analysis_col_label)
+            ax1.plot(dates, df['analysis_column'], 'b-', linewidth=1.2,
+                     alpha=0.8, label=analysis_col_label)
         ax1.set_ylabel(analysis_col_label, color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
 
-        # Y2 (right): predict_value as line (with markers)
+        # Y2 (right): p10, p50, p90 as three lines
         ax2 = ax1.twinx()
-        line2 = None
-        if 'predict_value' in df.columns:
-            line2 = ax2.plot(dates, df['predict_value'], 'r-o', linewidth=1.2,
-                             markersize=6, alpha=0.8, label='Predict Value')
-            ax2.axhline(y=0, color='gray', linewidth=0.5)
 
-            # Annotate each point with value
-            for i, (dt, val) in enumerate(zip(df['trade_date'], df['predict_value'])):
+        # P10 — dashed steelblue
+        if 'predict_p10' in df.columns:
+            ax2.plot(dates, df['predict_p10'], color='steelblue', linestyle='--',
+                     linewidth=1.0, markersize=2.5, marker='o', alpha=0.7, label='P10')
+            idx_p10 = cls._pick_annotate_indices(df['predict_p10'].values)
+            for i in idx_p10:
+                val = df['predict_p10'].iloc[i]
                 va = 'bottom' if val >= 0 else 'top'
-                offset_val = 0.001 if val >= 0 else -0.001
-                ax2.annotate(f'{val:.4f}', (dates.iloc[i] if is_datetime else i, val),
+                ax2.annotate(f'{val:.4f}',
+                             (dates.iloc[i] if is_datetime else i, val),
                              textcoords="offset points", xytext=(0, 8 if val >= 0 else -12),
-                             ha='center', va=va, fontsize=8, color='red')
+                             ha='center', va=va, fontsize=5, color='steelblue', rotation=45)
 
-        ax2.set_ylabel('predict_value', color='red')
+        # P50 — solid red (main prediction)
+        if 'predict_p50' in df.columns:
+            ax2.plot(dates, df['predict_p50'], 'r-o', linewidth=1.4,
+                     markersize=3.5, alpha=0.9, label='P50 (主预测)')
+            idx_p50 = cls._pick_annotate_indices(df['predict_p50'].values)
+            for i in idx_p50:
+                val = df['predict_p50'].iloc[i]
+                va = 'bottom' if val >= 0 else 'top'
+                ax2.annotate(f'{val:.4f}',
+                             (dates.iloc[i] if is_datetime else i, val),
+                             textcoords="offset points", xytext=(0, 8 if val >= 0 else -12),
+                             ha='center', va=va, fontsize=6, color='red', fontweight='bold', rotation=45)
+
+        # P90 — dashed darkorange
+        if 'predict_p90' in df.columns:
+            ax2.plot(dates, df['predict_p90'], color='darkorange', linestyle='--',
+                     linewidth=1.0, markersize=2.5, marker='o', alpha=0.7, label='P90')
+            idx_p90 = cls._pick_annotate_indices(df['predict_p90'].values)
+            for i in idx_p90:
+                val = df['predict_p90'].iloc[i]
+                va = 'bottom' if val >= 0 else 'top'
+                ax2.annotate(f'{val:.4f}',
+                             (dates.iloc[i] if is_datetime else i, val),
+                             textcoords="offset points", xytext=(0, 8 if val >= 0 else -12),
+                             ha='center', va=va, fontsize=5, color='darkorange', rotation=45)
+
+        # P05 — solid darkgreen (like P50 style)
+        if 'predict_p05' in df.columns:
+            ax2.plot(dates, df['predict_p05'], color='darkgreen', linestyle='-',
+                     linewidth=1.2, markersize=3, marker='o', alpha=0.7, label='P05')
+            idx_p05 = cls._pick_annotate_indices(df['predict_p05'].values)
+            for i in idx_p05:
+                val = df['predict_p05'].iloc[i]
+                va = 'bottom' if val >= 0 else 'top'
+                ax2.annotate(f'{val:.4f}',
+                             (dates.iloc[i] if is_datetime else i, val),
+                             textcoords="offset points", xytext=(0, 8 if val >= 0 else -12),
+                             ha='center', va=va, fontsize=5, color='darkgreen', fontweight='bold', rotation=45)
+
+        # P01 — solid darkcyan (like P50 style)
+        if 'predict_p01' in df.columns:
+            ax2.plot(dates, df['predict_p01'], color='darkcyan', linestyle='-',
+                     linewidth=1.2, markersize=3, marker='o', alpha=0.7, label='P01')
+            idx_p01 = cls._pick_annotate_indices(df['predict_p01'].values, max_labels=4)
+            for i in idx_p01:
+                val = df['predict_p01'].iloc[i]
+                va = 'bottom' if val >= 0 else 'top'
+                ax2.annotate(f'{val:.4f}',
+                             (dates.iloc[i] if is_datetime else i, val),
+                             textcoords="offset points", xytext=(0, 8 if val >= 0 else -12),
+                             ha='center', va=va, fontsize=4, color='darkcyan', fontweight='bold', rotation=45)
+
+        ax2.axhline(y=0, color='gray', linewidth=0.5)
+        ax2.set_ylabel('Predict (P01 / P05 / P10 / P50 / P90)', color='red')
         ax2.tick_params(axis='y', labelcolor='red')
 
         if is_datetime:
@@ -273,7 +350,7 @@ class Visualizer:
         Chart 4 — 最终结果 (折线图，双Y轴)
 
         X轴 = trade_date
-        Y轴 = analysis_column的值 + predict_value
+        Y轴 = analysis_column的值 + predict_p10/p50/p90
         Y1轴 = EGARCH模型的方差
         Title: 开始日期：{start_date} 结束日期：{预测最大date}
         """
@@ -290,7 +367,7 @@ class Visualizer:
         fig, ax = plt.subplots(figsize=(18, 8))
         fig.suptitle(full_title, fontsize=14, fontweight='bold')
 
-        # Y-axis (left): analysis_column (historical) + predict_value (future)
+        # Y-axis (left): analysis_column (historical) + predict_p10/p50/p90 (future)
         if 'analysis_column' in df.columns:
             ax.plot(dates[hist_mask], df.loc[hist_mask, 'analysis_column'],
                     'b-', linewidth=1.0, alpha=0.7, label='Historical ' + analysis_col_label)
@@ -308,22 +385,79 @@ class Visualizer:
             ax.axvspan(dates[pred_mask].iloc[0], dates[pred_mask].iloc[-1],
                        alpha=0.12, color='orange', label='Predict Zone')
 
-        # Predicted values as line + scatter
-        if pred_mask.any() and 'predict_value' in df.columns:
-            ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_value'],
-                    'o-', color='red', linewidth=1.2, markersize=3,
-                    zorder=5, marker='o', label='Predicted Value')
+        # Predicted values: p10/p50/p90 three lines with confidence band
+        if pred_mask.any():
+            has_p10 = 'predict_p10' in df.columns
+            has_p50 = 'predict_p50' in df.columns
+            has_p90 = 'predict_p90' in df.columns
 
-            # Annotate predicted values
-            for idx in df[pred_mask].index:
-                val = df.loc[idx, 'predict_value']
-                dt = df.loc[idx, 'trade_date']
-                d = dates[idx]
-                ax.annotate(f'{val:.4f}', (d, val),
-                            textcoords="offset points", xytext=(0, 10),
-                            ha='center', fontsize=8, color='darkorange')
+            # Confidence band: fill between p10 and p90
+            if has_p10 and has_p90:
+                ax.fill_between(dates[pred_mask],
+                                df.loc[pred_mask, 'predict_p10'],
+                                df.loc[pred_mask, 'predict_p90'],
+                                alpha=0.15, color='steelblue', label='P10-P90 置信带')
 
-        ax.set_ylabel(analysis_col_label + ' / predict_value')
+            # P10 line
+            if has_p10:
+                ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_p10'],
+                        '--', color='steelblue', linewidth=1.0, markersize=2,
+                        marker='s', alpha=0.7, zorder=4, label='P10')
+
+            pred_idx = df[pred_mask].index
+
+            # P50 line (main prediction)
+            if has_p50:
+                ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_p50'],
+                        'o-', color='red', linewidth=1.4, markersize=3,
+                        zorder=5, marker='o', label='P50 (主预测)')
+                # Annotate P50 values (selective, rotated)
+                idx_p50 = cls._pick_annotate_indices(df.loc[pred_idx, 'predict_p50'].values)
+                for i in idx_p50:
+                    idx = pred_idx[i]
+                    val = df.loc[idx, 'predict_p50']
+                    d = dates[idx]
+                    ax.annotate(f'{val:.4f}', (d, val),
+                                textcoords="offset points", xytext=(0, 10),
+                                ha='center', fontsize=5, color='red', fontweight='bold', rotation=45)
+
+            # P90 line
+            if has_p90:
+                ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_p90'],
+                        '--', color='darkorange', linewidth=1.0, markersize=2,
+                        marker='s', alpha=0.7, zorder=4, label='P90')
+
+            # P05 line (solid, circle marker, like P50 but darkgreen)
+            has_p05 = 'predict_p05' in df.columns
+            if has_p05:
+                ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_p05'],
+                        'o-', color='darkgreen', linewidth=1.2, markersize=3,
+                        zorder=5, marker='o', label='P05')
+                idx_p05 = cls._pick_annotate_indices(df.loc[pred_idx, 'predict_p05'].values)
+                for i in idx_p05:
+                    idx = pred_idx[i]
+                    val = df.loc[idx, 'predict_p05']
+                    d = dates[idx]
+                    ax.annotate(f'{val:.4f}', (d, val),
+                                textcoords="offset points", xytext=(0, 10),
+                                ha='center', fontsize=5, color='darkgreen', fontweight='bold', rotation=45)
+
+            # P01 line (solid, circle marker, like P50 but darkcyan)
+            has_p01 = 'predict_p01' in df.columns
+            if has_p01:
+                ax.plot(dates[pred_mask], df.loc[pred_mask, 'predict_p01'],
+                        'o-', color='darkcyan', linewidth=1.2, markersize=3,
+                        zorder=5, marker='o', label='P01')
+                idx_p01 = cls._pick_annotate_indices(df.loc[pred_idx, 'predict_p01'].values, max_labels=4)
+                for i in idx_p01:
+                    idx = pred_idx[i]
+                    val = df.loc[idx, 'predict_p01']
+                    d = dates[idx]
+                    ax.annotate(f'{val:.4f}', (d, val),
+                                textcoords="offset points", xytext=(0, 10),
+                                ha='center', fontsize=4, color='darkcyan', fontweight='bold', rotation=45)
+
+        ax.set_ylabel(analysis_col_label + ' / Predict P01/P05/P10/P50/P90')
         ax.axhline(y=0, color='gray', linewidth=0.5)
 
         # Y1-axis (right): sigma curves (normal, garch, egarch)
