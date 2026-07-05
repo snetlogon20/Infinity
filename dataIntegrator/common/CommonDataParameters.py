@@ -220,6 +220,8 @@ class CommonDataParameters():
         {'ts_code': '002384.SZ', 'name': '东山精密'},
         {'ts_code': '300408.SZ', 'name': '三环集团'},
         {'ts_code': '603228.SH', 'name': '景旺电子'},
+
+        {'ts_code': '600522.SH', 'name': '中天科技'},
     ]
 
     REFRESH_US_STOCK_LIST = [

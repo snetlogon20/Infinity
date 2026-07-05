@@ -85,6 +85,10 @@ class RunBondYieldComparator:
             raise
 
 
+    def run(self):
+        """生成收益率比较报告 - 无参数入口"""
+        self.generate_report()
+
+
 if __name__ == "__main__":
-    runner = RunBondYieldComparator()
-    runner.generate_report()
+    RunBondYieldComparator().run()

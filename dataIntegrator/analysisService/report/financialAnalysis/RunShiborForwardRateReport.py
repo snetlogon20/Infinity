@@ -147,34 +147,27 @@ class RunShiborForwardRateReport:
         return all_results
 
 
+    def run(self):
+        """批量生成 SHIBOR 远期利率分析报告 - 无参数入口"""
+        report_configs = [
+            {
+                "name": "SHIBOR远期利率_最近1年",
+                "start_date": CommonDataParameters.get_start_date(days=360),
+                "end_date": CommonParameters.today
+            },
+            {
+                "name": "SHIBOR远期利率_最近3年",
+                "start_date": CommonDataParameters.get_start_date(days=1095),
+                "end_date": CommonParameters.today
+            },
+            {
+                "name": "SHIBOR远期利率_最近5年",
+                "start_date": CommonDataParameters.get_start_date(days=1825),
+                "end_date": CommonParameters.today
+            }
+        ]
+        self.run_batch_reports(report_configs)
+
+
 if __name__ == "__main__":
-    """
-    使用示例 - 批量生成 SHIBOR 远期利率分析报告
-    """
-    import os
-
-    runReport = RunShiborForwardRateReport()
-
-    # ========================================
-    # 配置测试案例
-    # ========================================
-    report_configs = [
-        {
-            "name": "SHIBOR远期利率_最近1年",
-            "start_date": CommonDataParameters.get_start_date(days=360),
-            "end_date": CommonParameters.today
-        },
-        {
-            "name": "SHIBOR远期利率_最近3年",
-            "start_date": CommonDataParameters.get_start_date(days=1095),
-            "end_date": CommonParameters.today
-        },
-        {
-            "name": "SHIBOR远期利率_最近5年",
-            "start_date": CommonDataParameters.get_start_date(days=1825),
-            "end_date": CommonParameters.today
-        }
-    ]
-
-    # 执行批量报告生成
-    all_results = runReport.run_batch_reports(report_configs)
+    RunShiborForwardRateReport().run()

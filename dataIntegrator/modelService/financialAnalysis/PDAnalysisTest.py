@@ -225,7 +225,7 @@ if __name__ == '__main__':
     # pdAnalysisTest.run_all_analysis(start_year="2020", generate_reports=False)
 
     # 模式4: 按板块分组处理（分析 + 报告）—— 为每个行业板块生成独立报告
-    pdAnalysisTest.run_analysis_by_sector(start_year="2020", generate_reports=True)
+    # pdAnalysisTest.run_analysis_by_sector(start_year="2020", generate_reports=True)
 
     # # 模式5: 仅按板块分组分析（不生成报告）
     # pdAnalysisTest.run_analysis_by_sector(start_year="2020", generate_reports=False)

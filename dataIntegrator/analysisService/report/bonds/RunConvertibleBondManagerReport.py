@@ -34,7 +34,7 @@ class RunConvertibleBondManagerReport:
 
         if start_date is None:
             calendarService = CalendarService()
-            start_date = calendarService.calculate_T_minus_n_days(end_date, days=90)
+            start_date = calendarService.calculate_T_minus_n_days(end_date, days=10)
 
         logger.info("=" * 80)
         logger.info("开始生成 可转债量化管理报告")
@@ -67,6 +67,10 @@ class RunConvertibleBondManagerReport:
             raise
 
 
+    def run(self):
+        """生成可转债量化管理报告 - 无参数入口"""
+        self.generate_report()
+
+
 if __name__ == "__main__":
-    runner = RunConvertibleBondManagerReport()
-    runner.generate_report()
+    RunConvertibleBondManagerReport().run()
