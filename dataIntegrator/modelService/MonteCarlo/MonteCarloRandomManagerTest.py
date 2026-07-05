@@ -2420,7 +2420,7 @@ if __name__ == "__main__":
 
     # Citi-pctchange * 3 (normal/lognormal/historical)
     # monteCarloTest.test_multi_series_normal_distribution_citi_pctchang_rolling()
-    monteCarloTest.test_multi_series_lognormal_distribution_citi_pctchang_rolling()
+    # monteCarloTest.test_multi_series_lognormal_distribution_citi_pctchang_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_citi_pctchange_rolling()
 
     """
@@ -2449,7 +2449,7 @@ if __name__ == "__main__":
     # monteCarloTest.test_multi_series_historical_distribution_GC_rolling()
 
     # GC-pctchange * 3 (normal/lognormal/historical)
-    # monteCarloTest.test_multi_series_normal_distribution_GC_pctchang_rolling()
+    monteCarloTest.test_multi_series_normal_distribution_GC_pctchang_rolling()
     # monteCarloTest.test_multi_series_lognormal_distribution_GC_pctchang_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
 

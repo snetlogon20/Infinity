@@ -1,0 +1,275 @@
+@startuml MonteCarloSimuation_ClassDiagram
+
+' ============================================================
+' Monte Carlo Simulation System - Factory Pattern Architecture
+' Python 3.12 | arch | ClickHouse | scipy | matplotlib
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam backgroundColor #FEFEFE
+
+package "MonteCarloSimuation" {
+
+  ' ==========================================================
+  '  Core Engine Layer
+  ' ==========================================================
+  class MonteCarloEngine {
+    - returns: np.ndarray
+    - params: dict
+    - mu: float
+    - sigma: float
+    - distribution_type: str
+    - sigma_type: str
+    - n_series: int
+    - alpha: float
+    - t_param: float
+    - distribution: Callable
+    - distribution_params: dict
+    --
+    + __init__(returns: pd.Series, params: dict)
+    + fit_distribution(): dict
+    + calculate_sigma(): float
+    + get_conditional_volatility(): np.ndarray | None
+    + simulate_single_step(): np.ndarray
+    + simulate_multi_step(times: int): np.ndarray
+    + simulate_and_get_stats(times: int = None): dict | list
+    - _fit_normal(): dict
+    - _fit_student(): dict
+    - _fit_skewed_t(): dict
+    - _fit_lognormal(): dict
+    - _fit_historical(): dict
+    - _calc_normal_sigma(): float
+    - _calc_garch_sigma(): float
+    - _calc_egarch_sigma(): float
+  }
+
+  note right of MontecarloEngine
+    <b>支持分布:</b>
+    · normal  — 正态分布
+    · student — Student-t
+    · skewed-t — Hansen 偏态t
+    · lognormal — 对数正态
+    · history — 经验bootstrap
+
+    <b>支持波动率:</b>
+    · normal — 滚动标准差
+    · garch  — GARCH(1,1)
+    · egarch — EGARCH(1,1)
+  end note
+
+  class RiskMetrics {
+    + {static} calculate_var(simulated_values, alpha): (float, float)
+    + {static} calculate_es(simulated_values, alpha): (float, float)
+    + {static} calculate_all_stats(simulated_values, alpha): dict
+    - {static} _var_lower(values, alpha): float
+    - {static} _var_upper(values, alpha): float
+    - {static} _es_lower(values, alpha): float
+    - {static} _es_upper(values, alpha): float
+  }
+
+  ' ==========================================================
+  '  Analyzer Layer (Factory Pattern)
+  ' ==========================================================
+  abstract class BaseAssetAnalyzer {
+    # symbol: str
+    # start_date: str
+    # end_date: str
+    # analysis_column: str
+    # analysis_column_label: str
+    # limit_date: int
+    # next_n_working_days: int
+    # simulate_params: dict
+    # raw_data: pd.DataFrame
+    # calendar_data: pd.DataFrame
+    --
+    + {abstract} get_sql(symbol, start_date, end_date): str
+    + {abstract} get_asset_name(): str
+    + {static} _normalize_date(date_str): str
+    + fetch_data(): pd.DataFrame
+    + fetch_calendar(): pd.DataFrame
+    + get_future_working_days(last_date, n): List[str]
+    + get_analysis_returns(): pd.Series
+    + run(): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
+  }
+
+  class GoldAnalyzer {
+    -- 具体实现: COMEX黄金期货 --
+    + get_sql(symbol, start_date, end_date): str
+    + get_asset_name(): str
+  }
+
+  class AnalyzerFactory {
+    - {static} _registry: dict
+    --
+    + {static} register(symbol: str, analyzer_class: type)
+    + {static} create(symbol: str, **kwargs): BaseAssetAnalyzer
+    + {static} list_registered(): list
+  }
+
+  note right of AnalyzerFactory
+    <b>扩展新标的只需3步:</b>
+    1. class SilverAnalyzer(BaseAssetAnalyzer)
+    2. 实现 get_sql() 和 get_asset_name()
+    3. AnalyzerFactory.register('SI', SilverAnalyzer)
+  end note
+
+  ' ==========================================================
+  '  Result Aggregation Layer
+  ' ==========================================================
+  class ResultAggregator {
+    + {static} compute_ema(series, periods): pd.DataFrame
+    + {static} build_original_analysis(raw_data, risk_stats_list, ema_df, normal_segma, garch_segma, egarch_segma, step_num, analysis_column): pd.DataFrame
+    + {static} build_prediction_results(dates, predict_values, analysis_column): pd.DataFrame
+    + {static} merge_results(original_df, prediction_df): pd.DataFrame
+  }
+
+  note right of ResultAggregator
+    <b>输出3个DataFrame:</b>
+    1. 原始数据的分析 (21列)
+    2. 预测结果的分析 (3列)
+    3. 最终结果 (合并+排序)
+  end note
+
+  ' ==========================================================
+  '  Backtest Layer
+  ' ==========================================================
+  class BacktestEngine {
+    - symbol: str
+    - test_start_date: str
+    - test_end_date: str
+    - alpha: float
+    - limit_date: int
+    - distribution_types: list
+    - segma_calculation_type: str
+    --
+    + __init__(symbol, test_start_date, test_end_date, alpha, ...)
+    + run_backtest(): dict
+    + {static} kupiec_pof_test(violations, total, alpha): dict
+    + {static} recommend_distribution(results): str
+    + {static} plot_backtest_results(results)
+    + {static} plot_var_violations(result, title)
+  }
+
+  note right of BacktestEngine
+    <b>Kupiec POF 检验:</b>
+    · 2026年测试期
+    · 滚动窗口训练(limit_date天)
+    · 遍历所有分布类型
+    · 推荐最匹配的分布
+    · H0: 实际击穿率 = alpha
+    · LR_POF ~ χ²(1)
+  end note
+
+  ' ==========================================================
+  '  Visualization Layer
+  ' ==========================================================
+  class Visualizer {
+    + {static} plot_original_analysis(df, title, analysis_col_label)   <<图1>>
+    + {static} plot_volatility_analysis(df, title)                      <<图2>>
+    + {static} plot_prediction_results(df, title, analysis_col_label)   <<图3>>
+    + {static} plot_final_results(df, title, analysis_col_label)        <<图4>>
+    + {static} show_all(original_df, prediction_df, final_df, ...)
+    - {static} _parse_dates(df): pd.Series
+    - {static} _format_date_axis(ax, dates, is_datetime)
+  }
+
+  note bottom of Visualizer
+    <b>4张图:</b>
+    图1·原始数据分析 — trade_date(X), analysis_column(Y)
+       VAR上下限, ES上下限, average, median
+       EMA5, EMA10, EMA20, EMA60
+    图2·波动率分析 — trade_date(X)
+       normal_sigma, garch_sigma, egarch_sigma(Y)
+    图3·预测结果分析 — trade_date(X)
+       analysis_column(Y1), predict_value(Y2) 双Y轴
+    图4·最终结果 — trade_date(X)
+       历史analysis_column + 预测predict_value(Y)
+       EGARCH sigma(Y1轴) 双Y轴
+  end note
+
+  ' ==========================================================
+  '  Orchestrator
+  ' ==========================================================
+  class MonteCarloRunner {
+    - symbol: str
+    - start_date: str
+    - end_date: str
+    - analysis_column: str
+    - analysis_column_label: str
+    - limit_date: int
+    - next_n_working_days: int
+    - simulate_params: dict
+    - _analyzer: BaseAssetAnalyzer
+    - _original_df: pd.DataFrame
+    - _prediction_df: pd.DataFrame
+    - _final_df: pd.DataFrame
+    --
+    + __init__(symbol, start_date, end_date, ...)
+    + initialize(): void
+    + run_analysis(): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
+    + export_to_excel(output_dir): void
+    + run_and_export(output_dir): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
+    + run_backtest(test_start_date, test_end_date, distribution_types): dict
+    + plot_all(): void
+    + plot_original_analysis(): void
+    + plot_volatility_analysis(): void
+    + plot_prediction_results(): void
+    + plot_final_results(): void
+    - _build_filename(label, ext): str
+  }
+
+  note bottom of MonteCarloRunner
+    <b>一键执行流程: run_and_export() → plot_all()</b>
+    1. run_analysis()      → 蒙特卡罗模拟计算
+    2. export_to_excel()   → 输出3个Excel到 outbound/
+    3. plot_all()          → 绘制4张分析图
+
+    <b>Excel命名:</b>
+    Montcarlo_simulation_{标签}_{symbol}_{col}_{dist}_{sigma}_{start}_{end}.xlsx
+    标签: 原始数据 | 预测结果 | 最终结果
+
+    <b>回测流程:</b>
+    run_backtest('2026-01-01','2026-12-31') → Kupiec检验 → 分布推荐
+  end note
+
+}
+
+' ==========================================================
+'  Relationships
+' ==========================================================
+BaseAssetAnalyzer <|-- GoldAnalyzer
+AnalyzerFactory ..> BaseAssetAnalyzer : creates
+AnalyzerFactory ..> GoldAnalyzer : registers
+
+MonteCarloRunner --> AnalyzerFactory : creates via
+MonteCarloRunner --> BaseAssetAnalyzer : delegates to
+MonteCarloRunner --> MonteCarloEngine : uses
+MonteCarloRunner --> RiskMetrics : uses
+MonteCarloRunner --> ResultAggregator : uses
+MonteCarloRunner --> Visualizer : plots via
+MonteCarloRunner --> BacktestEngine : backtests via
+
+BaseAssetAnalyzer --> MonteCarloEngine : creates
+BaseAssetAnalyzer --> RiskMetrics : uses
+BaseAssetAnalyzer --> ResultAggregator : uses
+
+BacktestEngine --> BaseAssetAnalyzer : uses
+BacktestEngine --> MonteCarloEngine : uses
+
+MonteCarloEngine --> RiskMetrics : uses
+
+' ==========================================================
+'  Data flow (left to right)
+' ==========================================================
+note "Data Flow" as N1
+  <b>数据流:</b>
+  ClickHouse → BaseAssetAnalyzer.fetch_data()
+  → MonteCarloEngine.fit_distribution() + simulate()
+  → RiskMetrics → ResultAggregator → 3 DataFrames
+  → export_to_excel() → Excel files
+  → Visualizer → 4 charts
+  → BacktestEngine → Kupiec test + recommendation
+end note
+
+@enduml
