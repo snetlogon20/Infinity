@@ -33,11 +33,14 @@ class MonteCarloRandomManager:
     @classmethod
     def simulation_multi_series(cls, dataFrame, simulat_params, return_step_stats=False):
         monteCarloRandom = MonteCarloRandom()
-        return monteCarloRandom.simulation_multi_series(dataFrame, simulat_params, return_step_stats)
+        result = monteCarloRandom.simulation_multi_series(dataFrame, simulat_params, return_step_stats)
+        # result: (dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value,
+        #          [step_stats_list], es_lower_bound, es_upper_bound)
+        return result
 
     @classmethod
     def draw_plot(cls, all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value,
-                  step_stats_list=None):
+                  step_stats_list=None, es_lower_bound=None, es_upper_bound=None):
 
         S = stats["Init_Value"][0]
         times = simulat_params["times"]
@@ -80,6 +83,16 @@ class MonteCarloRandomManager:
         plt.axhline(y=median_value, color='green', linestyle='--', linewidth=2,
                     label=f'VaR MEDIAN ({alpha * 100:.0f}%): {median_value:.2f}')
 
+        # 添加ES下界
+        if es_lower_bound is not None:
+            plt.axhline(y=es_lower_bound, color='darkorange', linestyle='-.', linewidth=2,
+                        label=f'ES ({alpha * 100:.0f}%): {es_lower_bound:.2f}')
+
+        # 添加ES上界
+        if es_upper_bound is not None:
+            plt.axhline(y=es_upper_bound, color='darkred', linestyle='-.', linewidth=2,
+                        label=f'ES ({100 - alpha * 100:.0f}%): {es_upper_bound:.2f}')
+
         # 绘制逐步分位数曲线（step_stats_list）
         if step_stats_list and len(step_stats_list) > 0:
             steps = [s['step'] for s in step_stats_list]
@@ -96,6 +109,16 @@ class MonteCarloRandomManager:
                      marker='s', label='Step Average')
             plt.plot(steps, step_meds, color='purple', linestyle='-.', linewidth=2,
                      marker='d', label='Step Median')
+
+            # 绘制逐步ES曲线
+            if 'es_lower_bound' in step_stats_list[0]:
+                step_es_lowers = [s['es_lower_bound'] for s in step_stats_list]
+                plt.plot(steps, step_es_lowers, color='darkorange', linestyle='-.', linewidth=2,
+                         marker='v', label='Step ES Lower')
+            if 'es_upper_bound' in step_stats_list[0]:
+                step_es_uppers = [s['es_upper_bound'] for s in step_stats_list]
+                plt.plot(steps, step_es_uppers, color='darkred', linestyle='-.', linewidth=2,
+                         marker='^', label='Step ES Upper')
 
         plt.xlabel('Time Step')
         plt.ylabel('Value')

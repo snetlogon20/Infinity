@@ -211,7 +211,7 @@ class QuickInquiryManagerTest:
         }
         #all_line_df = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         #all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
 

@@ -41,8 +41,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'normal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_normal", "xlsx")
@@ -64,13 +64,281 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
         return all_line_df
+
+    def test_multi_series_historical_distribution_citi_pctchange_rolling(self):
+        """多线模拟 - Historical Distribution - Citi (花旗股票) - pct_change - Rolling"""
+        monteCarloRandomManager = MonteCarloRandomManager()
+        inquiryManager = InquiryManager()
+
+        start_date = datetime.strptime('2025-01-01', '%Y-%m-%d')
+        formatted_start_date = start_date.strftime('%Y-%m-%d')
+        end_date = CommonParameters.today
+
+        analysis_column = 'pct_change'
+        analysis_column_label = '涨跌幅'
+        limit_date = 600
+        next_n_working_days = 5
+
+        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'es_lower_bound', 'es_upper_bound', 'average', 'median_value'])
+        sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='C' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        original_dataFrame = inquiryManager.get_sql_dataset(sql)
+        original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame_citi_pctchange.xlsx")
+
+        sql = f"select trade_date from indexsysdb.df_tushare_us_stock_daily where ts_code='C' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        loop_date_dataFrame = inquiryManager.get_sql_dataset(sql)
+
+        sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='C' and trade_date>='{formatted_start_date}' order by trade_date "
+        past_calendar_dataFrame = inquiryManager.get_sql_dataset(sql)
+
+        for index, row in loop_date_dataFrame.iterrows():
+            current_date = row['trade_date']
+            sample_end_date = current_date
+
+            print(f"formatted_start_date: {formatted_start_date}")
+            print(f"current_date: {current_date}")
+            print(f"end_date: {end_date}")
+            print(f"sample_end_date: {sample_end_date}")
+
+            formatted_date = current_date
+
+            print(f"Processing date: {formatted_date}")
+            sql = f"""
+                    select *
+                    from 
+                    (
+                        select 
+                            trade_date,
+                            open_point as open,
+                            close_point as close,
+                            low_point as low,
+                            high_point as high,
+                            pct_change 
+                        from indexsysdb.df_tushare_us_stock_daily
+                        where ts_code = 'C' and trade_date <= '{sample_end_date}'
+                    order by trade_date desc
+                    limit {limit_date}
+                    )
+                    order by trade_date
+                """
+            print(sql)
+
+            dataFrame = inquiryManager.get_sql_dataset(sql)
+
+            if dataFrame.empty:
+                print(f"No data found for date: {formatted_date}")
+                current_date += timedelta(days=1)
+                continue
+
+            simulat_params = {
+                'init_value': 'pct_change',
+                'analysis_column': 'pct_change',
+                't': 0.01,
+                'times': next_n_working_days,
+                'series': 5000,
+                'alpha': 0.05,
+                'distribution_type': 'historical'
+            }
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+
+            calendarService = CalendarService()
+            last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
+                         (past_calendar_dataFrame, current_date, next_n_working_days))
+            print(f"current_date:{current_date}, last date: {last_date} ============================================================> ")
+            if last_date is None:
+                print(f"No next working day found for date: {current_date}")
+
+            new_row = pd.DataFrame([{
+                'trade_date': formatted_date,
+                'predict_date': last_date,
+                'var_lower_bound': var_lower_bound,
+                'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
+                'average': average,
+                'median_value': median_value
+            }])
+            print(new_row)
+            results_df = pd.concat([results_df, new_row], ignore_index=True)
+
+            if current_date > end_date:
+                print(f"current_date: {current_date}")
+                print(f"end_date: {end_date}")
+                break
+
+        print(results_df)
+
+        monteCarloRandomAssistant = MonteCarloRandomAssistant()
+        final_result = monteCarloRandomAssistant.generate_forecast_dataframes(original_dataFrame, results_df)
+
+        final_result_copy = monteCarloRandomAssistant.select_required_columns(final_result, analysis_column)
+
+        # 预计算 EMA 列，确保写入 Excel
+        monteCarloRandomAssistant.add_ema_columns(final_result_copy, [analysis_column])
+
+        monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
+
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='Citi')
+
+        return
+
+    def test_multi_series_lognormal_distribution_citi_pctchang_rolling(
+            self,
+            symbol='C',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='pct_change',
+            analysis_column_label='涨跌幅',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'C'  # 交易标的代码：花旗股票
+        start_date = '2026-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'pct_change'  # 分析列名：涨跌幅
+        analysis_column_label = '涨跌幅'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'pct_change',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': next_n_working_days,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'lognormal'  # 使用对数正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        get_trade_date_sql = f"select trade_date from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        get_past_calendar_sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' order by trade_date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        trade_date,
+                        open_point as open,
+                        close_point as close,
+                        low_point as low,
+                        high_point as high,
+                        pct_change
+                    from indexsysdb.df_tushare_us_stock_daily
+                    where ts_code = '{symbol}' and trade_date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：花旗股票
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：涨跌幅
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (lognormal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
+
+    def test_multi_series_normal_distribution_citi_pctchang_rolling(
+            self,
+            symbol='C',
+            start_date='2025-04-01',
+            end_date=None,
+            analysis_column='pct_change',
+            analysis_column_label='涨跌幅',
+            limit_date=600,
+            next_n_working_days=5,
+            monte_carlo_params=None,
+            output_path=None,
+            get_original_data_sql=None,
+            get_trade_date_sql=None,
+            get_past_calendar_sql=None,
+            monteCarlo_simulation_sql_template=None
+
+    ):
+        symbol = 'C'  # 交易标的代码：花旗股票
+        start_date = '2025-04-01'  # 开始日期
+        end_date = CommonParameters.today  # 结束日期：None 表示使用今天
+        analysis_column = 'pct_change'  # 分析列名：涨跌幅
+        analysis_column_label = '涨跌幅'  # 分析列标签
+        limit_date = 600  # 滚动窗口历史数据天数
+        next_n_working_days = 5  # 预测未来工作日天数
+
+        simulate_params = {
+            'init_value': 'pct_change',
+            'analysis_column': 'pct_change',
+            't': 0.01,
+            'times': next_n_working_days,
+            'series': 5000,
+            'alpha': 0.05,
+            'distribution_type': 'normal'  # 使用正态分布
+        }
+
+        start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        formatted_start_date = start_date_dt.strftime('%Y-%m-%d')
+        get_original_data_sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        get_trade_date_sql = f"select trade_date from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' and trade_date<='{end_date}' order by trade_date "
+        get_past_calendar_sql = f"select trade_date, open_point as open, close_point as close, low_point as low, high_point as high, pct_change from indexsysdb.df_tushare_us_stock_daily where ts_code='{symbol}' and trade_date>='{formatted_start_date}' order by trade_date "
+
+        monteCarlo_simulation_sql_template = """
+                select *
+                from
+                (
+                    select
+                        trade_date,
+                        open_point as open,
+                        close_point as close,
+                        low_point as low,
+                        high_point as high,
+                        pct_change
+                    from indexsysdb.df_tushare_us_stock_daily
+                    where ts_code = '{symbol}' and trade_date <= '{sample_end_date}'
+                order by trade_date desc
+                limit {limit_date}
+                )
+                order by trade_date
+            """
+
+        final_result, results_df, original_df = monteCarloTest.test_multi_series_historical_rolling(
+            symbol=symbol,  # 交易标的代码：花旗股票
+            start_date=start_date,  # 开始日期
+            end_date=None,  # 结束日期：None 表示使用今天
+            analysis_column=analysis_column,  # 分析列名：涨跌幅
+            analysis_column_label=analysis_column_label,  # 分析列标签
+            limit_date=limit_date,  # 滚动窗口历史数据天数
+            next_n_working_days=next_n_working_days,  # 预测未来工作日天数
+            monte_carlo_params=simulate_params,  # 蒙特卡洛模拟参数 (normal)
+            output_path=None,  # Excel 输出路径：None 表示自动生成
+            get_original_data_sql=get_original_data_sql,  # 获取原始数据的 SQL 模板：None 使用默认
+            get_trade_date_sql=get_trade_date_sql,  # 获取交易日期的 SQL 模板：None 使用默认
+            get_past_calendar_sql=get_past_calendar_sql,  # 获取历史日历的 SQL 模板：None 使用默认
+            monteCarlo_simulation_sql_template=monteCarlo_simulation_sql_template
+        )
 
     def test_multi_series_lognormal_distribution_jpm(self):
         """多线模拟 - LogNormal Distribution - 摩根股票"""
@@ -87,8 +355,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
@@ -110,8 +378,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
@@ -133,8 +401,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
@@ -160,8 +428,8 @@ class MonteCarloRandomTest:
         dataFrame = inquiryManager.get_tushare_stock_dataset(simulat_params['market'], simulat_params['stock'], simulat_params['start_date'],
                                      simulat_params['end_date'])
 
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
         all_line_df.to_excel(file_full_name)
@@ -270,9 +538,9 @@ class MonteCarloRandomTest:
             dataFrame = inquiryManager.get_tushare_stock_dataset(simulat_params['market'], simulat_params['stock'],
                                                             simulat_params['start_date'],
                                                             simulat_params['end_date'])
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(
                 dataFrame, simulat_params)
-            monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+            monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
             # 写入excel
             file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
             all_line_df.to_excel(file_full_name)
@@ -305,7 +573,7 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
@@ -341,7 +609,7 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'historical'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
@@ -367,7 +635,7 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 10
 
-        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'es_lower_bound', 'es_upper_bound', 'average', 'median_value'])
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_spot_hist_sge where date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
         original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame.xlsx")
@@ -430,7 +698,7 @@ class MonteCarloRandomTest:
                 'alpha': 0.30,
                 'distribution_type': 'historical'  # normal/lognormal/historical
             }
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
             calendarService = CalendarService()
             last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
@@ -445,6 +713,8 @@ class MonteCarloRandomTest:
                 'predict_date': last_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
@@ -477,7 +747,7 @@ class MonteCarloRandomTest:
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='SGE')
 
         return
 
@@ -508,7 +778,7 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
@@ -543,7 +813,7 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'historical'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
         monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
@@ -565,7 +835,7 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 10
 
-        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'es_lower_bound', 'es_upper_bound', 'average', 'median_value'])
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_spot_hist_sge where date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
         original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame.xlsx")
@@ -624,7 +894,7 @@ class MonteCarloRandomTest:
                 'alpha': 0.30,
                 'distribution_type': 'historical'
             }
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
             calendarService = CalendarService()
             last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
@@ -638,6 +908,8 @@ class MonteCarloRandomTest:
                 'predict_date': last_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
@@ -661,7 +933,7 @@ class MonteCarloRandomTest:
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='SGE')
 
         return
 
@@ -787,7 +1059,7 @@ class MonteCarloRandomTest:
                 continue
 
             # Step 2.3 设置蒙特卡洛模拟参数（return_step_stats=True 获取逐步分位数统计）
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list = monteCarloRandomManager.simulation_multi_series(
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(
                 dataFrame, simulat_params, return_step_stats=True)
 
             # Step 2.4 计算 predict_date = 当前日期 + n 工作日，
@@ -817,6 +1089,8 @@ class MonteCarloRandomTest:
                         'step_num': step_num,
                         'var_lower_bound': step_stat['var_lower_bound'],
                         'var_upper_bound': step_stat['var_upper_bound'],
+                        'es_lower_bound': step_stat['es_lower_bound'],
+                        'es_upper_bound': step_stat['es_upper_bound'],
                         'average': step_stat['average'],
                         'median_value': step_stat['median_value']
                     }])
@@ -832,6 +1106,8 @@ class MonteCarloRandomTest:
                     'step_num': next_n_working_days,
                     'var_lower_bound': var_lower_bound,
                     'var_upper_bound': var_upper_bound,
+                    'es_lower_bound': es_lower_bound,
+                    'es_upper_bound': es_upper_bound,
                     'average': average,
                     'median_value': median_value
                 }])
@@ -858,7 +1134,7 @@ class MonteCarloRandomTest:
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         # Step 2.8 画图
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name=symbol)
 
         return final_result_copy, results_df, original_dataFrame
 
@@ -1233,7 +1509,7 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 5
 
-        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'es_lower_bound', 'es_upper_bound', 'average', 'median_value'])
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='GC' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
         original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame_GC_pctchange.xlsx")
@@ -1292,7 +1568,7 @@ class MonteCarloRandomTest:
                 'alpha': 0.05,
                 'distribution_type': 'historical'
             }
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
             calendarService = CalendarService()
             last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
@@ -1306,6 +1582,8 @@ class MonteCarloRandomTest:
                 'predict_date': last_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
@@ -1329,7 +1607,7 @@ class MonteCarloRandomTest:
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='GC')
 
         return
 
@@ -1569,7 +1847,7 @@ class MonteCarloRandomTest:
                 'alpha': 0.05,
                 'distribution_type': 'historical'
             }
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(
                 dataFrame, simulat_params)
 
             calendarService = CalendarService()
@@ -1587,6 +1865,8 @@ class MonteCarloRandomTest:
                 'predict_date': last_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
@@ -1614,7 +1894,7 @@ class MonteCarloRandomTest:
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='XAG')
 
         return
 
@@ -1632,7 +1912,7 @@ class MonteCarloRandomTest:
         limit_date = 600
         next_n_working_days = 5
 
-        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'average', 'median_value'])
+        results_df = pd.DataFrame(columns=['trade_date', 'var_lower_bound', 'var_upper_bound', 'es_lower_bound', 'es_upper_bound', 'average', 'median_value'])
         sql = f"select date as trade_date,open,close,low,high,pct_change from indexsysdb.df_akshare_futures_foreign_hist where symbol='XAG' and date>='{formatted_start_date}' and date<='{end_date}' order by date "
         original_dataFrame = inquiryManager.get_sql_dataset(sql)
         original_dataFrame.to_excel(rf"D:\workspace_python\infinity_data\data\outbound\original_dataFrame_XAG_pctchange.xlsx")
@@ -1691,7 +1971,7 @@ class MonteCarloRandomTest:
                 'alpha': 0.05,
                 'distribution_type': 'historical'
             }
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
 
             calendarService = CalendarService()
             last_date = (calendarService.find_data_by_given_dataframe_and_date_offset
@@ -1705,6 +1985,8 @@ class MonteCarloRandomTest:
                 'predict_date': last_date,
                 'var_lower_bound': var_lower_bound,
                 'var_upper_bound': var_upper_bound,
+                'es_lower_bound': es_lower_bound,
+                'es_upper_bound': es_upper_bound,
                 'average': average,
                 'median_value': median_value
             }])
@@ -1728,7 +2010,7 @@ class MonteCarloRandomTest:
 
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name='XAG')
 
         return
 
@@ -1747,8 +2029,8 @@ class MonteCarloRandomTest:
             'alpha': 0.05,
             'distribution_type': 'lognormal'  # normal/lognormal/historical
         }
-        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
-        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound)
+        all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(dataFrame, simulat_params)
+        monteCarloRandomManager.draw_plot(all_lines, simulat_params, stats, var_lower_bound, var_upper_bound, average, median_value)
 
         # 写入excel
         file_full_name = FileUtility.get_full_filename_by_timestamp("Montcarlo_simulation_lognormal", "xlsx")
@@ -1924,7 +2206,7 @@ class MonteCarloRandomTest:
                 continue
 
             # Step 2.3 设置蒙特卡洛模拟参数（return_step_stats=True 获取逐步分位数统计）
-            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list = monteCarloRandomManager.simulation_multi_series(
+            all_line_df, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list, es_lower_bound, es_upper_bound = monteCarloRandomManager.simulation_multi_series(
                 dataFrame, simulat_params, return_step_stats=True)
 
             # Step 2.4 计算 predict_date = 当前日期 + n 工作日，
@@ -1954,6 +2236,8 @@ class MonteCarloRandomTest:
                         'step_num': step_num,
                         'var_lower_bound': step_stat['var_lower_bound'],
                         'var_upper_bound': step_stat['var_upper_bound'],
+                        'es_lower_bound': step_stat['es_lower_bound'],
+                        'es_upper_bound': step_stat['es_upper_bound'],
                         'average': step_stat['average'],
                         'median_value': step_stat['median_value']
                     }])
@@ -1969,6 +2253,8 @@ class MonteCarloRandomTest:
                     'step_num': next_n_working_days,
                     'var_lower_bound': var_lower_bound,
                     'var_upper_bound': var_upper_bound,
+                    'es_lower_bound': es_lower_bound,
+                    'es_upper_bound': es_upper_bound,
                     'average': average,
                     'median_value': median_value
                 }])
@@ -2001,7 +2287,7 @@ class MonteCarloRandomTest:
         monteCarloRandomAssistant.save_file_to_excel(final_result_copy)
 
         # Step 2.8 画图
-        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label)
+        monteCarloRandomAssistant.draw_plot(final_result_copy, analysis_column, analysis_column_label, stock_name=symbol)
         # Step 2.9 绘制预测差距折线图
         self.plot_predict_gap_chart(final_result_copy)
 
@@ -2131,6 +2417,12 @@ if __name__ == "__main__":
     # monteCarloTest.test_multi_series_lognormal_distribution_lvcw()
     # monteCarloTest.test_multi_stock_multi_series_lognormal_distribution()
 
+
+    # Citi-pctchange * 3 (normal/lognormal/historical)
+    # monteCarloTest.test_multi_series_normal_distribution_citi_pctchang_rolling()
+    monteCarloTest.test_multi_series_lognormal_distribution_citi_pctchang_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_citi_pctchange_rolling()
+
     """
     用不同方式对上海金价进行分析， lognormal/historical/historical_rolling
     """
@@ -2159,14 +2451,15 @@ if __name__ == "__main__":
     # GC-pctchange * 3 (normal/lognormal/historical)
     # monteCarloTest.test_multi_series_normal_distribution_GC_pctchang_rolling()
     # monteCarloTest.test_multi_series_lognormal_distribution_GC_pctchang_rolling()
-    monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_GC_pctchange_rolling()
 
-    ## XAU-history * 3 (normal/lognormal/historical)
+    # XAU-history * 3 (normal/lognormal/historical)
     # monteCarloTest.test_multi_series_historical_distribution_XAU_rolling()
-    # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
     # monteCarloTest.test_multi_series_historical_distribution_XAU_pctchange_rolling()
-    # monteCarloTest.test_multi_series_historical_distribution_XAG_pctchange_rolling()
 
+    # XAG-history * 3 (normal/lognormal/historical)
+    # monteCarloTest.test_multi_series_historical_distribution_XAG_rolling()
+    # monteCarloTest.test_multi_series_historical_distribution_XAG_pctchange_rolling()
 
     """
         美国债

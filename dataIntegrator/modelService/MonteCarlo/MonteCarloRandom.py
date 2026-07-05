@@ -128,6 +128,15 @@ class MonteCarloRandom:
         upper_alpha = 1 - alpha
         var_upper_index = int(upper_alpha * series)
         var_upper_bound = final_values[var_upper_index]
+        # ===== 计算ES (Expected Shortfall / CVaR) =====
+        # 下界ES：所有小于VaR_lower的值的平均值（左侧尾部期望损失）
+        es_lower_values = final_values[:var_index]
+        es_lower_bound = sum(es_lower_values) / len(es_lower_values) if len(es_lower_values) > 0 else var_lower_bound
+
+        # 上界ES：所有大于VaR_upper的值的平均值（右侧尾部期望收益）
+        es_upper_values = final_values[var_upper_index:]
+        es_upper_bound = sum(es_upper_values) / len(es_upper_values) if len(es_upper_values) > 0 else var_upper_bound
+
         # 计算均数和中位数（终值）
         average = sum(final_values) / len(final_values)
         median_value = statistics.median(final_values)
@@ -138,17 +147,23 @@ class MonteCarloRandom:
             vals = sorted(step_values[step_idx])
             n = len(vals)
             if n > 0:
+                step_var_lower = vals[int(alpha * n)]
+                step_var_upper = vals[int((1 - alpha) * n)]
+                step_es_lower_vals = vals[:int(alpha * n)]
+                step_es_upper_vals = vals[int((1 - alpha) * n):]
                 step_stats_list.append({
                     'step': step_idx + 1,
-                    'var_lower_bound': vals[int(alpha * n)],
-                    'var_upper_bound': vals[int((1 - alpha) * n)],
+                    'var_lower_bound': step_var_lower,
+                    'var_upper_bound': step_var_upper,
+                    'es_lower_bound': sum(step_es_lower_vals) / len(step_es_lower_vals) if len(step_es_lower_vals) > 0 else step_var_lower,
+                    'es_upper_bound': sum(step_es_upper_vals) / len(step_es_upper_vals) if len(step_es_upper_vals) > 0 else step_var_upper,
                     'average': sum(vals) / n,
                     'median_value': vals[n // 2]
                 })
 
         if return_step_stats:
-            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list
+            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, step_stats_list, es_lower_bound, es_upper_bound
         else:
-            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value
+            return dataFrame, all_lines, stats, var_lower_bound, var_upper_bound, average, median_value, es_lower_bound, es_upper_bound
 
 
