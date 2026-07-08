@@ -37,10 +37,34 @@ class AkShareStockYjbbEmService(AkShareService):
         try:
             # 将任意日期归一化到最近的季报日期，防止非季报日期传给API导致返回None
             report_date = self._normalizeToLatestReportDate(date)
-            if report_date != date:
-                logger.info(f"将日期 {date} 归一化为最近季报日期: {report_date}")
 
-            dataFrame = self.ak.stock_yjbb_em(date=report_date)
+            # 若最新季报尚未发布，逐季回退直至获取到数据（最多回退4个季度）
+            dataFrame = None
+            max_retries = 4
+            for attempt in range(max_retries):
+                if report_date != date or attempt > 0:
+                    logger.info(f"尝试查询季报日期: {report_date}")
+                try:
+                    dataFrame = self.ak.stock_yjbb_em(date=report_date)
+                    if dataFrame is not None and not dataFrame.empty:
+                        break
+                except TypeError:
+                    # akshare 内部 data_json["result"] 为 None 时会抛出 TypeError
+                    logger.warning(f"季报日期 {report_date} 数据未发布，回退前一季度...")
+                # 回退到前一季度
+                dt = datetime.strptime(report_date, '%Y%m%d')
+                if dt.month <= 3:
+                    dt = datetime(dt.year - 1, 12, 31)
+                elif dt.month <= 6:
+                    dt = datetime(dt.year, 3, 31)
+                elif dt.month <= 9:
+                    dt = datetime(dt.year, 6, 30)
+                else:
+                    dt = datetime(dt.year, 9, 30)
+                report_date = dt.strftime('%Y%m%d')
+            else:
+                raise ValueError(f"AKShare stock_yjbb_em 连续 {max_retries} 个季度均无数据，请检查数据源")
+
             dataFrame.columns = [
                 'seq',
                 'stock_code',

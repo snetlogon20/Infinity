@@ -457,8 +457,8 @@ class AkShareServiceManager():
             self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
             self.callAllAkShareStockUsDailyService(adjust='')
             self.callAkShareBondCbJslService()
-            self.callAkShareStockYjbbEmService(date=end_date)
             self.callAllAkShareFinancialDataIndicatorService(start_year="2020")
+            self.callAkShareStockYjbbEmService(date=end_date)
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)
