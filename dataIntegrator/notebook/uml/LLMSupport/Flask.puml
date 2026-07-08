@@ -1,0 +1,38 @@
+@startuml
+
+class RAGFactory {
+  +run_rag_inquiry(agent_name: str, agent_type: str, question: str, knowledge_base_file_path: str, prompt_file_path: str): dict
+}
+
+class RAG_SQL_inquiry_stock_summary_service {
+  +RAG_SQL_inquiry_stock_summary_service_fetch(agent_type: str, question: str): dict
+}
+
+class FlaskService {
+  -app: Flask
+  -response_dict: dict
+  +__init__(): None
+  +register_routes(): None
+  +RAG_SQL_inquiry_stock_summary(): Response
+  +RAG_SQL_inquiry_portfolio_volatility(): Response
+  +run(): None
+}
+
+class RAG_SQL_inquiry_portfolio_volatility_service {
+  +RAG_SQL_inquiry_portfolio_volatility_fetch(agent_type: str, question: str, response_dict: dict): (dict, str)
+}
+
+class PortfolioVolatilityCalculator {
+  -weight_a: float
+  -weight_b: float
+  -portfolio_data: DataFrame
+  +test_portfolio_volatility_with_any_pair(response_dict: dict): dict
+}
+
+RAG_SQL_inquiry_stock_summary_service --> RAGFactory: uses >
+FlaskService --> RAG_SQL_inquiry_stock_summary_service: uses >
+FlaskService --> RAG_SQL_inquiry_portfolio_volatility_service: uses >
+RAG_SQL_inquiry_portfolio_volatility_service --> RAGFactory: uses >
+RAG_SQL_inquiry_portfolio_volatility_service --> PortfolioVolatilityCalculator: uses >
+
+@enduml

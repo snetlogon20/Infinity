@@ -1,0 +1,1 @@
+C:\Users\ASUS\Anaconda3\envs\py312\Scripts\streamlit.exe run D:\workspace_python\infinity\dataIntegrator\LLMSuport\StreamLit\SteamLitManager\StreamLitManager.py

@@ -1,0 +1,336 @@
+你是一个资深的 python 专家和 click house 专家，请帮助我完成这个代码。
+
+我给你以下模板：
+
+AkShareService.py：AkShareService 的父类
+df_akshare_spot_hist_sge.sql：专门定义df_akshare_spot_hist_sge这张数据表的SQL
+AkShareSpotHistSGEService.py:继承了AkShareService，然后专门针对df_akshare_spot_hist_sge这张数据表进行操作
+AkShareSpotHistSGEServiceTest.py：AkShareSpotHistSGEService 的测试类
+
+现在我需要你根据以上模板， 根据以下接口的定义
+1. 接口名称：stock_financial_analysis_indicator
+
+接口: stock_financial_analysis_indicator
+
+目标地址: https://money.finance.sina.com.cn/corp/go.php/vFD_FinancialGuideLine/stockid/600004/ctrl/2019/displaytype/4.phtml
+
+描述: 获取新浪财经-财务分析-财务指标
+
+限量: 单次获取财务指标所有历史数据
+调用方式
+
+        self.df = ak.stock_financial_analysis_indicator(
+            symbol=self.symbol,
+            start_year=self.start_year
+        )
+
+
+
+名称
+类型
+描述
+date
+datetime64
+报告期
+diluted_eps
+String
+摊薄每股收益(元)
+weighted_eps
+String
+加权每股收益(元)
+adjusted_eps
+String
+每股收益_调整后(元)
+deducted_eps
+String
+扣除非经常性损益后的每股收益(元)
+net_asset_per_share_before_adj
+String
+每股净资产_调整前(元)
+net_asset_per_share_after_adj
+String
+每股净资产_调整后(元)
+operating_cash_flow_per_share
+String
+每股经营性现金流(元)
+capital_reserve_per_share
+String
+每股资本公积金(元)
+retained_earnings_per_share
+String
+每股未分配利润(元)
+adjusted_net_asset_per_share
+String
+调整后的每股净资产(元)
+total_asset_margin
+String
+总资产利润率(%)
+main_business_margin
+String
+主营业务利润率(%)
+roa
+String
+总资产净利润率(%)
+cost_profit_margin
+String
+成本费用利润率(%)
+operating_profit_margin
+String
+营业利润率(%)
+main_cost_ratio
+String
+主营业务成本率(%)
+net_sales_margin
+String
+销售净利率(%)
+equity_return_rate
+String
+股本报酬率(%)
+roe_return
+String
+净资产报酬率(%)
+asset_return_rate
+String
+资产报酬率(%)
+gross_margin
+String
+销售毛利率(%)
+three_fee_ratio
+String
+三项费用比重
+non_main_ratio
+String
+非主营比重
+main_profit_ratio
+String
+主营利润比重
+dividend_payout_ratio
+String
+股息发放率(%)
+investment_return_ratio
+String
+投资收益率(%)
+main_profit_amount
+String
+主营业务利润(元)
+roe
+String
+净资产收益率(%)
+weighted_roe
+String
+加权净资产收益率(%)
+deducted_net_profit
+String
+扣除非经常性损益后的净利润(元)
+main_income_growth_rate
+String
+主营业务收入增长率(%)
+net_profit_growth_rate
+String
+净利润增长率(%)
+net_asset_growth_rate
+String
+净资产增长率(%)
+total_asset_growth_rate
+String
+总资产增长率(%)
+receivables_turnover
+String
+应收账款周转率(次)
+receivables_turnover_days
+String
+应收账款周转天数(天)
+inventory_turnover_days
+String
+存货周转天数(天)
+inventory_turnover
+String
+存货周转率(次)
+fixed_asset_turnover
+String
+固定资产周转率(次)
+total_asset_turnover
+String
+总资产周转率(次)
+total_asset_turnover_days
+String
+总资产周转天数(天)
+current_asset_turnover
+String
+流动资产周转率(次)
+current_asset_turnover_days
+String
+流动资产周转天数(天)
+equity_turnover
+String
+股东权益周转率(次)
+current_ratio
+String
+流动比率
+quick_ratio
+String
+速动比率
+cash_ratio
+String
+现金比率(%)
+interest_coverage
+String
+利息支付倍数
+long_debt_to_working_capital_ratio
+String
+长期债务与营运资金比率(%)
+equity_ratio
+String
+股东权益比率(%)
+long_term_liability_ratio
+String
+长期负债比率(%)
+equity_to_fixed_assets_ratio
+String
+股东权益与固定资产比率(%)
+liabilities_to_equity_ratio
+String
+负债与所有者权益比率(%)
+long_assets_to_long_funds_ratio
+String
+长期资产与长期资金比率(%)
+capitalization_ratio
+String
+资本化比率(%)
+fixed_asset_net_value_ratio
+String
+固定资产净值率(%)
+capital_fixed_ratio
+String
+资本固定化比率(%)
+debt_to_equity_ratio
+String
+产权比率(%)
+liquidation_value_ratio
+String
+清算价值比率(%)
+fixed_asset_ratio
+String
+固定资产比重(%)
+asset_liability_ratio
+String
+资产负债率(%)
+total_assets
+String
+总资产(元)
+operating_cash_flow_to_sales_ratio
+String
+经营现金净流量对销售收入比率(%)
+operating_cash_flow_roa
+String
+资产的经营现金流量回报率(%)
+operating_cash_flow_to_net_profit_ratio
+String
+经营现金净流量与净利润的比率(%)
+operating_cash_flow_to_liability_ratio
+String
+经营现金净流量对负债比率(%)
+cash_flow_ratio
+String
+现金流量比率(%)
+short_stock_investment
+String
+短期股票投资(元)
+short_bond_investment
+String
+短期债券投资(元)
+short_other_operating_investment
+String
+短期其它经营性投资(元)
+long_stock_investment
+String
+长期股票投资(元)
+long_bond_investment
+String
+长期债券投资(元)
+long_other_operating_investment
+String
+长期其它经营性投资(元)
+receivables_within_1y
+String
+1年以内应收帐款(元)
+receivables_within_1_2y
+String
+1-2年以内应收帐款(元)
+receivables_within_2_3y
+String
+2-3年以内应收帐款(元)
+receivables_within_3y
+String
+3年以内应收帐款(元)
+prepayments_within_1y
+String
+1年以内预付货款(元)
+prepayments_within_1_2y
+String
+1-2年以内预付货款(元)
+prepayments_within_2_3y
+String
+2-3年以内预付货款(元)
+prepayments_within_3y
+String
+3年以内预付货款(元)
+other_receivables_within_1y
+String
+1年以内其它应收款(元)
+other_receivables_within_1_2y
+String
+1-2年以内其它应收款(元)
+other_receivables_within_2_3y
+String
+2-3年以内其它应收款(元)
+other_receivables_within_3y
+String
+3年以内其它应收款(元)
+
+接口示例
+
+代码语言：python
+AI代码解释
+import akshare as ak
+stock_financial_analysis_indicator_df = ak.stock_financial_analysis_indicator(stock="600004")
+print(stock_financial_analysis_indicator_df)
+
+数据示例
+
+代码语言：javascript
+AI代码解释
+           摊薄每股收益(元) 加权每股收益(元)  ... 2-3年以内其它应收款(元) 3年以内其它应收款(元)
+2020-03-31   -0.0307     -0.03  ...             --           --
+2019-12-31    0.5106      0.48  ...     5514408.82           --
+2019-09-30    0.2971      0.28  ...             --           --
+2019-06-30    0.2175      0.21  ...             --           --
+2019-03-31    0.1185      0.11  ...             --           --
+              ...       ...  ...            ...          ...
+2003-03-31      0.12        --  ...             --           --
+2002-12-31      0.48        --  ...     1570549.33           --
+2002-06-30      0.23        --  ...             --           --
+2001-12-31      0.49        --  ...             --           --
+2000-12-31      0.33        --  ...             --           --
+
+完成以下任务：
+1. 按照 SQL template，参考 df_akshare_spot_hist_sge.sql 生成 clickhouse 语法建表的语句。
+    表名：indexsysdb.接口名
+    object 在clickhouse中是 string
+    int64 在clickhouse中是 Int64
+    float64 在clickhouse中是 Float64
+    字段名参考接口中字段名()中的英文
+2. 按照 AkShareSpotHistSGEService，生成AkShare接口名Service
+    字段名参考接口中字段名()中的英文
+3. 按照 AkShareSpotHistSGEServiceTest，生成AkShare接口名ServiceTest
+    字段名参考接口中字段名()中的英文
+4. 按照 AkShareMacroChinaShrzgmServiceTest, 和 AkShareServiceManager.callAkShareFuturesForeignHistService 生成相关的代码
+    字段名参考接口中字段名()中的英文
+
+注意事项
+1. 需要考虑修改 import 的部分。
+    比如 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService1
+    需要改成from dataIntegrator.AKShareService.AkShareFDIService import AkShareFDIService
+2. 需要根据接口示例中的api调用说明，修改prepareDataFrame中的接口调用
+3. 注意 self.deleteAkDateFromClickHouse() 中传入的参数是根据上下文拼接的 del_sql
+4. 在 prepareDataFrame 中可以满足3中接口的不同方式，且能够从外部参数 symbol
