@@ -24,6 +24,7 @@ from dataIntegrator.analysisService.report.financialAnalysis.RunShiborForwardRat
 from dataIntegrator.analysisService.report.financialAnalysis.RunPDAnalysisReport import RunPDAnalysisReport
 from dataIntegrator.analysisService.report.bonds.RunConvertibleBondManagerReport import RunConvertibleBondManagerReport
 from dataIntegrator.analysisService.report.bonds.RunBondYieldComparator import RunBondYieldComparator
+from dataIntegrator.analysisService.report.systemSupport.RunSystemBatchStatusReport import RunSystemBatchStatusReport
 
 logger = CommonLib.logger
 
@@ -46,6 +47,7 @@ class ReportRunner:
         self._convertible_bond_runner = RunConvertibleBondManagerReport()
         self._bond_yield_runner = RunBondYieldComparator()
         self._pd_runner = RunPDAnalysisReport()
+        self._system_batch_status_runner = RunSystemBatchStatusReport()
 
     def run_all_reports(self):
         """工厂模式：按 run_reports.bat 顺序统一调用所有报告"""
@@ -59,7 +61,7 @@ class ReportRunner:
                 "CML Analysis With Commodities Report":          self._cml_commodities_runner.run,
                 "Information Ratio Analysis Report":             self._ir_runner.run,
                 "PD Analysis Report":                            self._pd_runner.run,
-                "Portfolio Analysis Report":                    self._portfolio_analysis_runner.run,
+                # "Portfolio Analysis Report":                    self._portfolio_analysis_runner.run,
                 "Portfolio Metrics Analysis Report":             self._portfolio_metrics_runner.run,
                 "SHIBOR Forward Rate Analysis Report":           self._shibor_runner.run,
                 "SML Analysis Report":                           self._sml_runner.run,
@@ -67,6 +69,8 @@ class ReportRunner:
                 "Treynor Ratio Analysis Report":                 self._treynor_runner.run,
                 "Bond Yield Comparator Report":                  self._bond_yield_runner.run,
                 "Convertible Bond Manager Report":               self._convertible_bond_runner.run,
+                #永远把System Batch Status Report放在最后面跑
+                "System Batch Status Report":                    self._system_batch_status_runner.generate_report,
             }
 
             failed_reports = []
