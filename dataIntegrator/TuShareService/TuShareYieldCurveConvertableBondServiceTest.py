@@ -1,7 +1,6 @@
 import time
 import os
 
-import pandas
 
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 from dataIntegrator import CommonLib, CommonParameters
