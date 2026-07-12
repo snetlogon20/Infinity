@@ -43,7 +43,8 @@ plt.rcParams['axes.unicode_minus'] = False
 class MacroEconomicIndicatorReport:
     """宏观经济指标 报告生成器"""
 
-    REPORT_DIR = r"D:\workspace_python\infinity_data\outbound\report\MicroEconomy"
+    #REPORT_DIR = r"D:\workspace_python\infinity_data\outbound\report\MacroEconomy"
+    REPORT_DIR = os.path.join(CommonParameters.reportPath, 'MacroEconomy')
 
     # 所有 _pct 字段
     ALL_PCT_FIELDS = [
