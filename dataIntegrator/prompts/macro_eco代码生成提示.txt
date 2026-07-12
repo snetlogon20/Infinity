@@ -1,0 +1,33 @@
+你按照   @CmlAnalysisTest.py 和 @CMLAnalysis.py ， @CMLAnalysisReport 的风格, 生成报表
+
+1. 在数据处理完后， 你先拿出 tb_macro_eina_economic_indicator 表中的内容, 注意现在 tb_macro_eina_economic_indicator 的内容增加了
+    usdx_index_pct Float64 COMMENT '美元指数 环比增幅',
+    gold_close_pct Float64 COMMENT '黄金期货GC 环比增幅',
+    dji_close_pct Float64 COMMENT '道琼斯工业指数 环比增幅',
+    sh_close_pct Float64 COMMENT '上证综指 环比增幅',
+    sz_close_pct Float64 COMMENT '深证成指数 环比增幅'
+2. 你把数据清洗下，如果有缺失值或者为0， 你按照前一期的数据进行填充
+3. 做折线图， 用细线。折线图中具体的样式参考 D:\workspace_python\infinity\dataIntegrator\modelService\MonteCarloSimuation\Visualizer.py
+    图1 先包含所有带有PCT的字段， 不要限制上下界
+    图2  m1_yoy	m2_yoy
+    图3  m1_yoy_pct	m2_yoy_pct
+    图4  forex_reserves	gold_reserves ，gold_close
+    图5  forex_reserves_pct	gold_reserves_pct, gold_close_pct
+    图6  cn_yield_2y	cn_yield_5y	cn_yield_10y， gdp_yoy ，cpi_yoy 不要限制上下界
+    图7  cn_yield_2y_pct	cn_yield_5y_pct	cn_yield_10y_pct， gdp_yoy_pct ，cpi_yoy_pct 不要限制上下界
+    图8  exports_yoy	imports_yoy
+    图9  exports_yoy_pct	imports_yoy_pct
+    图10  total_shrzgm	rmb_loan	entrusted_loan	trust_loan	corporate_bond	equity_financing，  不要限制上下界
+    图11  total_shrzgm_pct	rmb_loan_pct	entrusted_loan_pct	trust_loan_pct	corporate_bonds_pct	equity_financing_pct，  不要限制上下界
+    图12 dji_close， sh_close sz_close ，  不要限制上下界
+    图13 dji_close_pct， sh_close_pct sz_close_pct ，  不要限制上下界
+    图14  以上 不带有_PCT 字段的关系系数，用热力图展示
+    图15  以上 带有_PCT 字段的关系系数，用热力图展示
+4. 你要对以上这4张图的数据，用专业分析师的眼光进行分析，并生成专业报告
+   1. 综述
+   2. 图片2，专业文字描述  图片3，专业文字描述，依次类推
+   3. 学习 ConvertibleBondManagerReport 的格式， 把所有数据年底的数据(从最老的数据到今天)拉出出来给到 ZhipuGLM4， 并得到专业分析，然后放在报告的最后一页.
+        a. 你要优化提示词，让 ZhipuGLM4 用一个专业宏观经济专家的角度能够更专业地分析数据。
+        b. 你要用尽量节约token的方式，不要传一个很长的小数位给对方
+   4. 最终把以上的图片，文字、AI的分析作为 PDF 生成到 D:\workspace_python\infinity_data\outbound\report\MicroEconomy 中
+   5. 不要保存图片， 只要生成 PDF 即可

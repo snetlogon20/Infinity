@@ -16,12 +16,27 @@ import matplotlib.pyplot as plt
 from typing import Optional
 import logging
 
+# ============================================================
+#  Logging: ensure root logger has a console handler so that
+#  module-level loggers (logging.getLogger(__name__)) output
+#  to console. Without this, BacktestEngine logs are silently lost.
+# ============================================================
+_root_logger = logging.getLogger()
+if not _root_logger.hasHandlers():
+    _root_logger.setLevel(logging.INFO)
+    _console_handler = logging.StreamHandler()
+    _console_handler.setFormatter(
+        logging.Formatter('%(levelname)s - %(asctime)s [%(filename)s:%(lineno)d] %(message)s')
+    )
+    _root_logger.addHandler(_console_handler)
+
 logger = logging.getLogger(__name__)
 
-# Chinese font support
+# Chinese font support — Chinese fonts FIRST for CJK glyph coverage
 try:
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'Arial']
     plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['font.family'] = 'sans-serif'
 except Exception:
     pass
 
@@ -214,8 +229,10 @@ class BacktestEngine:
                 test_start_clean = self.test_start_date.replace('-', '')
                 test_mask = df['trade_date'].astype(str).str.replace('-', '') >= test_start_clean
                 test_indices = df.index[test_mask].tolist()
-                logger.info(f"  Data: {len(df)} total rows, {len(test_indices)} in test period, "
-                             f"returns range=[{np.nanmin(returns):.4f}, {np.nanmax(returns):.4f}]")
+                msg_data = f"  Data: {len(df)} total rows, {len(test_indices)} in test period, " \
+                             f"returns range=[{np.nanmin(returns):.4f}, {np.nanmax(returns):.4f}]"
+                logger.info(msg_data)
+                print(msg_data)
 
                 violations = 0
                 total = 0
@@ -225,13 +242,32 @@ class BacktestEngine:
 
                 from .MonteCarloEngine import MonteCarloEngine
 
+                n_total = len(df)
+                msg_diag = f"  Data rows: {n_total}, test period indices: {len(test_indices)}, limit_date={self.limit_date}"
+                logger.info(msg_diag)
+                print(msg_diag)
+
+                if len(test_indices) == 0:
+                    msg_warn = f"  [WARNING] No test period data found between " \
+                               f"{self.test_start_date} and {self.test_end_date}"
+                    logger.warning(msg_warn)
+                    print(msg_warn)
+                    results[dist_type] = self.kupiec_pof_test(0, 0, self.alpha)
+                    results[dist_type]['distribution_type'] = dist_type
+                    results[dist_type]['violation_dates'] = []
+                    results[dist_type]['var_lower_series'] = []
+                    results[dist_type]['actual_series'] = []
+                    continue
+
                 for pos in test_indices:
-                    # Need at least limit_date previous data points
-                    if pos < self.limit_date:
+                    # Use whatever data is available, capped by limit_date.
+                    # This adapts to the actual data length automatically.
+                    window_size = min(pos, self.limit_date)
+                    if window_size < 30:
                         continue
 
                     # Get rolling window of returns (drop NaN within window)
-                    window_raw = returns[max(0, pos - self.limit_date):pos]
+                    window_raw = returns[max(0, pos - window_size):pos]
                     window_valid = window_raw[~np.isnan(window_raw)]
                     actual_val = returns[pos]
 
@@ -240,9 +276,6 @@ class BacktestEngine:
 
                     total += 1
                     window_returns = pd.Series(window_valid)
-
-                    if len(window_returns) < 30:
-                        continue
 
                     engine = MonteCarloEngine(window_returns, analyzer.simulate_params)
                     engine.fit_distribution()
@@ -283,6 +316,18 @@ class BacktestEngine:
 
         logger.info("=" * 50)
         logger.info("Backtest complete for all distributions")
+        logger.info("------ Per-Distribution Summary ------")
+        for dist_type, r in results.items():
+            if 'error' in r:
+                logger.info(f"  [{dist_type:<12}] FAILED: {r.get('error', 'unknown')}")
+            else:
+                logger.info(
+                    f"  [{dist_type:<12}] OK: "
+                    f"violations={r.get('violations', '?')}/{r.get('total', '?')}  "
+                    f"rate={r.get('observed_rate', np.nan):.4f}  "
+                    f"p={r.get('p_value', np.nan):.4f}  "
+                    f"reject_h0={r.get('reject_h0', '?')}"
+                )
         logger.info("=" * 50)
         return results
 
@@ -339,8 +384,16 @@ class BacktestEngine:
     # ------------------------------------------------------------------
 
     @classmethod
-    def plot_backtest_results(cls, results: dict):
-        """Plot backtest summary: violation rates per distribution vs expected alpha."""
+    def plot_backtest_results(cls, results: dict, show: bool = True):
+        """Plot backtest summary: violation rates per distribution vs expected alpha.
+        
+        Args:
+            results: dict from run_backtest().
+            show: if True, call plt.show(). Always returns (fig, axes).
+        
+        Returns:
+            (fig, axes) tuple for embedding in PDF reports.
+        """
         dists = []
         observed_rates = []
         p_values = []
@@ -354,12 +407,16 @@ class BacktestEngine:
             p_values.append(result.get('p_value', np.nan))
             rejections.append(result.get('reject_h0', True))
 
-        if not dists:
-            print("No backtest results to plot.")
-            return
-
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         fig.suptitle("Kupiec POF Backtest Results", fontsize=14, fontweight='bold')
+
+        if not dists:
+            for ax in axes:
+                ax.text(0.5, 0.5, "No backtest results available", ha='center', va='center',
+                        transform=ax.transAxes, fontsize=12)
+            if show:
+                plt.show()
+            return fig, axes
 
         # Bar chart: observed vs expected violation rate
         ax1 = axes[0]
@@ -388,23 +445,38 @@ class BacktestEngine:
         ax2.set_title('Kupiec Test P-values')
         ax2.legend()
         ax2.grid(True, alpha=0.3, axis='y')
-        # Log scale for p-values
         ax2.set_yscale('log')
         ax2.set_ylim(bottom=1e-6, top=1.1)
 
         plt.tight_layout()
-        plt.show()
+        if show:
+            plt.show()
+        return fig, axes
 
     # ------------------------------------------------------------------
     #  Detailed VAR violation plot for a specific distribution
     # ------------------------------------------------------------------
 
     @classmethod
-    def plot_var_violations(cls, result: dict, title: str = "VAR Violation Analysis"):
-        """Plot actual returns vs VAR lower bound, highlighting violations."""
+    def plot_var_violations(cls, result: dict, title: str = "VAR Violation Analysis",
+                            show: bool = True):
+        """Plot actual returns vs VAR lower bound, highlighting violations.
+        
+        Args:
+            result: single distribution result dict from run_backtest().
+            title: chart title.
+            show: if True, call plt.show(). Always returns fig.
+        
+        Returns:
+            fig or None if no series data available.
+        """
         if 'var_lower_series' not in result or 'actual_series' not in result:
-            print("No detailed series data in result.")
-            return
+            fig, ax = plt.subplots(figsize=(10, 3))
+            ax.text(0.5, 0.5, "No detailed series data in result.", ha='center', va='center',
+                    transform=ax.transAxes, fontsize=12)
+            if show:
+                plt.show()
+            return fig
 
         var_lower = np.array(result['var_lower_series'])
         actual = np.array(result['actual_series'])
@@ -430,4 +502,6 @@ class BacktestEngine:
         ax.axhline(y=0, color='gray', linewidth=0.5)
 
         plt.tight_layout()
-        plt.show()
+        if show:
+            plt.show()
+        return fig

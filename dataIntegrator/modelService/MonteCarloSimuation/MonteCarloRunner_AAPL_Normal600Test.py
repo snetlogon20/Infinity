@@ -1,13 +1,13 @@
 """
-Monte Carlo Simulation Test — Gold (GC) Price Prediction
-=========================================================
+Monte Carlo Simulation Test — Apple (AAPL) Stock Price Prediction
+===================================================================
 Flow: run_and_export (analysis + Excel export) → plot_all (4 charts) → backtest → PDF report
 """
 from dataIntegrator.modelService.MonteCarloSimuation import MonteCarloRunner
 
 runner = MonteCarloRunner(
-    symbol='GC',
-    start_date='2026-04-01',
+    symbol='AAPL',
+    start_date='2025-04-01',
     end_date=None,  # 默认今天
     analysis_column='pct_change',
     analysis_column_label='涨跌幅',
@@ -24,8 +24,8 @@ runner = MonteCarloRunner(
 # 1. 主分析 + Excel 导出（先输出数据）
 original_df, prediction_df, final_df = runner.run_and_export()
 
-# 2. 作图（输出数据后再作图）
-runner.plot_all()
+# # 2. 作图（输出数据后再作图）
+# runner.plot_all()
 
 # 3. 回测验证（Kupiec 检验 2026 年）
 backtest_results = runner.run_backtest(

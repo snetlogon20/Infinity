@@ -24,16 +24,16 @@ package "MonteCarloSimuation" {
     - n_series: int
     - alpha: float
     - t_param: float
-    - distribution: Callable
+    - distribution: Optional[Callable]
     - distribution_params: dict
     --
     + __init__(returns: pd.Series, params: dict)
     + fit_distribution(): dict
     + calculate_sigma(): float
-    + get_conditional_volatility(): np.ndarray | None
+    + get_conditional_volatility(): Optional[np.ndarray]
     + simulate_single_step(): np.ndarray
     + simulate_multi_step(times: int): np.ndarray
-    + simulate_and_get_stats(times: int = None): dict | list
+    + simulate_and_get_stats(times: int = None): dict
     - _fit_normal(): dict
     - _fit_student(): dict
     - _fit_skewed_t(): dict
@@ -44,7 +44,7 @@ package "MonteCarloSimuation" {
     - _calc_egarch_sigma(): float
   }
 
-  note right of MontecarloEngine
+  note right of MonteCarloEngine
     <b>支持分布:</b>
     · normal  — 正态分布
     · student — Student-t
@@ -59,9 +59,9 @@ package "MonteCarloSimuation" {
   end note
 
   class RiskMetrics {
-    + {static} calculate_var(simulated_values, alpha): (float, float)
-    + {static} calculate_es(simulated_values, alpha): (float, float)
-    + {static} calculate_all_stats(simulated_values, alpha): dict
+    + {classMethod} calculate_var(simulated_values, alpha): Tuple[float, float]
+    + {classMethod} calculate_es(simulated_values, alpha): Tuple[float, float]
+    + {classMethod} calculate_all_stats(simulated_values, alpha): dict
     - {static} _var_lower(values, alpha): float
     - {static} _var_upper(values, alpha): float
     - {static} _es_lower(values, alpha): float
@@ -74,12 +74,12 @@ package "MonteCarloSimuation" {
   abstract class BaseAssetAnalyzer {
     # symbol: str
     # start_date: str
-    # end_date: str
+    # end_date: Optional[str]
     # analysis_column: str
     # analysis_column_label: str
     # limit_date: int
     # next_n_working_days: int
-    # simulate_params: dict
+    # simulate_params: Optional[dict]
     # raw_data: pd.DataFrame
     # calendar_data: pd.DataFrame
     --
@@ -90,7 +90,7 @@ package "MonteCarloSimuation" {
     + fetch_calendar(): pd.DataFrame
     + get_future_working_days(last_date, n): List[str]
     + get_analysis_returns(): pd.Series
-    + run(): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
+    + run(): Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
   }
 
   class GoldAnalyzer {
@@ -102,9 +102,9 @@ package "MonteCarloSimuation" {
   class AnalyzerFactory {
     - {static} _registry: dict
     --
-    + {static} register(symbol: str, analyzer_class: type)
-    + {static} create(symbol: str, **kwargs): BaseAssetAnalyzer
-    + {static} list_registered(): list
+    + {classMethod} register(symbol: str, analyzer_class: type)
+    + {classMethod} create(symbol: str, **kwargs): BaseAssetAnalyzer
+    + {classMethod} list_registered(): list
   }
 
   note right of AnalyzerFactory
@@ -119,15 +119,15 @@ package "MonteCarloSimuation" {
   ' ==========================================================
   class ResultAggregator {
     + {static} compute_ema(series, periods): pd.DataFrame
-    + {static} build_original_analysis(raw_data, risk_stats_list, ema_df, normal_segma, garch_segma, egarch_segma, step_num, analysis_column): pd.DataFrame
-    + {static} build_prediction_results(dates, predict_values, analysis_column): pd.DataFrame
+    + {classMethod} build_original_analysis(raw_data, risk_stats_list, ema_df, normal_segma, garch_segma, egarch_segma, step_num, analysis_column): pd.DataFrame
+    + {static} build_prediction_results(dates, predict_p10, predict_p50, predict_p90, predict_p05, predict_p01, analysis_column): pd.DataFrame
     + {static} merge_results(original_df, prediction_df): pd.DataFrame
   }
 
   note right of ResultAggregator
     <b>输出3个DataFrame:</b>
     1. 原始数据的分析 (21列)
-    2. 预测结果的分析 (3列)
+    2. 预测结果: P01/P05/P10/P50/P90/P95/P99
     3. 最终结果 (合并+排序)
   end note
 
@@ -143,12 +143,13 @@ package "MonteCarloSimuation" {
     - distribution_types: list
     - segma_calculation_type: str
     --
-    + __init__(symbol, test_start_date, test_end_date, alpha, ...)
+    + __init__(symbol='GC', test_start_date='2026-01-01', test_end_date='2026-12-31', alpha=0.05, limit_date=600, distribution_types=None, segma_calculation_type='normal')
     + run_backtest(): dict
     + {static} kupiec_pof_test(violations, total, alpha): dict
-    + {static} recommend_distribution(results): str
-    + {static} plot_backtest_results(results)
-    + {static} plot_var_violations(result, title)
+    + {classMethod} recommend_distribution(results): str
+    + {classMethod} plot_backtest_results(results)
+    + {classMethod} plot_var_violations(result, title)
+    - _get_lookback_start(): str
   }
 
   note right of BacktestEngine
@@ -165,12 +166,13 @@ package "MonteCarloSimuation" {
   '  Visualization Layer
   ' ==========================================================
   class Visualizer {
-    + {static} plot_original_analysis(df, title, analysis_col_label)   <<图1>>
-    + {static} plot_volatility_analysis(df, title)                      <<图2>>
-    + {static} plot_prediction_results(df, title, analysis_col_label)   <<图3>>
-    + {static} plot_final_results(df, title, analysis_col_label)        <<图4>>
-    + {static} show_all(original_df, prediction_df, final_df, ...)
+    + {classMethod} plot_original_analysis(df, title, analysis_col_label, start_date_str, end_date_str, show)   <<图1>>
+    + {classMethod} plot_volatility_analysis(df, title, start_date_str, end_date_str, show)                      <<图2>>
+    + {classMethod} plot_prediction_results(df, title, analysis_col_label, start_date_str, end_date_str, show)   <<图3>>
+    + {classMethod} plot_final_results(df, title, analysis_col_label, start_date_str, end_date_str, show)        <<图4>>
+    + {classMethod} show_all(original_df, prediction_df, final_df, asset_name, analysis_col_label, start_date_str, end_date_str)
     - {static} _parse_dates(df): pd.Series
+    - {static} _pick_annotate_indices(series, max_labels): list
     - {static} _format_date_axis(ax, dates, is_datetime)
   }
 
@@ -194,29 +196,32 @@ package "MonteCarloSimuation" {
   class MonteCarloRunner {
     - symbol: str
     - start_date: str
-    - end_date: str
+    - end_date: Optional[str]
     - analysis_column: str
     - analysis_column_label: str
     - limit_date: int
     - next_n_working_days: int
-    - simulate_params: dict
+    - simulate_params: Optional[dict]
     - _analyzer: BaseAssetAnalyzer
     - _original_df: pd.DataFrame
     - _prediction_df: pd.DataFrame
     - _final_df: pd.DataFrame
     --
-    + __init__(symbol, start_date, end_date, ...)
+    + __init__(symbol='GC', start_date='2026-04-01', end_date=None, analysis_column='pct_change', analysis_column_label='涨跌幅', limit_date=600, next_n_working_days=5, simulate_params=None)
+    + «property» analyzer(): BaseAssetAnalyzer
     + initialize(): void
-    + run_analysis(): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
+    + run_analysis(): Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+    + run_backtest(test_start_date='2026-01-01', test_end_date='2026-12-31', distribution_types=None): dict
     + export_to_excel(output_dir): void
-    + run_and_export(output_dir): (pd.DataFrame, pd.DataFrame, pd.DataFrame)
-    + run_backtest(test_start_date, test_end_date, distribution_types): dict
+    + export_to_pdf(backtest_results): str
+    + run_and_export(output_dir): Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
     + plot_all(): void
     + plot_original_analysis(): void
     + plot_volatility_analysis(): void
     + plot_prediction_results(): void
     + plot_final_results(): void
     - _build_filename(label, ext): str
+    - _get_date_range_strs(): Tuple[str, str]
   }
 
   note bottom of MonteCarloRunner
@@ -231,6 +236,21 @@ package "MonteCarloSimuation" {
 
     <b>回测流程:</b>
     run_backtest('2026-01-01','2026-12-31') → Kupiec检验 → 分布推荐
+  end note
+
+  ' ==========================================================
+  '  Report Generation Layer
+  ' ==========================================================
+  class ReportGenerator {
+    + {static} generate(original_df, prediction_df, final_df, asset_name, analysis_col_label, start_date, end_date, simulate_params, backtest_results, output_dir): str
+  }
+
+  note right of ReportGenerator
+    <b>生成PDF报告:</b>
+    · 使用matplotlib渲染多页PDF
+    · 包含原始分析/预测/最终结果图表
+    · 可选回测结果展示
+    · 返回PDF文件路径
   end note
 
 }
@@ -249,12 +269,13 @@ MonteCarloRunner --> RiskMetrics : uses
 MonteCarloRunner --> ResultAggregator : uses
 MonteCarloRunner --> Visualizer : plots via
 MonteCarloRunner --> BacktestEngine : backtests via
+MonteCarloRunner --> ReportGenerator : PDF via
 
 BaseAssetAnalyzer --> MonteCarloEngine : creates
 BaseAssetAnalyzer --> RiskMetrics : uses
 BaseAssetAnalyzer --> ResultAggregator : uses
 
-BacktestEngine --> BaseAssetAnalyzer : uses
+BacktestEngine --> AnalyzerFactory : creates via
 BacktestEngine --> MonteCarloEngine : uses
 
 MonteCarloEngine --> RiskMetrics : uses
@@ -262,8 +283,8 @@ MonteCarloEngine --> RiskMetrics : uses
 ' ==========================================================
 '  Data flow (left to right)
 ' ==========================================================
-note "Data Flow" as N1
-  <b>数据流:</b>
+note as N1
+  <b>Data Flow / 数据流:</b>
   ClickHouse → BaseAssetAnalyzer.fetch_data()
   → MonteCarloEngine.fit_distribution() + simulate()
   → RiskMetrics → ResultAggregator → 3 DataFrames

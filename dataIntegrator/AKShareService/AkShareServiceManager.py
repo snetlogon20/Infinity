@@ -1,8 +1,13 @@
 import os
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.AKShareService.AkShareMacroChinaFxGoldService import AkShareMacroChinaFxGoldService
+from dataIntegrator.AKShareService.AkShareMacroChinaHgjckService import AkShareMacroChinaHgjckService
+from dataIntegrator.AKShareService.AkShareMacroChinaExportsYoyService import AkShareMacroChinaExportsYoyService
+from dataIntegrator.AKShareService.AkShareMacroChinaImportsYoyService import AkShareMacroChinaImportsYoyService
 from dataIntegrator.AKShareService.AkShareMacroChinaNewHousePriceService import AkShareMacroChinaNewHousePriceService
 from dataIntegrator.AKShareService.AkShareMacroChinaShrzgmService import AkShareMacroChinaShrzgmService
+from dataIntegrator.AKShareService.AkShareBondZhUsRateService import AkShareBondZhUsRateService
 from dataIntegrator.AKShareService.AkShareSpotHistSGEService import AkShareSpotHistSGEService
 from dataIntegrator.AKShareService.AkShareFuturesForeignHistService import AkShareFuturesForeignHistService
 from dataIntegrator.AKShareService.AkShareStockUsDailyService import AkShareStockUsDailyService
@@ -151,6 +156,55 @@ class AkShareServiceManager():
         logger.info("callAkShareMacroChinaShrzgmService ended...")
 
     @classmethod
+    def callAkShareBondZhUsRateService(self, start_date="19901219"):
+        """
+        调用 AkShare 中美国债收益率历史数据服务
+        """
+        logger.info("callAkShareBondZhUsRateService started...")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, 'bond_zh_us_rate.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareBondZhUsRateService')
+            
+            akShareService = AkShareBondZhUsRateService()
+
+            # 获取数据（从指定起始日期开始获取全部历史数据）
+            dataFrame = akShareService.prepareDataFrame(start_date=start_date)
+
+            # 保存到磁盘
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+
+            # 从磁盘读取
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+
+            # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
+            if not dataFrame.empty:
+                min_date = dataFrame['trade_date'].min()
+                max_date = dataFrame['trade_date'].max()
+                akShareService.deleteDateFromClickHouse(min_date, max_date)
+
+            # 转换数据格式
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+
+            # 保存到 ClickHouse
+            akShareService.saveDateToClickHouse(dataFrame)
+            
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareBondZhUsRateService ended...")
+
+    @classmethod
     def callAkShareMacroChinaNewHousePriceService(self, city_first="北京", city_second="上海"):
         """
         调用 AkShare 中国新建商品住宅价格指数数据服务
@@ -193,6 +247,154 @@ class AkShareServiceManager():
             raise e
 
         logger.info("callAkShareMacroChinaNewHousePriceService ended...")
+
+    @classmethod
+    def callAkShareMacroChinaFxGoldService(self):
+        """
+        调用 AkShare 中国外汇和黄金储备数据服务
+        """
+        logger.info("callAkShareMacroChinaFxGoldService started...")
+
+        # 外汇和黄金储备数据不需要日期范围，获取全部历史数据
+        file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_fx_gold.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaFxGoldService', {})
+
+            akShareService = AkShareMacroChinaFxGoldService()
+
+            # 获取数据（不需要日期参数）
+            dataFrame = akShareService.prepareDataFrame()
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse()
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareMacroChinaFxGoldService ended...")
+
+    @classmethod
+    def callAkShareMacroChinaHgjckService(self):
+        """
+        调用 AkShare 海关进出口增减情况一览表数据服务
+        """
+        logger.info("callAkShareMacroChinaHgjckService started...")
+
+        # 海关进出口增减情况一览表数据不需要日期范围，获取全部历史数据
+        file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_hgjck.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaHgjckService', {})
+
+            akShareService = AkShareMacroChinaHgjckService()
+
+            # 获取数据（不需要日期参数）
+            dataFrame = akShareService.prepareDataFrame()
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse()
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareMacroChinaHgjckService ended...")
+
+    @classmethod
+    def callAkShareMacroChinaExportsYoyService(self):
+        """
+        调用 AkShare 中国以美元计算出口年率报告数据服务
+        """
+        logger.info("callAkShareMacroChinaExportsYoyService started...")
+
+        # 出口同比增速数据不需要日期范围，获取全部历史数据
+        file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_exports_yoy.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaExportsYoyService', {})
+
+            akShareService = AkShareMacroChinaExportsYoyService()
+
+            # 获取数据（不需要日期参数）
+            dataFrame = akShareService.prepareDataFrame()
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse()
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareMacroChinaExportsYoyService ended...")
+
+    @classmethod
+    def callAkShareMacroChinaImportsYoyService(self):
+        """
+        调用 AkShare 中国以美元计算进口年率报告数据服务
+        """
+        logger.info("callAkShareMacroChinaImportsYoyService started...")
+
+        # 进口同比增速数据不需要日期范围，获取全部历史数据
+        file_path = os.path.join(CommonParameters.outBoundPath, 'macro_china_imports_yoy.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareMacroChinaImportsYoyService', {})
+
+            akShareService = AkShareMacroChinaImportsYoyService()
+
+            # 获取数据（不需要日期参数）
+            dataFrame = akShareService.prepareDataFrame()
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+            akShareService.deleteDateFromClickHouse()
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareMacroChinaImportsYoyService ended...")
 
     @classmethod
     def callAkShareStockUsDailyService(self, symbol='AAPL', adjust=''):
@@ -446,19 +648,24 @@ class AkShareServiceManager():
             start_date = "20240101"
             end_date = CommonParameters.today
 
-            self.callAkShareSpotHistSGEService(start_date, end_date)
-            self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')
-            self.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')
-            self.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')
-            self.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL') ## WTI
-            self.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')  ## Bre
-            self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')  ## 天然气
-            self.callAkShareMacroChinaShrzgmService()
-            self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")
-            self.callAllAkShareStockUsDailyService(adjust='')
-            self.callAkShareBondCbJslService()
-            self.callAkShareStockYjbbEmService(date=end_date)
-            self.callAllAkShareFinancialDataIndicatorService(start_year="2020")
+            self.callAkShareSpotHistSGEService(start_date, end_date)                                ## 上金所现货
+            self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')                ## 白银
+            self.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')                  ## 黄金
+            self.callAkShareFuturesForeignHistService(symbol='XAU', file_suffix='XAU')                ## 伦敦金
+            self.callAkShareFuturesForeignHistService(symbol='CL', file_suffix='CL')                  ## WTI原油
+            self.callAkShareFuturesForeignHistService(symbol='OIL', file_suffix='OIL')                ## 布伦特原油
+            self.callAkShareFuturesForeignHistService(symbol='NG', file_suffix='NG')                  ## 天然气
+            self.callAkShareMacroChinaShrzgmService()                                                 ## 社会融资规模
+            self.callAkShareBondZhUsRateService()                                                     ## 中美国债收益率
+            self.callAkShareMacroChinaNewHousePriceService(city_first="北京", city_second="上海")     ## 新房价格
+            self.callAkShareMacroChinaFxGoldService()                                                 ## 外汇黄金储备
+            self.callAkShareMacroChinaHgjckService()                                                  ## 进出口贸易
+            self.callAkShareMacroChinaExportsYoyService()                                             ## 出口同比
+            self.callAkShareMacroChinaImportsYoyService()                                             ## 进口同比
+            self.callAllAkShareStockUsDailyService(adjust='')                                         ## 美股日频
+            self.callAkShareBondCbJslService()                                                        ## 可转债
+            self.callAllAkShareFinancialDataIndicatorService(start_year="2020")                       ## A股财务指标
+            self.callAkShareStockYjbbEmService(date=end_date)                                         ## A股业绩快报
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)
