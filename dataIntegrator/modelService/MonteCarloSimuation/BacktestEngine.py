@@ -16,6 +16,20 @@ import matplotlib.pyplot as plt
 from typing import Optional
 import logging
 
+# ============================================================
+#  Logging: ensure root logger has a console handler so that
+#  module-level loggers (logging.getLogger(__name__)) output
+#  to console. Without this, BacktestEngine logs are silently lost.
+# ============================================================
+_root_logger = logging.getLogger()
+if not _root_logger.hasHandlers():
+    _root_logger.setLevel(logging.INFO)
+    _console_handler = logging.StreamHandler()
+    _console_handler.setFormatter(
+        logging.Formatter('%(levelname)s - %(asctime)s [%(filename)s:%(lineno)d] %(message)s')
+    )
+    _root_logger.addHandler(_console_handler)
+
 logger = logging.getLogger(__name__)
 
 # Chinese font support — Chinese fonts FIRST for CJK glyph coverage
@@ -215,8 +229,10 @@ class BacktestEngine:
                 test_start_clean = self.test_start_date.replace('-', '')
                 test_mask = df['trade_date'].astype(str).str.replace('-', '') >= test_start_clean
                 test_indices = df.index[test_mask].tolist()
-                logger.info(f"  Data: {len(df)} total rows, {len(test_indices)} in test period, "
-                             f"returns range=[{np.nanmin(returns):.4f}, {np.nanmax(returns):.4f}]")
+                msg_data = f"  Data: {len(df)} total rows, {len(test_indices)} in test period, " \
+                             f"returns range=[{np.nanmin(returns):.4f}, {np.nanmax(returns):.4f}]"
+                logger.info(msg_data)
+                print(msg_data)
 
                 violations = 0
                 total = 0
@@ -226,13 +242,32 @@ class BacktestEngine:
 
                 from .MonteCarloEngine import MonteCarloEngine
 
+                n_total = len(df)
+                msg_diag = f"  Data rows: {n_total}, test period indices: {len(test_indices)}, limit_date={self.limit_date}"
+                logger.info(msg_diag)
+                print(msg_diag)
+
+                if len(test_indices) == 0:
+                    msg_warn = f"  [WARNING] No test period data found between " \
+                               f"{self.test_start_date} and {self.test_end_date}"
+                    logger.warning(msg_warn)
+                    print(msg_warn)
+                    results[dist_type] = self.kupiec_pof_test(0, 0, self.alpha)
+                    results[dist_type]['distribution_type'] = dist_type
+                    results[dist_type]['violation_dates'] = []
+                    results[dist_type]['var_lower_series'] = []
+                    results[dist_type]['actual_series'] = []
+                    continue
+
                 for pos in test_indices:
-                    # Need at least limit_date previous data points
-                    if pos < self.limit_date:
+                    # Use whatever data is available, capped by limit_date.
+                    # This adapts to the actual data length automatically.
+                    window_size = min(pos, self.limit_date)
+                    if window_size < 30:
                         continue
 
                     # Get rolling window of returns (drop NaN within window)
-                    window_raw = returns[max(0, pos - self.limit_date):pos]
+                    window_raw = returns[max(0, pos - window_size):pos]
                     window_valid = window_raw[~np.isnan(window_raw)]
                     actual_val = returns[pos]
 
@@ -241,9 +276,6 @@ class BacktestEngine:
 
                     total += 1
                     window_returns = pd.Series(window_valid)
-
-                    if len(window_returns) < 30:
-                        continue
 
                     engine = MonteCarloEngine(window_returns, analyzer.simulate_params)
                     engine.fit_distribution()

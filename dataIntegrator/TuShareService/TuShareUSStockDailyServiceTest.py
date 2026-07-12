@@ -17,7 +17,8 @@ class TuShareUSStockDailyServiceTest(TuShareService):
             end_date = CommonParameters.today
 
             ts_code_list = CommonParameters.US_STOCK_LIST
-            #ts_code_list = ["C", "JPM", "AAPL", "NVDA", "MSFT"]
+            # Monte Carlo simulation symbols — refresh these to ensure 2026 data exists
+            # ts_code_list = ["C", "JPM", "SPY", "AAPL", "NVDA", "MSFT"]
             ts_code_list = ["SPY"]
             ts_code_dict = {f"stock_{i}": code for i, code in enumerate(ts_code_list, 1)}
 
