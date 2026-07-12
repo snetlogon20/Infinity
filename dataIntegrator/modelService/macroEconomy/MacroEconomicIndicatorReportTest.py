@@ -1,20 +1,20 @@
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.macroEconomy.MacroEinaEconomicIndicatorReport import \
-    MacroEinaEconomicIndicatorReport
+from dataIntegrator.modelService.macroEconomy.MacroEconomicIndicatorReport import \
+    MacroEconomicIndicatorReport
 
 logger = CommonLib.logger
 commonLib = CommonLib()
 
 
-class MacroEinaEconomicIndicatorReportTest:
+class MacroEconomicIndicatorReportTest:
 
     def run(self):
-        """运行宏观EINA经济指标报告生成测试"""
+        """运行宏观经济指标报告生成测试"""
         logger.info("=" * 80)
-        logger.info("Starting MacroEinaEconomicIndicatorReportTest")
+        logger.info("Starting MacroEconomicIndicatorReportTest")
         logger.info("=" * 80)
 
-        report = MacroEinaEconomicIndicatorReport()
+        report = MacroEconomicIndicatorReport()
         pdf_path = report.run()
 
         if pdf_path:
@@ -30,5 +30,5 @@ class MacroEinaEconomicIndicatorReportTest:
 
 
 if __name__ == "__main__":
-    test = MacroEinaEconomicIndicatorReportTest()
+    test = MacroEconomicIndicatorReportTest()
     test.run()

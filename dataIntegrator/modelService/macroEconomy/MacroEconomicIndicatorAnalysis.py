@@ -9,14 +9,14 @@ logger = CommonLib.logger
 commonLib = CommonLib()
 
 
-class MacroEinaEconomicIndicatorAnalysis:
-    """宏观EINA经济指标数据生成类
+class MacroEconomicIndicatorAnalysis:
+    """宏观经济指标数据生成类
 
     流程：
     1. 从 ClickHouse 拉取月度宏观数据（多表 JOIN）
     2. 前向填充缺失值
     3. 计算每条数据的环比增幅 _pct
-    4. 写入 tb_macro_eina_economic_indicator
+    4. 写入 tb_macro_economic_indicator
     """
 
     # 需要计算 _pct 环比增幅的字段
@@ -32,12 +32,12 @@ class MacroEinaEconomicIndicatorAnalysis:
         'gdp_yoy',
     ]
 
-    TARGET_TABLE = 'tb_macro_eina_economic_indicator'
+    TARGET_TABLE = 'tb_macro_economic_indicator'
 
     def __init__(self):
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName=sys._getframe().f_code.co_name,
-                          event="MacroEinaEconomicIndicator started")
+                          event="MacroEconomicIndicator started")
 
     def writeLogInfo(self, className="unknown", functionName="unknown", event="unknown"):
         """记录日志信息"""
@@ -338,7 +338,7 @@ class MacroEinaEconomicIndicatorAnalysis:
         logger.info(f"Saved {len(df)} rows to {self.TARGET_TABLE}")
 
     def generate_macro_indicator_data(self):
-        """生成宏观EINA经济指标数据的主流程
+        """生成宏观经济指标数据的主流程
 
         返回:
         - df: 最终 DataFrame

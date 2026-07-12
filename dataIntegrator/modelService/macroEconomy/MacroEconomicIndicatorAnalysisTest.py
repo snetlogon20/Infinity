@@ -1,19 +1,19 @@
-from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.financialAnalysis.MacroEinaEconomicIndicatorAnalysis import MacroEinaEconomicIndicatorAnalysis
+from dataIntegrator import CommonLib
+from dataIntegrator.modelService.macroEconomy.MacroEconomicIndicatorAnalysis import MacroEconomicIndicatorAnalysis
 
 logger = CommonLib.logger
 commonLib = CommonLib()
 
 
-class MacroEinaEconomicIndicatorTest:
+class MacroEconomicIndicatorAnalysisTest:
 
     def run(self):
-        """运行宏观EINA经济指标数据生成测试"""
+        """运行宏观经济指标数据生成测试"""
         logger.info("=" * 80)
-        logger.info("🚀 Starting MacroEinaEconomicIndicatorTest")
+        logger.info("🚀 Starting MacroEconomicIndicatorTest")
         logger.info("=" * 80)
 
-        indicator = MacroEinaEconomicIndicatorAnalysis()
+        indicator = MacroEconomicIndicatorAnalysis()
         df = indicator.generate_macro_indicator_data()
 
         # 打印前5行预览
@@ -28,5 +28,5 @@ class MacroEinaEconomicIndicatorTest:
 
 
 if __name__ == "__main__":
-    test = MacroEinaEconomicIndicatorTest()
+    test = MacroEconomicIndicatorAnalysisTest()
     test.run()

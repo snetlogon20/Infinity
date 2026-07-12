@@ -3,6 +3,11 @@ import sys
 import traceback
 from datetime import datetime
 
+from dataIntegrator.analysisService.report.macroEconomy.RunMacroEconomicIndicatorAnalysis import \
+    RunMacroEconomicIndicatorAnalysis
+from dataIntegrator.analysisService.report.macroEconomy.RunMacroEconomicIndicatorReport import \
+    RunMacroEconomicIndicatorReport
+
 # ensure project root is on sys.path so we can import from dataIntegrator
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _project_root not in sys.path:
@@ -47,7 +52,12 @@ class ReportRunner:
         self._convertible_bond_runner = RunConvertibleBondManagerReport()
         self._bond_yield_runner = RunBondYieldComparator()
         self._pd_runner = RunPDAnalysisReport()
+        self._macro_economic_indicator_analysis_runner = RunMacroEconomicIndicatorAnalysis()
+        self._macro_economic_indicator_report_runner = RunMacroEconomicIndicatorReport()
+
+        # 永远把System Batch Status Report放在最后面跑
         self._system_batch_status_runner = RunSystemBatchStatusReport()
+
 
     def run_all_reports(self):
         """工厂模式：按 run_reports.bat 顺序统一调用所有报告"""
@@ -56,19 +66,21 @@ class ReportRunner:
 
             # 工厂映射：报告名称 -> 调用的无参 run() 方法
             report_method_dict = {
-                "China Treasury Forward Rate Analysis Report":   self._china_treasury_runner.run,
-                "CML Analysis Report (Pure Stocks)":             self._cml_runner.run,
-                "CML Analysis With Commodities Report":          self._cml_commodities_runner.run,
-                "Information Ratio Analysis Report":             self._ir_runner.run,
-                "PD Analysis Report":                            self._pd_runner.run,
-                # "Portfolio Analysis Report":                    self._portfolio_analysis_runner.run,
-                "Portfolio Metrics Analysis Report":             self._portfolio_metrics_runner.run,
-                "SHIBOR Forward Rate Analysis Report":           self._shibor_runner.run,
-                "SML Analysis Report":                           self._sml_runner.run,
-                "SOR Analysis Report":                           self._sor_runner.run,
-                "Treynor Ratio Analysis Report":                 self._treynor_runner.run,
-                "Bond Yield Comparator Report":                  self._bond_yield_runner.run,
-                "Convertible Bond Manager Report":               self._convertible_bond_runner.run,
+                # "China Treasury Forward Rate Analysis Report":   self._china_treasury_runner.run,
+                # "CML Analysis Report (Pure Stocks)":             self._cml_runner.run,
+                # "CML Analysis With Commodities Report":          self._cml_commodities_runner.run,
+                # "Information Ratio Analysis Report":             self._ir_runner.run,
+                # "PD Analysis Report":                            self._pd_runner.run,
+                # # "Portfolio Analysis Report":                    self._portfolio_analysis_runner.run,
+                # "Portfolio Metrics Analysis Report":             self._portfolio_metrics_runner.run,
+                # "SHIBOR Forward Rate Analysis Report":           self._shibor_runner.run,
+                # "SML Analysis Report":                           self._sml_runner.run,
+                # "SOR Analysis Report":                           self._sor_runner.run,
+                # "Treynor Ratio Analysis Report":                 self._treynor_runner.run,
+                # "Bond Yield Comparator Report":                  self._bond_yield_runner.run,
+                # "Convertible Bond Manager Report":               self._convertible_bond_runner.run,
+                "Macro Economic Indicator Data Generation":      self._macro_economic_indicator_analysis_runner.run,
+                "Macro Economic Indicator Report":               self._macro_economic_indicator_report_runner.run,
                 #永远把System Batch Status Report放在最后面跑
                 "System Batch Status Report":                    self._system_batch_status_runner.generate_report,
             }

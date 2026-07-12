@@ -1,10 +1,10 @@
 """
-宏观EINA经济指标 报告生成器
+宏观经济指标 报告生成器
 
 流程：
-1. 从 tb_macro_eina_economic_indicator 拉取数据
+1. 从 tb_macro_economic_indicator 拉取数据
 2. 数据清洗（缺失值/0值前向填充）
-3. 生成7张折线图（不保存PNG，直接嵌入PDF）
+3. 生成13张图表（不保存PNG，直接嵌入PDF）
 4. 专业分析师文字描述
 5. ZhipuGLM4 AI 分析（年底数据全景）
 6. 生成 PDF 报告（reportlab 风格，参照 CMLAnalysisReport）
@@ -40,8 +40,8 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 
-class MacroEinaEconomicIndicatorReport:
-    """宏观EINA经济指标 报告生成器"""
+class MacroEconomicIndicatorReport:
+    """宏观经济指标 报告生成器"""
 
     REPORT_DIR = r"D:\workspace_python\infinity_data\outbound\report\MicroEconomy"
 
@@ -126,11 +126,11 @@ class MacroEinaEconomicIndicatorReport:
     # ===================== 数据获取与清洗 =====================
 
     def fetch_data(self):
-        """从 ClickHouse 拉取 tb_macro_eina_economic_indicator 表数据"""
+        """从 ClickHouse 拉取 tb_macro_economic_indicator 表数据"""
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName="fetch_data",
-                          event="Fetching data from tb_macro_eina_economic_indicator")
-        sql = "SELECT * FROM indexsysdb.tb_macro_eina_economic_indicator ORDER BY trade_month"
+                          event="Fetching data from tb_macro_economic_indicator")
+        sql = "SELECT * FROM indexsysdb.tb_macro_economic_indicator ORDER BY trade_month"
         df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
         logger.info(f"Fetched {len(df)} rows, {len(df.columns)} columns")
         return df
@@ -419,7 +419,7 @@ class MacroEinaEconomicIndicatorReport:
         recent = df.tail(12)
 
         lines = [
-            "本报告基于 ClickHouse tb_macro_eina_economic_indicator 表数据，",
+            "本报告基于 ClickHouse tb_macro_economic_indicator 表数据，",
             f"覆盖 {len(self.ALL_RAW_FIELDS)} 个宏观经济指标（含原始值与环比增幅），",
             f"时间跨度为 {df['trade_month'].min()} 至 {df['trade_month'].max()}。",
             "",
@@ -1041,8 +1041,8 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
     # ===================== 主流程 =====================
 
     def run(self):
-        """运行宏观EINA经济指标报告生成主流程"""
-        self.job_logger.start_job('MacroEinaEconomicIndicatorReport', 'MacroEconomy', params={})
+        """运行宏观经济指标报告生成主流程"""
+        self.job_logger.start_job('MacroEconomicIndicatorReport', 'MacroEconomy', params={})
 
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName="run",
@@ -1132,5 +1132,5 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
 
 
 if __name__ == "__main__":
-    report = MacroEinaEconomicIndicatorReport()
+    report = MacroEconomicIndicatorReport()
     report.run()

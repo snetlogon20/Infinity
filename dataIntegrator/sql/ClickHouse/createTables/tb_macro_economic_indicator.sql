@@ -1,7 +1,7 @@
--- D:\workspace_python\infinity\dataIntegrator\sql\ClickHouse\createTables\tb_macro_eina_economic_indicator.sql
---drop table indexsysdb.tb_macro_eina_economic_indicator
---宏观EINA经济指标月度数据（含环比增幅）
-CREATE TABLE indexsysdb.tb_macro_eina_economic_indicator (
+-- D:\workspace_python\infinity\dataIntegrator\sql\ClickHouse\createTables\tb_macro_economic_indicator.sql
+--drop table indexsysdb.tb_macro_economic_indicator
+--宏观经济指标月度数据（含环比增幅）
+CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     trade_year UInt32 COMMENT '年份',
     trade_month UInt32 COMMENT '月份(YYYYMM)',
     last_trade_date String COMMENT '当月最后交易日(YYYYMMDD)',
