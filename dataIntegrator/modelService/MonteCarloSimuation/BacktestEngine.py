@@ -284,6 +284,18 @@ class BacktestEngine:
 
         logger.info("=" * 50)
         logger.info("Backtest complete for all distributions")
+        logger.info("------ Per-Distribution Summary ------")
+        for dist_type, r in results.items():
+            if 'error' in r:
+                logger.info(f"  [{dist_type:<12}] FAILED: {r.get('error', 'unknown')}")
+            else:
+                logger.info(
+                    f"  [{dist_type:<12}] OK: "
+                    f"violations={r.get('violations', '?')}/{r.get('total', '?')}  "
+                    f"rate={r.get('observed_rate', np.nan):.4f}  "
+                    f"p={r.get('p_value', np.nan):.4f}  "
+                    f"reject_h0={r.get('reject_h0', '?')}"
+                )
         logger.info("=" * 50)
         return results
 

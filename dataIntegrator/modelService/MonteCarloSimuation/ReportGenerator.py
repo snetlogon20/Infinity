@@ -428,6 +428,24 @@ class ReportGenerator:
             logger.info("  Building backtest pages...")
             from .BacktestEngine import BacktestEngine
 
+            # ---- Log per-distribution backtest result summary ----
+            logger.info("  ====== Backtest Result Summary ======")
+            for dist_type, r in backtest_results.items():
+                if 'error' in r:
+                    logger.info(f"    [{dist_type:<12}] ERROR: {r.get('error', 'unknown')}")
+                else:
+                    has_series = 'var_lower_series' in r
+                    logger.info(
+                        f"    [{dist_type:<12}] OK: "
+                        f"violations={r.get('violations', '?')}/{r.get('total', '?')}  "
+                        f"rate={r.get('observed_rate', np.nan):.4f}  "
+                        f"p={r.get('p_value', np.nan):.4f}  "
+                        f"reject_h0={r.get('reject_h0', '?')}  "
+                        f"has_series={has_series}"
+                    )
+            logger.info(f"    Recommended distribution: {recommended}")
+            logger.info("  ======================================")
+
             # Backtest summary text page
             pages.append(("回测检验报告",
                            ReportGenerator._make_backtest_text_page(
@@ -437,10 +455,12 @@ class ReportGenerator:
             fig_bt, _ = BacktestEngine.plot_backtest_results(backtest_results, show=False)
             pages.append(("回测图表: 击穿率与P值", fig_bt))
 
-            # Violation detail charts for top 3 non-error distributions
+            # Violation detail charts for ALL non-error distributions (not just top 3)
             non_error = [(k, v) for k, v in backtest_results.items()
                          if 'error' not in v and 'var_lower_series' in v]
-            for dist_type, result in non_error[:3]:
+            logger.info(f"  Distributions with violation detail charts: "
+                        f"{[k for k, _ in non_error]} (total={len(non_error)})")
+            for dist_type, result in non_error:
                 logger.info(f"  Building violation chart for {dist_type}...")
                 fig_v = BacktestEngine.plot_var_violations(
                     result,
