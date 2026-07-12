@@ -37,6 +37,7 @@ Usage:
 from .MonteCarloRunner import MonteCarloRunner
 from .BaseAssetAnalyzer import BaseAssetAnalyzer, AnalyzerFactory
 from .GoldAnalyzer import GoldAnalyzer
+from .USStockAnalyzer import USStockAnalyzer
 from .MonteCarloEngine import MonteCarloEngine
 from .RiskMetrics import RiskMetrics
 from .ResultAggregator import ResultAggregator
@@ -48,6 +49,7 @@ __all__ = [
     'BaseAssetAnalyzer',
     'AnalyzerFactory',
     'GoldAnalyzer',
+    'USStockAnalyzer',
     'MonteCarloEngine',
     'RiskMetrics',
     'ResultAggregator',

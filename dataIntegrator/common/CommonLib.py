@@ -37,7 +37,7 @@ class CommonLib():
 
         self.logger.error('==============================================')
         self.logger.error("%s.%s:" % (className, functionName))
-        self.logger.error('Exception: ', e)
+        self.logger.error('Exception: %s', e)
         info = traceback.format_exc()
         self.logger.error(info)
         self.logger.error('==============================================')

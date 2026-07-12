@@ -3,6 +3,7 @@ SHIBOR 远期利率分析报告生成器
 
 本文件用于批量生成 SHIBOR 远期利率分析报告
 """
+import os
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
