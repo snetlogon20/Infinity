@@ -38,7 +38,6 @@ from .MonteCarloRunner import MonteCarloRunner
 from .BaseAssetAnalyzer import BaseAssetAnalyzer, AnalyzerFactory
 from .GoldAnalyzer import GoldAnalyzer
 from .USStockAnalyzer import USStockAnalyzer
-from .ChinaStockAnalyzer import ChinaStockAnalyzer
 from .MonteCarloEngine import MonteCarloEngine
 from .RiskMetrics import RiskMetrics
 from .ResultAggregator import ResultAggregator
@@ -51,7 +50,6 @@ __all__ = [
     'AnalyzerFactory',
     'GoldAnalyzer',
     'USStockAnalyzer',
-    'ChinaStockAnalyzer',
     'MonteCarloEngine',
     'RiskMetrics',
     'ResultAggregator',

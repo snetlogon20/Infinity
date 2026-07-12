@@ -555,3 +555,141 @@ class Visualizer:
         )
 
         logger.info("All 4 charts plotted successfully")
+
+    # ==================================================================
+    #  Chart 5: 资产价格概率分布 (Histogram)
+    # ==================================================================
+
+    @staticmethod
+    def plot_price_distribution(simulated_returns: np.ndarray, last_close: float,
+                                asset_name: str = "",
+                                series_count: int = 5000,
+                                show: bool = True):
+        """
+        Chart 5 — 资产价格概率分布 (直方图)
+
+        Shows histogram of simulated absolute prices from Monte Carlo simulation,
+        with current price marker and P5/P50/P95 statistics.
+        """
+        simulated_prices = last_close * (1 + simulated_returns)
+
+        p5 = float(np.percentile(simulated_prices, 5))
+        p50 = float(np.percentile(simulated_prices, 50))
+        p95 = float(np.percentile(simulated_prices, 95))
+
+        fig, ax = plt.subplots(figsize=(18, 7))
+        title = f"[{asset_name}] 资产价格概率分布 ({int(series_count):,}次模拟)"
+        fig.suptitle(title, fontsize=14, fontweight='bold')
+
+        # Histogram
+        ax.hist(simulated_prices, bins=60, alpha=0.7, color='steelblue',
+                edgecolor='white', linewidth=0.5, label='Frequency')
+
+        # Current price line
+        ax.axvline(x=last_close, color='orange', linestyle='--', linewidth=2,
+                   label=f'Current Price: ${last_close:.2f}')
+
+        # Annotations for key percentiles
+        y_max = ax.get_ylim()[1]
+        ax.annotate(f'P5: ${p5:.2f}', xy=(p5, y_max * 0.9),
+                    xytext=(-40, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#e74c3c',
+                    arrowprops=dict(arrowstyle='->', color='#e74c3c'))
+        ax.annotate(f'P50: ${p50:.2f}', xy=(p50, y_max * 0.7),
+                    xytext=(-40, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#2c3e50',
+                    arrowprops=dict(arrowstyle='->', color='#2c3e50'))
+        ax.annotate(f'P95: ${p95:.2f}', xy=(p95, y_max * 0.5),
+                    xytext=(10, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#27ae60',
+                    arrowprops=dict(arrowstyle='->', color='#27ae60'))
+
+        ax.set_xlabel('Price')
+        ax.set_ylabel('Frequency')
+        ax.legend(loc='upper right', fontsize=9)
+        ax.grid(True, alpha=0.3)
+
+        # Stats box below chart
+        stats_text = (
+            f'5th Percentile (Downside): ${p5:.2f}    |    '
+            f'Median Value: ${p50:.2f}    |    '
+            f'95th Percentile (Upside): ${p95:.2f}'
+        )
+        fig.text(0.5, 0.01, stats_text, ha='center', fontsize=11,
+                 fontweight='bold', color='#2c3e50',
+                 bbox=dict(boxstyle='round,pad=0.5', facecolor='#f0f0f0',
+                          edgecolor='#cccccc'))
+
+        plt.tight_layout(rect=[0, 0.05, 1, 1])
+        if show:
+            plt.show()
+        return fig, ax
+
+    # ==================================================================
+    #  Chart 6: 收益率概率分布 (Histogram)
+    # ==================================================================
+
+    @staticmethod
+    def plot_pct_change_distribution(simulated_returns: np.ndarray,
+                                     asset_name: str = "",
+                                     series_count: int = 5000,
+                                     show: bool = True):
+        """
+        Chart 6 — 收益率概率分布 (直方图)
+
+        Shows histogram of simulated percentage changes from Monte Carlo simulation,
+        with zero line and P5/P50/P95 statistics.
+        """
+        simulated_pct = simulated_returns * 100  # convert to percentage points
+
+        p5 = float(np.percentile(simulated_pct, 5))
+        p50 = float(np.percentile(simulated_pct, 50))
+        p95 = float(np.percentile(simulated_pct, 95))
+
+        fig, ax = plt.subplots(figsize=(18, 7))
+        title = f"[{asset_name}] 收益率概率分布 ({int(series_count):,}次模拟)"
+        fig.suptitle(title, fontsize=14, fontweight='bold')
+
+        # Histogram
+        ax.hist(simulated_pct, bins=60, alpha=0.7, color='steelblue',
+                edgecolor='white', linewidth=0.5, label='Frequency')
+
+        # Zero line (no change)
+        ax.axvline(x=0, color='orange', linestyle='--', linewidth=2,
+                   label='0% (No Change)')
+
+        # Annotations for key percentiles
+        y_max = ax.get_ylim()[1]
+        ax.annotate(f'P5: {p5:.2f}%', xy=(p5, y_max * 0.9),
+                    xytext=(-60, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#e74c3c',
+                    arrowprops=dict(arrowstyle='->', color='#e74c3c'))
+        ax.annotate(f'P50: {p50:.2f}%', xy=(p50, y_max * 0.7),
+                    xytext=(-60, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#2c3e50',
+                    arrowprops=dict(arrowstyle='->', color='#2c3e50'))
+        ax.annotate(f'P95: {p95:.2f}%', xy=(p95, y_max * 0.5),
+                    xytext=(10, 10), textcoords='offset points',
+                    fontsize=9, fontweight='bold', color='#27ae60',
+                    arrowprops=dict(arrowstyle='->', color='#27ae60'))
+
+        ax.set_xlabel('Percentage Change (%)')
+        ax.set_ylabel('Frequency')
+        ax.legend(loc='upper right', fontsize=9)
+        ax.grid(True, alpha=0.3)
+
+        # Stats box below chart
+        stats_text = (
+            f'5th Percentile (Downside): {p5:.2f}%    |    '
+            f'Median Value: {p50:.2f}%    |    '
+            f'95th Percentile (Upside): {p95:.2f}%'
+        )
+        fig.text(0.5, 0.01, stats_text, ha='center', fontsize=11,
+                 fontweight='bold', color='#2c3e50',
+                 bbox=dict(boxstyle='round,pad=0.5', facecolor='#f0f0f0',
+                          edgecolor='#cccccc'))
+
+        plt.tight_layout(rect=[0, 0.05, 1, 1])
+        if show:
+            plt.show()
+        return fig, ax

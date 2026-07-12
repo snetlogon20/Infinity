@@ -143,6 +143,70 @@ _COMMENTARY_CHART4_RISK = (
     "   —— 风险管理专家"
 )
 
+_COMMENTARY_CHART5_TITLE = "资产价格概率分布 — 专家观点"
+
+_COMMENTARY_CHART5_TRADER = (
+    "1. 价格分布形态\n"
+    "   观察价格直方图的分布形态（对称/左偏/右偏）。若分布左偏（左侧尾部拉长），\n"
+    "   说明下行风险大于上行空间——空头情景的概率更高。\n\n"
+    "2. 当前价格位置\n"
+    "   当前价格在分布中的百分位位置至关重要——若处于 P10 以下区间（低估区间），\n"
+    "   可能是买入机会；若处于 P90 以上（高估区间），应考虑减仓或对冲。\n\n"
+    "3. P5/P50/P95 解读\n"
+    "   · P5 (5%分位)：最坏情景下的资产价格，用于设定最大亏损承受线。\n"
+    "   · P50 (中位数)：最可能情景——方向性交易的核心参考。\n"
+    "   · P95 (95%分位)：最优情景，用于设定止盈目标。\n\n"
+    "4. 交易建议\n"
+    "   结合当前价格与分位数。若当前价接近 P5，可轻仓试多；若接近 P95，分批止盈。\n"
+    "   —— 资深交易员"
+)
+
+_COMMENTARY_CHART5_RISK = (
+    "1. 尾部风险识别\n"
+    "   P5 与当前价格的价差反映极端下行风险。若该价差超过账户可承受的\n"
+    "   最大亏损比例，需立即减仓或买入看跌期权保护。\n\n"
+    "2. 分布宽度（波动率代理）\n"
+    "   P95 - P5 的宽度间接反映模型的波动率假设：宽度越大，不确定性越高，\n"
+    "   需要的保证金和资本储备越多。\n\n"
+    "3. 风险管控建议\n"
+    "   · 将 P5 设为硬止损参考线。\n"
+    "   · 若分布呈\"尖峰厚尾\"形态（峰度高），增加尾部风险对冲（如价外期权）。\n"
+    "   · 每日重估分布参数，确认假设是否仍然有效。\n"
+    "   —— 风险管理专家"
+)
+
+_COMMENTARY_CHART6_TITLE = "收益率概率分布 — 专家观点"
+
+_COMMENTARY_CHART6_TRADER = (
+    "1. 期望收益率\n"
+    "   分布均值（μ）反映预期收益方向。若均值 > 0，模型倾向于看涨；\n"
+    "   若均值 < 0，需谨慎对待多头仓位。\n\n"
+    "2. 正负概率比\n"
+    "   计算 P(return > 0) 的比率——若超过 60%，模型有较强的正面趋势信号；\n"
+    "   若在 40%-60% 之间，方向不明确，适合区间交易策略。\n\n"
+    "3. 极端收益概率\n"
+    "   P5 和 P95 的绝对值反映了极端行情的可能幅度。\n"
+    "   对于短线交易（5日），P5 < -3% 提示需收紧止损。\n\n"
+    "4. 交易建议\n"
+    "   分布形状决定仓位大小：分布越宽（波动大），仓位越轻。\n"
+    "   —— 资深交易员"
+)
+
+_COMMENTARY_CHART6_RISK = (
+    "1. 左尾风险\n"
+    "   重点关注 P5 的绝对值是否超过持仓的逐日盯市（MTM）止损阈值。\n"
+    "   若 P5 < -5%，需立即审查头寸规模和杠杆率。\n\n"
+    "2. 模型风险\n"
+    "   收益率分布假设（正态/学生-t/偏斜-t）对尾部估计影响极大。\n"
+    "   若实际分布与假设不符，蒙特卡罗结果可能低估尾部风险。\n"
+    "   建议对比多种分布的回测结果。\n\n"
+    "3. 风险限额建议\n"
+    "   · 设定 P1 为终极止损线（此处未显示，需用 99% VaR 补充）。\n"
+    "   · 若模拟收益率的标准差 > 历史同期 90 分位，启动波动率预警。\n"
+    "   · 定期进行分布拟合优度检验（KS/AD 检验），确保模型有效。\n"
+    "   —— 风险管理专家"
+)
+
 
 # ======================================================================
 #  ReportGenerator
@@ -303,6 +367,8 @@ class ReportGenerator:
         end_date: str = "",
         simulate_params: Optional[Dict[str, Any]] = None,
         backtest_results: Optional[Dict[str, Any]] = None,
+        simulated_returns: Optional[np.ndarray] = None,
+        last_close_price: Optional[float] = None,
         output_dir: str = _DEFAULT_PDF_OUTPUT_DIR,
     ) -> str:
         """Generate comprehensive PDF report.
@@ -422,6 +488,33 @@ class ReportGenerator:
         pages.append(("图4点评",
                        ReportGenerator._make_commentary_figure(
                            _COMMENTARY_CHART4_TITLE, _COMMENTARY_CHART4_TRADER, _COMMENTARY_CHART4_RISK)))
+
+        # --- Charts 5 & 6: distribution (if simulated_returns available) ---
+        if simulated_returns is not None and last_close_price is not None:
+            series_count = len(simulated_returns)
+            logger.info(f"  Building Chart 5: 资产价格概率分布 ({series_count} simulations)...")
+            fig5, _ = Visualizer.plot_price_distribution(
+                simulated_returns, last_close_price,
+                asset_name=asset_name,
+                series_count=series_count,
+                show=False,
+            )
+            pages.append(("图5: 资产价格概率分布", fig5))
+            pages.append(("图5点评",
+                           ReportGenerator._make_commentary_figure(
+                               _COMMENTARY_CHART5_TITLE, _COMMENTARY_CHART5_TRADER, _COMMENTARY_CHART5_RISK)))
+
+            logger.info(f"  Building Chart 6: 收益率概率分布 ({series_count} simulations)...")
+            fig6, _ = Visualizer.plot_pct_change_distribution(
+                simulated_returns,
+                asset_name=asset_name,
+                series_count=series_count,
+                show=False,
+            )
+            pages.append(("图6: 收益率概率分布", fig6))
+            pages.append(("图6点评",
+                           ReportGenerator._make_commentary_figure(
+                               _COMMENTARY_CHART6_TITLE, _COMMENTARY_CHART6_TRADER, _COMMENTARY_CHART6_RISK)))
 
         # --- Backtest (if available) ---
         if backtest_results:

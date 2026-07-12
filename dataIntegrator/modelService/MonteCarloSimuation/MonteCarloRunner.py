@@ -385,7 +385,29 @@ class MonteCarloRunner:
             raise RuntimeError("No analysis results. Call run_analysis() first.")
 
         from .ReportGenerator import ReportGenerator
+        from .MonteCarloEngine import MonteCarloEngine
 
+        # ---- Generate raw simulated returns for distribution charts ----
+        simulated_returns = None
+        last_close_price = None
+        try:
+            returns_col = self._original_df['analysis_column'].dropna().values
+            limit = self.limit_date
+            returns_slice = pd.Series(returns_col[-limit:])
+
+            engine = MonteCarloEngine(returns_slice, self.simulate_params)
+            engine.fit_distribution()
+            engine.calculate_sigma()
+            simulated_returns = engine.simulate_single_step()
+
+            if 'close' in self._original_df.columns:
+                last_close_price = float(self._original_df['close'].iloc[-1])
+            logger.info(f"Distribution data prepared: {len(simulated_returns)} simulated returns, "
+                         f"last_close={last_close_price}")
+        except Exception as e:
+            logger.warning(f"Could not generate distribution simulation data: {e}")
+
+        # ---- Generate PDF ----
         logger.info("Generating PDF report...")
         pdf_path = ReportGenerator.generate(
             original_df=self._original_df,
@@ -397,6 +419,8 @@ class MonteCarloRunner:
             end_date=self.analyzer.end_date or "",
             simulate_params=self.simulate_params,
             backtest_results=backtest_results,
+            simulated_returns=simulated_returns,
+            last_close_price=last_close_price,
             output_dir=_MONTE_CARLO_REPORT_DIR,
         )
         logger.info(f"PDF report generated: {pdf_path}")
