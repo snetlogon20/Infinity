@@ -24,8 +24,8 @@ runner = MonteCarloRunner(
 # 1. 主分析 + Excel 导出（先输出数据）
 original_df, prediction_df, final_df = runner.run_and_export()
 
-# 2. 作图（输出数据后再作图）
-runner.plot_all()
+# # 2. 作图（输出数据后再作图）
+# runner.plot_all()
 
 # 3. 回测验证（Kupiec 检验 2026 年）
 backtest_results = runner.run_backtest(

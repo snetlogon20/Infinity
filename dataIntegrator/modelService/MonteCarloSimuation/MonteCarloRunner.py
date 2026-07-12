@@ -3,11 +3,17 @@ MonteCarloRunner — main orchestrator.
 Entry point for running Monte Carlo analysis and backtesting.
 """
 
+import os
 import pandas as pd
 import numpy as np
 from typing import Tuple, Optional
 import logging
 from datetime import datetime
+
+from dataIntegrator.common.CommonParameters import CommonParameters
+
+# 报表输出目录，基于 CommonParameters.reportPath，避免操作系统切换硬编码
+_MONTE_CARLO_REPORT_DIR = os.path.join(CommonParameters.reportPath, 'MonteCarloSimulationAnalysis')
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +199,8 @@ class MonteCarloRunner:
         print(f"\nRecommended distribution: {recommended}")
         print("=" * 70 + "\n")
 
-        # Plot
-        BacktestEngine.plot_backtest_results(results)
+        # Plot (suppressed — charts are embedded in the PDF report)
+        # BacktestEngine.plot_backtest_results(results)
 
         return results
 
@@ -215,7 +221,7 @@ class MonteCarloRunner:
             f"{start_clean}_{end_clean}_{ts}.{ext}"
         )
 
-    def export_to_excel(self, output_dir: str = r"D:\workspace_python\infinity_data\data\outbound"):
+    def export_to_excel(self, output_dir: str = _MONTE_CARLO_REPORT_DIR):
         """
         Export all 3 DataFrames to Excel files with standardized naming.
 
@@ -256,7 +262,7 @@ class MonteCarloRunner:
         print(f"  预测结果: {os.path.basename(file_prediction)}")
         print(f"  最终结果: {os.path.basename(file_final)}")
 
-    def run_and_export(self, output_dir: str = r"D:\workspace_python\infinity_data\data\outbound"
+    def run_and_export(self, output_dir: str = _MONTE_CARLO_REPORT_DIR
                        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Run analysis, export to Excel, then return DataFrames."""
         logger.info(">>> run_and_export: step 1/2 — running analysis...")
@@ -391,6 +397,7 @@ class MonteCarloRunner:
             end_date=self.analyzer.end_date or "",
             simulate_params=self.simulate_params,
             backtest_results=backtest_results,
+            output_dir=_MONTE_CARLO_REPORT_DIR,
         )
         logger.info(f"PDF report generated: {pdf_path}")
         return pdf_path

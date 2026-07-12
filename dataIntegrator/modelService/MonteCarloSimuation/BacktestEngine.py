@@ -18,10 +18,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Chinese font support
+# Chinese font support — Chinese fonts FIRST for CJK glyph coverage
 try:
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'Arial']
     plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['font.family'] = 'sans-serif'
 except Exception:
     pass
 
@@ -339,8 +340,16 @@ class BacktestEngine:
     # ------------------------------------------------------------------
 
     @classmethod
-    def plot_backtest_results(cls, results: dict):
-        """Plot backtest summary: violation rates per distribution vs expected alpha."""
+    def plot_backtest_results(cls, results: dict, show: bool = True):
+        """Plot backtest summary: violation rates per distribution vs expected alpha.
+        
+        Args:
+            results: dict from run_backtest().
+            show: if True, call plt.show(). Always returns (fig, axes).
+        
+        Returns:
+            (fig, axes) tuple for embedding in PDF reports.
+        """
         dists = []
         observed_rates = []
         p_values = []
@@ -354,12 +363,16 @@ class BacktestEngine:
             p_values.append(result.get('p_value', np.nan))
             rejections.append(result.get('reject_h0', True))
 
-        if not dists:
-            print("No backtest results to plot.")
-            return
-
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         fig.suptitle("Kupiec POF Backtest Results", fontsize=14, fontweight='bold')
+
+        if not dists:
+            for ax in axes:
+                ax.text(0.5, 0.5, "No backtest results available", ha='center', va='center',
+                        transform=ax.transAxes, fontsize=12)
+            if show:
+                plt.show()
+            return fig, axes
 
         # Bar chart: observed vs expected violation rate
         ax1 = axes[0]
@@ -388,23 +401,38 @@ class BacktestEngine:
         ax2.set_title('Kupiec Test P-values')
         ax2.legend()
         ax2.grid(True, alpha=0.3, axis='y')
-        # Log scale for p-values
         ax2.set_yscale('log')
         ax2.set_ylim(bottom=1e-6, top=1.1)
 
         plt.tight_layout()
-        plt.show()
+        if show:
+            plt.show()
+        return fig, axes
 
     # ------------------------------------------------------------------
     #  Detailed VAR violation plot for a specific distribution
     # ------------------------------------------------------------------
 
     @classmethod
-    def plot_var_violations(cls, result: dict, title: str = "VAR Violation Analysis"):
-        """Plot actual returns vs VAR lower bound, highlighting violations."""
+    def plot_var_violations(cls, result: dict, title: str = "VAR Violation Analysis",
+                            show: bool = True):
+        """Plot actual returns vs VAR lower bound, highlighting violations.
+        
+        Args:
+            result: single distribution result dict from run_backtest().
+            title: chart title.
+            show: if True, call plt.show(). Always returns fig.
+        
+        Returns:
+            fig or None if no series data available.
+        """
         if 'var_lower_series' not in result or 'actual_series' not in result:
-            print("No detailed series data in result.")
-            return
+            fig, ax = plt.subplots(figsize=(10, 3))
+            ax.text(0.5, 0.5, "No detailed series data in result.", ha='center', va='center',
+                    transform=ax.transAxes, fontsize=12)
+            if show:
+                plt.show()
+            return fig
 
         var_lower = np.array(result['var_lower_series'])
         actual = np.array(result['actual_series'])
@@ -430,4 +458,6 @@ class BacktestEngine:
         ax.axhline(y=0, color='gray', linewidth=0.5)
 
         plt.tight_layout()
-        plt.show()
+        if show:
+            plt.show()
+        return fig

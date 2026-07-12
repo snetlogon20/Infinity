@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 # Fix Unicode minus sign: must be set BEFORE any font configuration
 plt.rcParams['axes.unicode_minus'] = False
 
-# Configure fonts: DejaVu Sans first to avoid \u2212 glyph issues,
-# then Chinese fonts for CJK support
+# Configure fonts: Chinese fonts FIRST for CJK support,
+# DejaVu Sans as fallback for Latin glyphs
 try:
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Microsoft YaHei', 'Arial']
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'Arial']
     plt.rcParams['font.family'] = 'sans-serif'
 except Exception:
     pass
