@@ -54,7 +54,6 @@ trade_date  2016-07-11
 select * from indexsysdb.df_tushare_index_global
 where ts_code = 'DJI'
 order by trade_date desc
-
 trade_date  20260709
 
 --上证综指
@@ -68,6 +67,27 @@ select * from df_tushare_cn_index_daily
 where ts_code = '399001.SZ'
 
 trade_date  20240102
+
+--恒生指数
+select * from indexsysdb.df_tushare_index_global
+where ts_code = 'HSI'
+trade_date  20260709
+
+--台湾
+select * from indexsysdb.df_tushare_index_global
+where ts_code = 'TWII'
+trade_date  20260709
+
+--韩国
+select * from indexsysdb.df_tushare_index_global
+where ts_code = 'KS11'
+trade_date  20260709
+
+--日经
+select * from indexsysdb.df_tushare_index_global
+where ts_code = 'N225'
+trade_date  20260709
+
 
 -- ============================================================
 -- 宏观经济指标宽表：以 df_sys_calendar 为左表，关联所有宏观数据
@@ -98,6 +118,10 @@ trade_date  20240102
 --   df_tushare_usd_index_daily   trade_date  20200101   (YYYYMMDD), 美元指数
 --   df_akshare_futures_foreign_hist    date   2016-07-11 (YYYY-MM-DD), filter symbol='GC', 黄金期货
 --   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='DJI', 道琼斯
+--   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='HSI', 恒生指数
+--   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='TWII', 台湾加权
+--   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='KS11', 韩国综合
+--   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='N225', 日经225
 --   df_tushare_cn_index_daily    trade_date  20220523   (YYYYMMDD), filter ts_code='000001.SH', 上证综指
 --   df_tushare_cn_index_daily    trade_date  20240102   (YYYYMMDD), filter ts_code='399001.SZ', 深证成指
 -- ============================================================
@@ -155,7 +179,12 @@ SELECT
     -- ==================== 日频：上证综指 ====================
     sh.close            AS sh_close,
     -- ==================== 日频：深证成指数 ====================
-    sz.close            AS sz_close
+    sz.close            AS sz_close,
+    -- ==================== 日频：全球其他股指 ====================
+    hsi.close           AS hsi_close,
+    twii.close          AS twii_close,
+    ks11.close          AS ks11_close,
+    n225.close          AS n225_close
 FROM indexsysdb.df_sys_calendar cal
 -- 日频：直连 trade_date（均为 YYYYMMDD）
 LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
@@ -201,6 +230,18 @@ LEFT JOIN indexsysdb.df_tushare_cn_index_daily sh
 -- 日频：深证成指数 399001.SZ，trade_date='20240102'
 LEFT JOIN indexsysdb.df_tushare_cn_index_daily sz
     ON cal.trade_date = sz.trade_date AND sz.ts_code = '399001.SZ'
+-- 日频：恒生指数 HSI，trade_date='20260709'
+LEFT JOIN indexsysdb.df_tushare_index_global hsi
+    ON cal.trade_date = hsi.trade_date AND hsi.ts_code = 'HSI'
+-- 日频：台湾加权 TWII，trade_date='20260709'
+LEFT JOIN indexsysdb.df_tushare_index_global twii
+    ON cal.trade_date = twii.trade_date AND twii.ts_code = 'TWII'
+-- 日频：韩国综合 KS11，trade_date='20260709'
+LEFT JOIN indexsysdb.df_tushare_index_global ks11
+    ON cal.trade_date = ks11.trade_date AND ks11.ts_code = 'KS11'
+-- 日频：日经225 N225，trade_date='20260709'
+LEFT JOIN indexsysdb.df_tushare_index_global n225
+    ON cal.trade_date = n225.trade_date AND n225.ts_code = 'N225'
 WHERE cal.trade_date >= '20100101' and cal.trade_date <= '20260710'
 ORDER BY cal.trade_date desc 
 
@@ -325,6 +366,42 @@ sz_monthly AS (
     FROM indexsysdb.df_tushare_cn_index_daily
     WHERE ts_code = '399001.SZ'
     GROUP BY substring(trade_date, 1, 6)
+),
+-- 恒生指数 HSI 月度预聚合
+hsi_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS hsi_close
+    FROM indexsysdb.df_tushare_index_global
+    WHERE ts_code = 'HSI'
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 台湾加权 TWII 月度预聚合
+twii_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS twii_close
+    FROM indexsysdb.df_tushare_index_global
+    WHERE ts_code = 'TWII'
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 韩国综合 KS11 月度预聚合
+ks11_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS ks11_close
+    FROM indexsysdb.df_tushare_index_global
+    WHERE ts_code = 'KS11'
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 日经225 N225 月度预聚合
+n225_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS n225_close
+    FROM indexsysdb.df_tushare_index_global
+    WHERE ts_code = 'N225'
+    GROUP BY substring(trade_date, 1, 6)
 )
 SELECT
     toUInt32(cal.trade_year) AS trade_year,
@@ -364,7 +441,15 @@ SELECT
     -- 上证综指月末值
     max(sh.sh_close) AS sh_close,
     -- 深证成指数月末值
-    max(sz.sz_close) AS sz_close
+    max(sz.sz_close) AS sz_close,
+    -- 恒生指数月末值
+    max(hsi.hsi_close) AS hsi_close,
+    -- 台湾加权月末值
+    max(twii.twii_close) AS twii_close,
+    -- 韩国综合月末值
+    max(ks11.ks11_close) AS ks11_close,
+    -- 日经225月末值
+    max(n225.n225_close) AS n225_close
 FROM indexsysdb.df_sys_calendar cal
 ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
     ON cal.trade_date = shibor.trade_date
@@ -398,6 +483,14 @@ ANY LEFT JOIN sh_monthly sh
     ON substring(cal.trade_date, 1, 6) = sh.yyyymm
 ANY LEFT JOIN sz_monthly sz
     ON substring(cal.trade_date, 1, 6) = sz.yyyymm
+ANY LEFT JOIN hsi_monthly hsi
+    ON substring(cal.trade_date, 1, 6) = hsi.yyyymm
+ANY LEFT JOIN twii_monthly twii
+    ON substring(cal.trade_date, 1, 6) = twii.yyyymm
+ANY LEFT JOIN ks11_monthly ks11
+    ON substring(cal.trade_date, 1, 6) = ks11.yyyymm
+ANY LEFT JOIN n225_monthly n225
+    ON substring(cal.trade_date, 1, 6) = n225.yyyymm
 WHERE cal.trade_date BETWEEN '20100101' AND '20260710'
 GROUP BY
     toUInt32(cal.trade_year),

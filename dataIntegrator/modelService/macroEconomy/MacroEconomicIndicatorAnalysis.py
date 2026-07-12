@@ -31,6 +31,7 @@ class MacroEconomicIndicatorAnalysis:
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
         'gdp_yoy',
         'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
+        'hsi_close', 'twii_close', 'ks11_close', 'n225_close',
     ]
 
     TARGET_TABLE = 'tb_macro_economic_indicator'
@@ -165,6 +166,38 @@ class MacroEconomicIndicatorAnalysis:
             FROM indexsysdb.df_tushare_cn_index_daily
             WHERE ts_code = '399001.SZ'
             GROUP BY substring(trade_date, 1, 6)
+        ),
+        hsi_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS hsi_close
+            FROM indexsysdb.df_tushare_index_global
+            WHERE ts_code = 'HSI'
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        twii_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS twii_close
+            FROM indexsysdb.df_tushare_index_global
+            WHERE ts_code = 'TWII'
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        ks11_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS ks11_close
+            FROM indexsysdb.df_tushare_index_global
+            WHERE ts_code = 'KS11'
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        n225_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS n225_close
+            FROM indexsysdb.df_tushare_index_global
+            WHERE ts_code = 'N225'
+            GROUP BY substring(trade_date, 1, 6)
         )
         SELECT
             toUInt32(cal.trade_year) AS trade_year,
@@ -196,7 +229,11 @@ class MacroEconomicIndicatorAnalysis:
             max(gld.gold_close) AS gold_close,
             max(dji.dji_close) AS dji_close,
             max(sh.sh_close) AS sh_close,
-            max(sz.sz_close) AS sz_close
+            max(sz.sz_close) AS sz_close,
+            max(hsi.hsi_close) AS hsi_close,
+            max(twii.twii_close) AS twii_close,
+            max(ks11.ks11_close) AS ks11_close,
+            max(n225.n225_close) AS n225_close
         FROM indexsysdb.df_sys_calendar cal
         ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
             ON cal.trade_date = shibor.trade_date
@@ -230,6 +267,14 @@ class MacroEconomicIndicatorAnalysis:
             ON substring(cal.trade_date, 1, 6) = sh.yyyymm
         ANY LEFT JOIN sz_monthly sz
             ON substring(cal.trade_date, 1, 6) = sz.yyyymm
+        ANY LEFT JOIN hsi_monthly hsi
+            ON substring(cal.trade_date, 1, 6) = hsi.yyyymm
+        ANY LEFT JOIN twii_monthly twii
+            ON substring(cal.trade_date, 1, 6) = twii.yyyymm
+        ANY LEFT JOIN ks11_monthly ks11
+            ON substring(cal.trade_date, 1, 6) = ks11.yyyymm
+        ANY LEFT JOIN n225_monthly n225
+            ON substring(cal.trade_date, 1, 6) = n225.yyyymm
         WHERE cal.trade_date BETWEEN '20100101' AND '{today}'
         GROUP BY
             toUInt32(cal.trade_year),
@@ -381,11 +426,19 @@ class MacroEconomicIndicatorAnalysis:
             dji_close Float64,
             sh_close Float64,
             sz_close Float64,
+            hsi_close Float64,
+            twii_close Float64,
+            ks11_close Float64,
+            n225_close Float64,
             usdx_index_pct Float64,
             gold_close_pct Float64,
             dji_close_pct Float64,
             sh_close_pct Float64,
-            sz_close_pct Float64
+            sz_close_pct Float64,
+            hsi_close_pct Float64,
+            twii_close_pct Float64,
+            ks11_close_pct Float64,
+            n225_close_pct Float64
         )
         ENGINE = MergeTree()
         ORDER BY (trade_month)

@@ -58,6 +58,7 @@ class MacroEconomicIndicatorReport:
         'gdp_yoy_pct',
         'usdx_index_pct', 'gold_close_pct', 'dji_close_pct',
         'sh_close_pct', 'sz_close_pct',
+        'hsi_close_pct', 'twii_close_pct', 'ks11_close_pct', 'n225_close_pct',
     ]
 
     ALL_RAW_FIELDS = [
@@ -71,6 +72,7 @@ class MacroEconomicIndicatorReport:
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
         'gdp_yoy',
         'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
+        'hsi_close', 'twii_close', 'ks11_close', 'n225_close',
     ]
 
     FIELD_CN_NAMES = {
@@ -89,6 +91,8 @@ class MacroEconomicIndicatorReport:
         'dji_close': '道琼斯工业', 'sh_close': '上证综指', 'sz_close': '深证成指',
         'usdx_index_pct': '美元指数环比', 'gold_close_pct': '黄金GC环比',
         'dji_close_pct': '道琼斯环比', 'sh_close_pct': '上证综指环比', 'sz_close_pct': '深证成指环比',
+        'hsi_close': '恒生指数', 'twii_close': '台湾加权', 'ks11_close': '韩国综合', 'n225_close': '日经225',
+        'hsi_close_pct': '恒生指数环比', 'twii_close_pct': '台湾加权环比', 'ks11_close_pct': '韩国综合环比', 'n225_close_pct': '日经225环比',
     }
 
     CHART_COLORS = [
@@ -380,22 +384,30 @@ class MacroEconomicIndicatorReport:
         }, title, figsize=(16, 7), ylabel='环比增幅')
 
     def gen_chart12_market_raw(self, df):
-        """图12：dji_close, sh_close, sz_close（绝对值），不限制上下界"""
+        """图12：dji_close, hsi_close, twii_close, ks11_close, n225_close, sh_close, sz_close（绝对值），不限制上下界"""
         title = '图12：全球主要股指收盘价（原始值）'
         return self._draw_line_chart(df, {
             'dji_close': '道琼斯工业',
+            'hsi_close': '恒生指数',
+            'twii_close': '台湾加权',
+            'ks11_close': '韩国综合',
+            'n225_close': '日经225',
             'sh_close': '上证综指',
             'sz_close': '深证成指',
-        }, title, figsize=(15, 7), ylabel='收盘价')
+        }, title, figsize=(18, 8), ylabel='收盘价')
 
     def gen_chart13_market_pct(self, df):
-        """图13：dji_close_pct, sh_close_pct, sz_close_pct，不限制上下界"""
+        """图13：dji_close_pct, hsi_close_pct, twii_close_pct, ks11_close_pct, n225_close_pct, sh_close_pct, sz_close_pct，不限制上下界"""
         title = '图13：全球主要股指 环比增幅'
         return self._draw_line_chart(df, {
             'dji_close_pct': '道琼斯环比',
+            'hsi_close_pct': '恒生指数环比',
+            'twii_close_pct': '台湾加权环比',
+            'ks11_close_pct': '韩国综合环比',
+            'n225_close_pct': '日经225环比',
             'sh_close_pct': '上证综指环比',
             'sz_close_pct': '深证成指环比',
-        }, title, figsize=(15, 7), ylabel='环比增幅')
+        }, title, figsize=(18, 8), ylabel='环比增幅')
 
     def gen_chart14_heatmap_raw(self, df):
         """图14：不带有_PCT字段的相关系数热力图"""
@@ -755,41 +767,52 @@ class MacroEconomicIndicatorReport:
         """图12：全球主要股指 原始值"""
         lines = []
         recent = df.tail(12)
-        if 'dji_close' in df.columns and 'sh_close' in df.columns and 'sz_close' in df.columns:
-            dji_last = recent['dji_close'].dropna().iloc[-1]
-            sh_last = recent['sh_close'].dropna().iloc[-1]
-            sz_last = recent['sz_close'].dropna().iloc[-1]
-            lines.append(
-                f"【全球股指】道琼斯 {dji_last:.0f} 点，上证综指 {sh_last:.0f} 点，深证成指 {sz_last:.0f} 点。"
-            )
-            if len(df) > 24:
-                dji_start = df['dji_close'].dropna().iloc[0]
-                sh_start = df['sh_close'].dropna().iloc[0]
-                dji_return = (dji_last - dji_start) / dji_start * 100
-                sh_return = (sh_last - sh_start) / sh_start * 100
-                lines.append(
-                    f"区间涨跌：道琼斯 {dji_return:.1f}%，上证综指 {sh_return:.1f}%。"
-                    f"{'美股整体强于A股。' if dji_return > sh_return else 'A股整体强于美股。'}"
-                )
+        indices = [
+            ('dji_close', '道琼斯'), ('hsi_close', '恒生'), ('twii_close', '台湾加权'),
+            ('ks11_close', '韩国综合'), ('n225_close', '日经225'),
+            ('sh_close', '上证综指'), ('sz_close', '深证成指'),
+        ]
+        latest_parts = []
+        for col, name in indices:
+            if col in df.columns:
+                last_val = recent[col].dropna().iloc[-1] if len(recent[col].dropna()) > 0 else None
+                if last_val is not None:
+                    latest_parts.append(f"{name} {last_val:.0f}")
+        if latest_parts:
+            lines.append(f"【全球股指】{'，'.join(latest_parts)}。")
+        if len(df) > 24:
+            perf_parts = []
+            for col, name in indices:
+                if col in df.columns:
+                    vals = df[col].dropna()
+                    if len(vals) > 0:
+                        first = vals.iloc[0]
+                        last = vals.iloc[-1]
+                        ret = (last - first) / first * 100
+                        perf_parts.append(f"{name} {ret:+.1f}%")
+            if perf_parts:
+                lines.append(f"区间涨跌：{'，'.join(perf_parts)}。")
+        # 亚太vs美股对比
+        if 'dji_close' in df.columns and 'hsi_close' in df.columns:
+            dji_corr = df['dji_close'].corr(df['hsi_close'])
+            lines.append(f"道琼斯与恒生相关系数 {dji_corr:.2f}，{'联动紧密。' if abs(dji_corr) > 0.7 else '存在一定独立性。'}")
         return lines
 
     def _get_chart13_analysis(self, df):
         """图13：全球主要股指 环比增幅"""
         lines = []
         recent = df.tail(12)
-        if 'dji_close_pct' in df.columns and 'sh_close_pct' in df.columns:
-            dji_pct = recent['dji_close_pct'].dropna().iloc[-1]
-            sh_pct = recent['sh_close_pct'].dropna().iloc[-1]
-            lines.append(
-                f"【股指环比】道琼斯环比 {dji_pct * 100:.2f}%，上证综指环比 {sh_pct * 100:.2f}%。"
-                f"{'美股与A股同向波动。' if dji_pct * sh_pct > 0 else '中美股市出现分化。'}"
-            )
-        if 'dji_close_pct' in df.columns:
-            dji_vol = df['dji_close_pct'].std()
-            lines.append(f"道琼斯环比波动率 {dji_vol * 100:.2f}%，反映美股的风险水平。")
-        if 'sh_close_pct' in df.columns:
-            sh_vol = df['sh_close_pct'].std()
-            lines.append(f"上证综指环比波动率 {sh_vol * 100:.2f}%。")
+        pct_indices = [
+            ('dji_close_pct', '道琼斯'), ('hsi_close_pct', '恒生'), ('twii_close_pct', '台湾加权'),
+            ('ks11_close_pct', '韩国综合'), ('n225_close_pct', '日经225'),
+            ('sh_close_pct', '上证综指'), ('sz_close_pct', '深证成指'),
+        ]
+        for col, name in pct_indices:
+            if col in df.columns:
+                last_val = recent[col].dropna().iloc[-1] if len(recent[col].dropna()) > 0 else None
+                if last_val is not None:
+                    trend = "↑" if last_val > 0 else "↓"
+                    lines.append(f"{name}环比 {trend} {abs(last_val) * 100:.2f}%")
         return lines
 
     def _get_chart14_analysis(self, df):
@@ -889,7 +912,7 @@ class MacroEconomicIndicatorReport:
 - 货币市场：SHIBOR 3M、LPR 5Y、M1/M2同比、CPI同比、USDCNH汇率
 - 国债收益率：2Y/5Y/10Y
 - 外部：美国10Y国债、美元指数、外汇储备、黄金储备、黄金期货GC价格、进出口同比
-- 全球股指：道琼斯工业、上证综指、深证成指
+- 全球股指：道琼斯工业、恒生指数、台湾加权、韩国综合、日经225、上证综指、深证成指
 - 融资：社会融资规模及各分项（人民币贷款/委托贷款/信托贷款/企业债券/股权融资）
 - 实体：GDP同比
 
@@ -900,7 +923,7 @@ class MacroEconomicIndicatorReport:
 1.【经济周期定位】当前中国经济处于什么周期阶段？结合GDP/M1-M2剪刀差/CPI变化趋势判断
 2.【货币政策评估】SHIBOR/LPR/国债收益率走势反映的货币政策取向及流动性环境
 3.【外部环境】美国利率、美元指数、人民币汇率、外汇储备、黄金价格、进出口数据揭示的外部压力与机遇
-4.【全球市场联动】道琼斯/上证综指/深证成指的走势特征及跨境联动性分析
+4.【全球市场联动】道琼斯/恒生/台湾加权/韩国综合/日经225/上证综指/深证成指的走势特征及亚太-美股跨境联动性分析
 5.【融资结构变迁】社会融资规模及各分项的结构变化说明，企业融资偏好演变
 6.【前瞻判断】未来1-2年宏观经济最可能的走势及主要风险点
 7.【资产配置启示】当前宏观环境下对固收/权益/大宗商品（含黄金）的配置建议
@@ -942,7 +965,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
 美国利率维持高位对人民币汇率形成压力，但外汇储备充足提供了缓冲。美元指数与黄金价格联动反映全球风险偏好的变化。进出口数据显示外需存在不确定性，贸易结构持续优化。
 
 4.【全球市场联动】
-道琼斯工业指数、上证综指与深证成指呈现出一定的联动特征，但A股受国内政策影响更大。美股持续走强对全球风险偏好形成支撑，A股估值相对低位为中长期配置提供安全边际。
+道琼斯指数、恒生指数、台湾加权、韩国综合、日经225、上证综指与深证成指呈现出一定的联动特征，但A股受国内政策影响更大。美股走强对全球风险偏好形成支撑，亚太各市场因经济结构差异表现分化，A股估值相对低位为中长期配置提供安全边际。
 
 5.【融资结构变迁】
 社会融资规模中，人民币贷款仍占主导，企业债券和股权融资占比逐步提升，反映直接融资市场的发展。信托贷款和委托贷款在监管收紧下有所收缩。
