@@ -56,6 +56,8 @@ class MacroEconomicIndicatorReport:
         'usdcnh_bid_close_pct', 'usdcnh_ask_close_pct',
         'cn_yield_2y_pct', 'cn_yield_5y_pct', 'cn_yield_10y_pct',
         'gdp_yoy_pct',
+        'usdx_index_pct', 'gold_close_pct', 'dji_close_pct',
+        'sh_close_pct', 'sz_close_pct',
     ]
 
     ALL_RAW_FIELDS = [
@@ -68,6 +70,7 @@ class MacroEconomicIndicatorReport:
         'usdcnh_bid_close', 'usdcnh_ask_close',
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
         'gdp_yoy',
+        'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
     ]
 
     FIELD_CN_NAMES = {
@@ -82,6 +85,10 @@ class MacroEconomicIndicatorReport:
         'usdcnh_ask_close': 'USDCNH卖出价', 'cn_yield_2y': '国债2Y收益率',
         'cn_yield_5y': '国债5Y收益率', 'cn_yield_10y': '国债10Y收益率',
         'gdp_yoy': 'GDP同比',
+        'usdx_index': '美元指数', 'gold_close': '黄金期货GC',
+        'dji_close': '道琼斯工业', 'sh_close': '上证综指', 'sz_close': '深证成指',
+        'usdx_index_pct': '美元指数环比', 'gold_close_pct': '黄金GC环比',
+        'dji_close_pct': '道琼斯环比', 'sh_close_pct': '上证综指环比', 'sz_close_pct': '深证成指环比',
     }
 
     CHART_COLORS = [
@@ -293,20 +300,22 @@ class MacroEconomicIndicatorReport:
         }, title, figsize=(14, 6), ylabel='环比增幅')
 
     def gen_chart4_forex_raw(self, df):
-        """图4：forex_reserves, gold_reserves（绝对值）"""
-        title = '图4：外汇储备 & 黄金储备（原始值）'
+        """图4：forex_reserves, gold_reserves, gold_close（绝对值）"""
+        title = '图4：外汇储备 & 黄金储备 & 黄金期货GC（原始值）'
         return self._draw_line_chart(df, {
             'forex_reserves': '外汇储备(亿美元)',
             'gold_reserves': '黄金储备(万盎司)',
-        }, title, figsize=(14, 6), ylabel='数值')
+            'gold_close': '黄金期货GC(美元/盎司)',
+        }, title, figsize=(16, 7), ylabel='数值')
 
     def gen_chart5_forex_pct(self, df):
-        """图5：forex_reserves_pct, gold_reserves_pct"""
-        title = '图5：外汇储备 & 黄金储备 环比增幅'
+        """图5：forex_reserves_pct, gold_reserves_pct, gold_close_pct"""
+        title = '图5：外汇储备 & 黄金储备 & 黄金期货GC 环比增幅'
         return self._draw_line_chart(df, {
             'forex_reserves_pct': '外汇储备环比',
             'gold_reserves_pct': '黄金储备环比',
-        }, title, figsize=(14, 6), ylabel='环比增幅')
+            'gold_close_pct': '黄金期货GC环比',
+        }, title, figsize=(16, 7), ylabel='环比增幅')
 
     def gen_chart6_yields_raw(self, df):
         """图6：国债2Y/5Y/10Y收益率 + GDP + CPI（绝对值），不限制上下界"""
@@ -370,18 +379,36 @@ class MacroEconomicIndicatorReport:
             'equity_financing_pct': '股权融资环比',
         }, title, figsize=(16, 7), ylabel='环比增幅')
 
-    def gen_chart12_heatmap_raw(self, df):
-        """图12：不带有_PCT字段的相关系数热力图"""
-        title = '图12：宏观经济指标原始值 相关系数矩阵'
+    def gen_chart12_market_raw(self, df):
+        """图12：dji_close, sh_close, sz_close（绝对值），不限制上下界"""
+        title = '图12：全球主要股指收盘价（原始值）'
+        return self._draw_line_chart(df, {
+            'dji_close': '道琼斯工业',
+            'sh_close': '上证综指',
+            'sz_close': '深证成指',
+        }, title, figsize=(15, 7), ylabel='收盘价')
+
+    def gen_chart13_market_pct(self, df):
+        """图13：dji_close_pct, sh_close_pct, sz_close_pct，不限制上下界"""
+        title = '图13：全球主要股指 环比增幅'
+        return self._draw_line_chart(df, {
+            'dji_close_pct': '道琼斯环比',
+            'sh_close_pct': '上证综指环比',
+            'sz_close_pct': '深证成指环比',
+        }, title, figsize=(15, 7), ylabel='环比增幅')
+
+    def gen_chart14_heatmap_raw(self, df):
+        """图14：不带有_PCT字段的相关系数热力图"""
+        title = '图14：宏观经济指标原始值 相关系数矩阵'
         raw_cols = [c for c in self.ALL_RAW_FIELDS if c in df.columns]
         if len(raw_cols) < 2:
             logger.warning("RAW字段不足，跳过热力图")
             return None
         return self._draw_heatmap(df, raw_cols, title)
 
-    def gen_chart13_heatmap_pct(self, df):
-        """图13：带有_PCT字段的相关系数热力图"""
-        title = '图13：宏观经济指标环比增幅 相关系数矩阵'
+    def gen_chart15_heatmap_pct(self, df):
+        """图15：带有_PCT字段的相关系数热力图"""
+        title = '图15：宏观经济指标环比增幅 相关系数矩阵'
         pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
         if len(pct_cols) < 2:
             logger.warning("PCT字段不足，跳过热力图")
@@ -534,7 +561,7 @@ class MacroEconomicIndicatorReport:
         return lines
 
     def _get_chart4_analysis(self, df):
-        """图4：外汇/黄金 原始值"""
+        """图4：外汇/黄金/黄金期货 原始值"""
         lines = []
         if 'forex_reserves' in df.columns:
             forex_last = df['forex_reserves'].dropna().iloc[-1]
@@ -551,10 +578,20 @@ class MacroEconomicIndicatorReport:
                 f"【黄金储备】当前 {gold_last:.0f} 万盎司，"
                 f"较期初增加 {change:.0f} 万盎司。央行持续增持黄金反映储备多元化战略。"
             )
+        if 'gold_close' in df.columns:
+            gc_last = df['gold_close'].dropna().iloc[-1]
+            gc_min = df['gold_close'].min()
+            gc_max = df['gold_close'].max()
+            lines.append(
+                f"【黄金期货GC】当前 {gc_last:.0f} 美元/盎司，"
+                f"区间 [{gc_min:.0f}, {gc_max:.0f}]。"
+                f"黄金价格与美元指数、地缘风险高度相关，为全球风险偏好的重要晴雨表。"
+                f"{'当前金价处于高位，反映避险需求旺盛。' if gc_last > gc_max * 0.85 else ''}"
+            )
         return lines
 
     def _get_chart5_analysis(self, df):
-        """图5：外汇/黄金 环比增幅"""
+        """图5：外汇/黄金/黄金期货 环比增幅"""
         lines = []
         forex_last = df['forex_reserves_pct'].dropna().iloc[-1] if 'forex_reserves_pct' in df.columns else None
         gold_last = df['gold_reserves_pct'].dropna().iloc[-1] if 'gold_reserves_pct' in df.columns else None
@@ -570,6 +607,13 @@ class MacroEconomicIndicatorReport:
             lines.append(
                 f"【黄金储备】最新环比增幅 {gold_last * 100:.2f}%，央行{label}黄金储备。"
                 f"黄金作为避险资产，其配置变化反映对国际货币体系的判断。"
+            )
+        if 'gold_close_pct' in df.columns:
+            gc_last = df['gold_close_pct'].dropna().iloc[-1]
+            direction = "上涨" if gc_last > 0 else "下跌"
+            lines.append(
+                f"【黄金期货GC环比】{direction} {abs(gc_last) * 100:.2f}%，"
+                f"{'市场避险情绪升温。' if gc_last > 0 else '风险偏好回升。'}"
             )
         return lines
 
@@ -708,12 +752,53 @@ class MacroEconomicIndicatorReport:
         return lines
 
     def _get_chart12_analysis(self, df):
-        """图12：原始值相关系数 专业分析"""
+        """图12：全球主要股指 原始值"""
+        lines = []
+        recent = df.tail(12)
+        if 'dji_close' in df.columns and 'sh_close' in df.columns and 'sz_close' in df.columns:
+            dji_last = recent['dji_close'].dropna().iloc[-1]
+            sh_last = recent['sh_close'].dropna().iloc[-1]
+            sz_last = recent['sz_close'].dropna().iloc[-1]
+            lines.append(
+                f"【全球股指】道琼斯 {dji_last:.0f} 点，上证综指 {sh_last:.0f} 点，深证成指 {sz_last:.0f} 点。"
+            )
+            if len(df) > 24:
+                dji_start = df['dji_close'].dropna().iloc[0]
+                sh_start = df['sh_close'].dropna().iloc[0]
+                dji_return = (dji_last - dji_start) / dji_start * 100
+                sh_return = (sh_last - sh_start) / sh_start * 100
+                lines.append(
+                    f"区间涨跌：道琼斯 {dji_return:.1f}%，上证综指 {sh_return:.1f}%。"
+                    f"{'美股整体强于A股。' if dji_return > sh_return else 'A股整体强于美股。'}"
+                )
+        return lines
+
+    def _get_chart13_analysis(self, df):
+        """图13：全球主要股指 环比增幅"""
+        lines = []
+        recent = df.tail(12)
+        if 'dji_close_pct' in df.columns and 'sh_close_pct' in df.columns:
+            dji_pct = recent['dji_close_pct'].dropna().iloc[-1]
+            sh_pct = recent['sh_close_pct'].dropna().iloc[-1]
+            lines.append(
+                f"【股指环比】道琼斯环比 {dji_pct * 100:.2f}%，上证综指环比 {sh_pct * 100:.2f}%。"
+                f"{'美股与A股同向波动。' if dji_pct * sh_pct > 0 else '中美股市出现分化。'}"
+            )
+        if 'dji_close_pct' in df.columns:
+            dji_vol = df['dji_close_pct'].std()
+            lines.append(f"道琼斯环比波动率 {dji_vol * 100:.2f}%，反映美股的风险水平。")
+        if 'sh_close_pct' in df.columns:
+            sh_vol = df['sh_close_pct'].std()
+            lines.append(f"上证综指环比波动率 {sh_vol * 100:.2f}%。")
+        return lines
+
+    def _get_chart14_analysis(self, df):
+        """图14：原始值相关系数 专业分析"""
         raw_cols = [c for c in self.ALL_RAW_FIELDS if c in df.columns]
         return self._corr_analysis(df, raw_cols, "原始值")
 
-    def _get_chart13_analysis(self, df):
-        """图13：PCT相关系数 专业分析"""
+    def _get_chart15_analysis(self, df):
+        """图15：PCT相关系数 专业分析"""
         pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
         return self._corr_analysis(df, pct_cols, "环比增幅")
 
@@ -803,7 +888,8 @@ class MacroEconomicIndicatorReport:
 数据为每年12月末截面数据，{df_ye['trade_month'].min()}-{df_ye['trade_month'].max()}，共{n_years}年。字段：
 - 货币市场：SHIBOR 3M、LPR 5Y、M1/M2同比、CPI同比、USDCNH汇率
 - 国债收益率：2Y/5Y/10Y
-- 外部：美国10Y国债、外汇储备、黄金储备、进出口同比
+- 外部：美国10Y国债、美元指数、外汇储备、黄金储备、黄金期货GC价格、进出口同比
+- 全球股指：道琼斯工业、上证综指、深证成指
 - 融资：社会融资规模及各分项（人民币贷款/委托贷款/信托贷款/企业债券/股权融资）
 - 实体：GDP同比
 
@@ -813,10 +899,11 @@ class MacroEconomicIndicatorReport:
 请完成以下分析，每条100-200字，结构清晰：
 1.【经济周期定位】当前中国经济处于什么周期阶段？结合GDP/M1-M2剪刀差/CPI变化趋势判断
 2.【货币政策评估】SHIBOR/LPR/国债收益率走势反映的货币政策取向及流动性环境
-3.【外部环境】美国利率、人民币汇率、外汇储备、进出口数据揭示的外部压力与机遇
-4.【融资结构变迁】社会融资规模及各分项的结构变化说明，企业融资偏好演变
-5.【前瞻判断】未来1-2年宏观经济最可能的走势及主要风险点
-6.【资产配置启示】当前宏观环境下对固收/权益/大宗商品的配置建议
+3.【外部环境】美国利率、美元指数、人民币汇率、外汇储备、黄金价格、进出口数据揭示的外部压力与机遇
+4.【全球市场联动】道琼斯/上证综指/深证成指的走势特征及跨境联动性分析
+5.【融资结构变迁】社会融资规模及各分项的结构变化说明，企业融资偏好演变
+6.【前瞻判断】未来1-2年宏观经济最可能的走势及主要风险点
+7.【资产配置启示】当前宏观环境下对固收/权益/大宗商品（含黄金）的配置建议
 
 请用中文直接给出分析内容，以编号和标题开头。"""
 
@@ -852,15 +939,18 @@ class MacroEconomicIndicatorReport:
 SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。国债收益率曲线形态反映市场对中长期经济增长的预期。流动性整体合理充裕。
 
 3.【外部环境】
-美国利率维持高位对人民币汇率形成压力，但外汇储备充足提供了缓冲。进出口数据显示外需存在不确定性，贸易结构持续优化。
+美国利率维持高位对人民币汇率形成压力，但外汇储备充足提供了缓冲。美元指数与黄金价格联动反映全球风险偏好的变化。进出口数据显示外需存在不确定性，贸易结构持续优化。
 
-4.【融资结构变迁】
+4.【全球市场联动】
+道琼斯工业指数、上证综指与深证成指呈现出一定的联动特征，但A股受国内政策影响更大。美股持续走强对全球风险偏好形成支撑，A股估值相对低位为中长期配置提供安全边际。
+
+5.【融资结构变迁】
 社会融资规模中，人民币贷款仍占主导，企业债券和股权融资占比逐步提升，反映直接融资市场的发展。信托贷款和委托贷款在监管收紧下有所收缩。
 
-5.【前瞻判断】
+6.【前瞻判断】
 未来1-2年，预计经济将延续结构性转型路径。主要风险点包括：房地产市场调整、地方政府债务化解、外部需求波动、以及地缘政治不确定性。
 
-6.【资产配置启示】
+7.【资产配置启示】
 固收：中短久期利率债具备配置价值，信用债需精选；权益：关注科技、消费、高端制造等结构性机会；大宗商品：黄金作为避险资产值得关注，工业金属需跟踪基建力度。
 
 (以上为模拟 AI 分析)"""
@@ -974,9 +1064,9 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
              self._get_chart2_analysis, '三、'),
             ('chart3_money_pct', '图3：货币供应量 M1/M2 环比增幅',
              self._get_chart3_analysis, '四、'),
-            ('chart4_forex_raw', '图4：外汇储备 & 黄金储备（原始值）',
+            ('chart4_forex_raw', '图4：外汇储备 & 黄金储备 & 黄金期货GC（原始值）',
              self._get_chart4_analysis, '五、'),
-            ('chart5_forex_pct', '图5：外汇储备 & 黄金储备 环比增幅',
+            ('chart5_forex_pct', '图5：外汇储备 & 黄金储备 & 黄金期货GC 环比增幅',
              self._get_chart5_analysis, '六、'),
             ('chart6_yields_raw', '图6：国债收益率 / GDP同比 / CPI同比（原始值）',
              self._get_chart6_analysis, '七、'),
@@ -990,10 +1080,14 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
              self._get_chart10_analysis, '十一、'),
             ('chart11_financing_pct', '图11：社会融资分项 环比增幅',
              self._get_chart11_analysis, '十二、'),
-            ('chart12_heatmap_raw', '图12：指标原始值 相关系数热力图',
+            ('chart12_market_raw', '图12：全球主要股指收盘价（原始值）',
              self._get_chart12_analysis, '十三、'),
-            ('chart13_heatmap_pct', '图13：指标环比增幅 相关系数热力图',
+            ('chart13_market_pct', '图13：全球主要股指 环比增幅',
              self._get_chart13_analysis, '十四、'),
+            ('chart14_heatmap_raw', '图14：指标原始值 相关系数热力图',
+             self._get_chart14_analysis, '十五、'),
+            ('chart15_heatmap_pct', '图15：指标环比增幅 相关系数热力图',
+             self._get_chart15_analysis, '十六、'),
         ]
 
         for i, (buf_key, chart_title, analysis_fn, section_label) in enumerate(chart_config):
@@ -1017,7 +1111,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
 
         # ===== AI 分析 =====
         if ai_analysis:
-            story.append(Paragraph('十五、AI 宏观分析师：年度截面数据专业分析', styles['h1']))
+            story.append(Paragraph('十七、AI 宏观分析师：年度截面数据专业分析', styles['h1']))
             story.append(Spacer(1, 0.15 * inch))
             for line in ai_analysis.strip().split('\n'):
                 if line.strip():
@@ -1025,7 +1119,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
         story.append(PageBreak())
 
         # ===== 风险提示 =====
-        story.append(Paragraph('十六、风险提示', styles['h1']))
+        story.append(Paragraph('十八、风险提示', styles['h1']))
         story.append(Spacer(1, 0.15 * inch))
         risk_text = (
             "本报告基于历史宏观经济数据进行量化分析，仅供参考，不构成投资建议。"
@@ -1095,12 +1189,16 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
             chart_buffers['chart10_financing_raw'] = self.gen_chart10_financing_raw(df)
             chart_buffers['chart11_financing_pct'] = self.gen_chart11_financing_pct(df)
 
-            # 图12-13: 热力图
-            chart_buffers['chart12_heatmap_raw'] = self.gen_chart12_heatmap_raw(df)
-            chart_buffers['chart13_heatmap_pct'] = self.gen_chart13_heatmap_pct(df)
+            # 图12-13: 全球主要股指 原始值 + 环比
+            chart_buffers['chart12_market_raw'] = self.gen_chart12_market_raw(df)
+            chart_buffers['chart13_market_pct'] = self.gen_chart13_market_pct(df)
+
+            # 图14-15: 热力图
+            chart_buffers['chart14_heatmap_raw'] = self.gen_chart14_heatmap_raw(df)
+            chart_buffers['chart15_heatmap_pct'] = self.gen_chart15_heatmap_pct(df)
 
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
-            logger.info(f"Charts generated: {chart_count}/13")
+            logger.info(f"Charts generated: {chart_count}/15")
 
             # AI 分析
             ai_analysis = self._generate_ai_macro_analysis(df)

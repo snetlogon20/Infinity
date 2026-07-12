@@ -35,6 +35,12 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     cn_yield_10y Float64 COMMENT '中国国债10Y收益率(%)',
     -- === GDP ===
     gdp_yoy Float64 COMMENT 'GDP 当季同比(%)',
+    -- === 境外市场行情 ===
+    usdx_index Float64 COMMENT '美元指数月末值',
+    gold_close Float64 COMMENT '黄金期货GC月末收盘价',
+    dji_close Float64 COMMENT '道琼斯工业指数月末收盘价',
+    sh_close Float64 COMMENT '上证综指月末收盘价',
+    sz_close Float64 COMMENT '深证成指数月末收盘价',
     -- === 环比增幅 (当期-前期)/前期，小数表示 ===
     shibor_3m_eom_pct Float64 COMMENT 'SHIBOR 3M 环比增幅',
     lpr_5y_eom_pct Float64 COMMENT 'LPR 5Y 环比增幅',
@@ -57,7 +63,12 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     cn_yield_2y_pct Float64 COMMENT '中国国债2Y 环比增幅',
     cn_yield_5y_pct Float64 COMMENT '中国国债5Y 环比增幅',
     cn_yield_10y_pct Float64 COMMENT '中国国债10Y 环比增幅',
-    gdp_yoy_pct Float64 COMMENT 'GDP 环比增幅'
+    gdp_yoy_pct Float64 COMMENT 'GDP 环比增幅',
+    usdx_index_pct Float64 COMMENT '美元指数 环比增幅',
+    gold_close_pct Float64 COMMENT '黄金期货GC 环比增幅',
+    dji_close_pct Float64 COMMENT '道琼斯工业指数 环比增幅',
+    sh_close_pct Float64 COMMENT '上证综指 环比增幅',
+    sz_close_pct Float64 COMMENT '深证成指数 环比增幅'
 )
 ENGINE=MergeTree()
 ORDER BY (trade_month)

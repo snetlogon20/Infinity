@@ -30,6 +30,7 @@ class MacroEconomicIndicatorAnalysis:
         'usdcnh_bid_close', 'usdcnh_ask_close',
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
         'gdp_yoy',
+        'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
     ]
 
     TARGET_TABLE = 'tb_macro_economic_indicator'
@@ -125,6 +126,45 @@ class MacroEconomicIndicatorAnalysis:
                 max(gdp_yoy) AS gdp_yoy
             FROM indexsysdb.df_tushare_cn_gdp
             GROUP BY quarter
+        ),
+        usdx_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(USDX_index, trade_date) AS usdx_index
+            FROM indexsysdb.df_tushare_usd_index_daily
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        gold_monthly AS (
+            SELECT
+                substring(replaceAll(date, '-', ''), 1, 6) AS yyyymm,
+                argMax(close, replaceAll(date, '-', '')) AS gold_close
+            FROM indexsysdb.df_akshare_futures_foreign_hist
+            WHERE symbol = 'GC'
+            GROUP BY substring(replaceAll(date, '-', ''), 1, 6)
+        ),
+        dji_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS dji_close
+            FROM indexsysdb.df_tushare_index_global
+            WHERE ts_code = 'DJI'
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        sh_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS sh_close
+            FROM indexsysdb.df_tushare_cn_index_daily
+            WHERE ts_code = '000001.SH'
+            GROUP BY substring(trade_date, 1, 6)
+        ),
+        sz_monthly AS (
+            SELECT
+                substring(trade_date, 1, 6) AS yyyymm,
+                argMax(close, trade_date) AS sz_close
+            FROM indexsysdb.df_tushare_cn_index_daily
+            WHERE ts_code = '399001.SZ'
+            GROUP BY substring(trade_date, 1, 6)
         )
         SELECT
             toUInt32(cal.trade_year) AS trade_year,
@@ -151,7 +191,12 @@ class MacroEconomicIndicatorAnalysis:
             max(cb.cn_yield_2y)  AS cn_yield_2y,
             max(cb.cn_yield_5y)  AS cn_yield_5y,
             max(cb.cn_yield_10y) AS cn_yield_10y,
-            max(gdp.gdp_yoy) AS gdp_yoy
+            max(gdp.gdp_yoy) AS gdp_yoy,
+            max(udx.usdx_index) AS usdx_index,
+            max(gld.gold_close) AS gold_close,
+            max(dji.dji_close) AS dji_close,
+            max(sh.sh_close) AS sh_close,
+            max(sz.sz_close) AS sz_close
         FROM indexsysdb.df_sys_calendar cal
         ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
             ON cal.trade_date = shibor.trade_date
@@ -175,6 +220,16 @@ class MacroEconomicIndicatorAnalysis:
             ON substring(cal.trade_date, 1, 6) = cb.yyyymm
         ANY LEFT JOIN gdp_quarterly gdp
             ON concat(cal.trade_year, 'Q', cal.quarter) = gdp.quarter
+        ANY LEFT JOIN usdx_monthly udx
+            ON substring(cal.trade_date, 1, 6) = udx.yyyymm
+        ANY LEFT JOIN gold_monthly gld
+            ON substring(cal.trade_date, 1, 6) = gld.yyyymm
+        ANY LEFT JOIN dji_monthly dji
+            ON substring(cal.trade_date, 1, 6) = dji.yyyymm
+        ANY LEFT JOIN sh_monthly sh
+            ON substring(cal.trade_date, 1, 6) = sh.yyyymm
+        ANY LEFT JOIN sz_monthly sz
+            ON substring(cal.trade_date, 1, 6) = sz.yyyymm
         WHERE cal.trade_date BETWEEN '20100101' AND '{today}'
         GROUP BY
             toUInt32(cal.trade_year),
@@ -320,7 +375,17 @@ class MacroEconomicIndicatorAnalysis:
             cn_yield_2y_pct Float64,
             cn_yield_5y_pct Float64,
             cn_yield_10y_pct Float64,
-            gdp_yoy_pct Float64
+            gdp_yoy_pct Float64,
+            usdx_index Float64,
+            gold_close Float64,
+            dji_close Float64,
+            sh_close Float64,
+            sz_close Float64,
+            usdx_index_pct Float64,
+            gold_close_pct Float64,
+            dji_close_pct Float64,
+            sh_close_pct Float64,
+            sz_close_pct Float64
         )
         ENGINE = MergeTree()
         ORDER BY (trade_month)

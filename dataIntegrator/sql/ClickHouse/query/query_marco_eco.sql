@@ -38,9 +38,36 @@ month 201501
 select * from indexsysdb.df_tushare_fx_daily where ts_code LIKE  'USDCNH.FXCM'
 trade_date 20200102
 
-
 select * from  df_akshare_bond_zh_us_rate
 trade_date  19901219
+
+
+--美元指数
+SELECT USDX_index FROM df_tushare_usd_index_daily
+trade_date 20200101
+
+--黄金价格
+SELECT * FROM indexsysdb.df_akshare_futures_foreign_hist WHERE symbol = 'GC'
+trade_date  2016-07-11
+
+--道琼斯
+select * from indexsysdb.df_tushare_index_global
+where ts_code = 'DJI'
+order by trade_date desc
+
+trade_date  20260709
+
+--上证综指
+select * from df_tushare_cn_index_daily
+where ts_code = '000001.SH'
+
+trade_date  20220523
+
+--深证成指数
+select * from df_tushare_cn_index_daily
+where ts_code = '399001.SZ'
+
+trade_date  20240102
 
 -- ============================================================
 -- 宏观经济指标宽表：以 df_sys_calendar 为左表，关联所有宏观数据
@@ -68,6 +95,11 @@ trade_date  19901219
 --   df_macro_china_shrzgm        month       201501     (YYYYMM)
 --   df_tushare_fx_daily          trade_date  20200102   (YYYYMMDD), filter ts_code='USDCNH.FXCM'
 --   df_akshare_bond_zh_us_rate   trade_date  19901219   (YYYYMMDD), 中美国债收益率日频
+--   df_tushare_usd_index_daily   trade_date  20200101   (YYYYMMDD), 美元指数
+--   df_akshare_futures_foreign_hist    date   2016-07-11 (YYYY-MM-DD), filter symbol='GC', 黄金期货
+--   df_tushare_index_global      trade_date  20260709   (YYYYMMDD), filter ts_code='DJI', 道琼斯
+--   df_tushare_cn_index_daily    trade_date  20220523   (YYYYMMDD), filter ts_code='000001.SH', 上证综指
+--   df_tushare_cn_index_daily    trade_date  20240102   (YYYYMMDD), filter ts_code='399001.SZ', 深证成指
 -- ============================================================
 SELECT
     cal.trade_date,
@@ -113,7 +145,17 @@ SELECT
     gdp.gdp_yoy,
     gdp.pi_yoy,
     gdp.si_yoy,
-    gdp.ti_yoy
+    gdp.ti_yoy,
+    -- ==================== 日频：美元指数 ====================
+    udx.USDX_index      AS usdx_index,
+    -- ==================== 日频：黄金期货 GC ====================
+    gold.close          AS gold_close,
+    -- ==================== 日频：道琼斯工业指数 ====================
+    dji.close           AS dji_close,
+    -- ==================== 日频：上证综指 ====================
+    sh.close            AS sh_close,
+    -- ==================== 日频：深证成指数 ====================
+    sz.close            AS sz_close
 FROM indexsysdb.df_sys_calendar cal
 -- 日频：直连 trade_date（均为 YYYYMMDD）
 LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
@@ -144,8 +186,23 @@ LEFT JOIN indexsysdb.df_akshare_bond_zh_us_rate cb
 -- 季频：cal.trade_year='2024' + cal.quarter='4' → '2024Q4'，匹配 gdp.quarter='2018Q1'
 LEFT JOIN indexsysdb.df_tushare_cn_gdp gdp
     ON concat(cal.trade_year, 'Q', cal.quarter) = gdp.quarter
-WHERE cal.trade_date >= '20100101'
-ORDER BY cal.trade_date
+-- 日频：美元指数，trade_date='20200101'
+LEFT JOIN indexsysdb.df_tushare_usd_index_daily udx
+    ON cal.trade_date = udx.trade_date
+-- 日频：黄金期货 GC，date='2016-07-11'，格式 YYYY-MM-DD → YYYYMMDD
+LEFT JOIN indexsysdb.df_akshare_futures_foreign_hist gold
+    ON cal.trade_date = replaceAll(gold.date, '-', '') AND gold.symbol = 'GC'
+-- 日频：道琼斯工业指数 DJI，trade_date='20260709'
+LEFT JOIN indexsysdb.df_tushare_index_global dji
+    ON cal.trade_date = dji.trade_date AND dji.ts_code = 'DJI'
+-- 日频：上证综指 000001.SH，trade_date='20220523'
+LEFT JOIN indexsysdb.df_tushare_cn_index_daily sh
+    ON cal.trade_date = sh.trade_date AND sh.ts_code = '000001.SH'
+-- 日频：深证成指数 399001.SZ，trade_date='20240102'
+LEFT JOIN indexsysdb.df_tushare_cn_index_daily sz
+    ON cal.trade_date = sz.trade_date AND sz.ts_code = '399001.SZ'
+WHERE cal.trade_date >= '20100101' and cal.trade_date <= '20260710'
+ORDER BY cal.trade_date desc 
 
 --月度数据SQL
 WITH
@@ -224,6 +281,50 @@ gdp_quarterly AS (
         max(gdp_yoy) AS gdp_yoy
     FROM indexsysdb.df_tushare_cn_gdp
     GROUP BY quarter
+),
+-- 美元指数月度预聚合（取月末最后交易日值）
+usdx_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(USDX_index, trade_date) AS usdx_index
+    FROM indexsysdb.df_tushare_usd_index_daily
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 黄金期货 GC 月度预聚合（取月末最后交易日值），date格式 YYYY-MM-DD
+gold_monthly AS (
+    SELECT
+        substring(replaceAll(date, '-', ''), 1, 6) AS yyyymm,
+        argMax(close, replaceAll(date, '-', '')) AS gold_close
+    FROM indexsysdb.df_akshare_futures_foreign_hist
+    WHERE symbol = 'GC'
+    GROUP BY substring(replaceAll(date, '-', ''), 1, 6)
+),
+-- 道琼斯工业指数 DJI 月度预聚合
+dji_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS dji_close
+    FROM indexsysdb.df_tushare_index_global
+    WHERE ts_code = 'DJI'
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 上证综指 月度预聚合
+sh_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS sh_close
+    FROM indexsysdb.df_tushare_cn_index_daily
+    WHERE ts_code = '000001.SH'
+    GROUP BY substring(trade_date, 1, 6)
+),
+-- 深证成指数 月度预聚合
+sz_monthly AS (
+    SELECT
+        substring(trade_date, 1, 6) AS yyyymm,
+        argMax(close, trade_date) AS sz_close
+    FROM indexsysdb.df_tushare_cn_index_daily
+    WHERE ts_code = '399001.SZ'
+    GROUP BY substring(trade_date, 1, 6)
 )
 SELECT
     toUInt32(cal.trade_year) AS trade_year,
@@ -253,7 +354,17 @@ SELECT
     max(cb.cn_yield_2y)  AS cn_yield_2y,
     max(cb.cn_yield_5y)  AS cn_yield_5y,
     max(cb.cn_yield_10y) AS cn_yield_10y,
-    max(gdp.gdp_yoy) AS gdp_yoy
+    max(gdp.gdp_yoy) AS gdp_yoy,
+    -- 美元指数月末值
+    max(udx.usdx_index) AS usdx_index,
+    -- 黄金期货 GC 月末值
+    max(gld.gold_close) AS gold_close,
+    -- 道琼斯工业指数月末值
+    max(dji.dji_close) AS dji_close,
+    -- 上证综指月末值
+    max(sh.sh_close) AS sh_close,
+    -- 深证成指数月末值
+    max(sz.sz_close) AS sz_close
 FROM indexsysdb.df_sys_calendar cal
 ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
     ON cal.trade_date = shibor.trade_date
@@ -277,6 +388,16 @@ ANY LEFT JOIN cb_monthly cb
     ON substring(cal.trade_date, 1, 6) = cb.yyyymm
 ANY LEFT JOIN gdp_quarterly gdp
     ON concat(cal.trade_year, 'Q', cal.quarter) = gdp.quarter
+ANY LEFT JOIN usdx_monthly udx
+    ON substring(cal.trade_date, 1, 6) = udx.yyyymm
+ANY LEFT JOIN gold_monthly gld
+    ON substring(cal.trade_date, 1, 6) = gld.yyyymm
+ANY LEFT JOIN dji_monthly dji
+    ON substring(cal.trade_date, 1, 6) = dji.yyyymm
+ANY LEFT JOIN sh_monthly sh
+    ON substring(cal.trade_date, 1, 6) = sh.yyyymm
+ANY LEFT JOIN sz_monthly sz
+    ON substring(cal.trade_date, 1, 6) = sz.yyyymm
 WHERE cal.trade_date BETWEEN '20100101' AND '20260710'
 GROUP BY
     toUInt32(cal.trade_year),
