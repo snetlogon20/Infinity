@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Image as RLImage,
                                  PageBreak)
@@ -483,7 +486,459 @@ class MacroEconomicIndicatorReport:
         plt.tight_layout()
         return self._fig_to_bytesio(fig)
 
-    # ===================== 专业分析文字 =====================
+    # ===================== 进阶分析：VIF / PCA / 滚动相关性 =====================
+
+    def _vif_analysis(self, df, cols, label):
+        """VIF 多重共线性检测，返回分析文字"""
+        if len(cols) < 3:
+            return [f"{label}字段不足，无法计算VIF。"]
+
+        valid_cols = [c for c in cols if c in df.columns and df[c].notna().sum() > 2]
+        if len(valid_cols) < 3:
+            return [f"{label}有效字段不足，无法计算VIF。"]
+
+        data = df[valid_cols].dropna()
+        if len(data) < 10:
+            return [f"{label}有效样本不足({len(data)}行)，无法计算VIF。"]
+
+        # VIF 计算（跳过常数列，处理无限值）
+        data = data.replace([np.inf, -np.inf], np.nan).dropna(axis=1, how='any')
+        if data.shape[1] < 3:
+            return [f"{label}去除异常值后有效字段不足。"]
+
+        vif_df = pd.DataFrame()
+        vif_df["feature"] = data.columns
+        vif_values = []
+        for i in range(data.shape[1]):
+            try:
+                vif = variance_inflation_factor(data.values, i)
+                # 无穷大或极大值标为 999
+                vif = 999.0 if np.isinf(vif) or vif > 1000 else round(vif, 2)
+            except Exception:
+                vif = 999.0
+            vif_values.append(vif)
+        vif_df["VIF"] = vif_values
+
+        lines = [
+            f"【VIF 多重共线性检测 - {label}】",
+            "VIF>10 表示严重多重共线性（该变量可被其他变量高度线性解释）。",
+        ]
+
+        high_vif = vif_df[vif_df["VIF"] > 10].sort_values("VIF", ascending=False)
+        moderate_vif = vif_df[(vif_df["VIF"] >= 5) & (vif_df["VIF"] <= 10)].sort_values("VIF", ascending=False)
+
+        if len(high_vif) > 0:
+            items = []
+            for _, row in high_vif.iterrows():
+                cn = self.FIELD_CN_NAMES.get(row["feature"].replace('_pct', ''), row["feature"])
+                items.append(f"{cn}(VIF={row['VIF']:.1f})")
+            lines.append(f"严重(VIF>10)：{'，'.join(items[:8])}。")
+        if len(moderate_vif) > 0:
+            items = []
+            for _, row in moderate_vif.iterrows():
+                cn = self.FIELD_CN_NAMES.get(row["feature"].replace('_pct', ''), row["feature"])
+                items.append(f"{cn}(VIF={row['VIF']:.1f})")
+            lines.append(f"中等(VIF 5~10)：{'，'.join(items[:5])}。")
+        if len(high_vif) == 0 and len(moderate_vif) == 0:
+            lines.append("所有指标的 VIF 均小于 5，指标间不存在严重的多重共线性问题。")
+
+        # 建议剔除策略
+        if len(high_vif) > 0:
+            top = high_vif.iloc[0]
+            cn = self.FIELD_CN_NAMES.get(top["feature"].replace('_pct', ''), top["feature"])
+            lines.append(f"建议关注 {cn}(VIF最高)，可考虑在建模时剔除或使用PCA降维处理。")
+
+        return lines
+
+    def _interpret_pc(self, loadings, feature_names):
+        """根据载荷分布给每个主成分赋予经济含义标签"""
+        # 定义主题关键词映射
+        theme_keywords = {
+            '货币/信贷': ['m1', 'm2', 'shibor', 'lpr', 'rmb_loan', 'entrusted_loan',
+                        'trust_loan', 'corporate_bonds', 'equity_financing', 'total_shrzgm'],
+            '外部/贸易': ['exports', 'imports', 'usdx', 'usdcnh', 'forex', 'gold'],
+            '增长/通胀': ['cpi', 'gdp_yoy', 'cn_yield'],
+            '市场/风险': ['dji', 'hsi', 'sh_close', 'sz_close', 'n225', 'ks11', 'twii', 'vix', 'gold_close'],
+            '海外利率': ['ust_y'],
+            'GDP结构': ['gdp_pi', 'gdp_si', 'gdp_ti'],
+        }
+        # 主题的简短别名
+        theme_short = {
+            '货币/信贷': '货币信贷', '外部/贸易': '外部贸易', '增长/通胀': '增长通胀',
+            '市场/风险': '市场风险', '海外利率': '海外利率', 'GDP结构': '产业结构',
+        }
+
+        pc_labels = []
+        for i in range(loadings.shape[0]):
+            feat_series = pd.Series(loadings[i], index=feature_names)
+            top_pos = feat_series.nlargest(3).index.tolist()
+            top_neg = feat_series.nsmallest(3).index.tolist()
+            all_top = top_pos + top_neg
+
+            # 统计每个主题匹配的指标数
+            scores = {}
+            for theme, kws in theme_keywords.items():
+                score = sum(1 for f in all_top if any(kw in f for kw in kws))
+                if score > 0:
+                    scores[theme] = score
+
+            if scores:
+                primary = max(scores, key=scores.get)
+                pc_labels.append(theme_short.get(primary, primary))
+            else:
+                pc_labels.append(f'混合因子')
+
+        return pc_labels
+
+    def gen_chart16_pca(self, df):
+        """图16：PCA 主成分分析散点图 + 载荷热力图"""
+        title = '图16：宏观经济指标 PCA 主成分分析（基于环比增幅）'
+        pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
+        if len(pct_cols) < 4:
+            logger.warning("PCT字段不足，跳过PCA分析")
+            return None
+
+        # 筛选有足够有效数据的列（至少50%非空）
+        valid_cols = [c for c in pct_cols if df[c].notna().sum() > len(df) * 0.3]
+        if len(valid_cols) < 4:
+            logger.warning("PCT有效列不足，跳过PCA分析")
+            return None
+
+        # 对有效列，只保留所有有效列都有值的行
+        data = df[valid_cols].dropna()
+        if len(data) < 10:
+            logger.warning(f"PCA有效样本不足({len(data)}行)")
+            return None
+
+        logger.info(f"PCA: {len(valid_cols)}个字段, {len(data)}行样本")
+
+        # 标准化
+        scaler = StandardScaler()
+        scaled = scaler.fit_transform(data)
+
+        # PCA
+        pca = PCA(n_components=0.95)  # 保留95%方差
+        components = pca.fit_transform(scaled)
+        explained_var = pca.explained_variance_ratio_
+
+        fig, axes = plt.subplots(1, 2, figsize=(22, 9))
+        fig.suptitle(title, fontsize=14, fontweight='bold', color='#1a1a2e')
+
+        # ===== 左图：PC1 vs PC2 散点 =====
+        ax1 = axes[0]
+        year_labels = df.loc[data.index, 'trade_year'].values if 'trade_year' in df.columns else None
+        if year_labels is not None:
+            unique_years = np.unique(year_labels)
+            colors_map = plt.cm.tab20(np.linspace(0, 1, min(len(unique_years), 20)))
+            for idx, yr in enumerate(unique_years):
+                mask = year_labels == yr
+                label = str(int(yr)) if idx < 20 else ''
+                ax1.scatter(components[mask, 0], components[mask, 1],
+                           color=colors_map[idx % 20], label=label,
+                           alpha=0.7, s=30, edgecolors='white', linewidth=0.5)
+            ax1.legend(loc='upper right', fontsize=7, ncol=2, title='年份')
+        else:
+            ax1.scatter(components[:, 0], components[:, 1], alpha=0.7, s=30,
+                       c='steelblue', edgecolors='white', linewidth=0.5)
+
+        ax1.set_xlabel(f'主成分1 ({explained_var[0]*100:.1f}% 方差解释)', fontsize=10)
+        ax1.set_ylabel(f'主成分2 ({explained_var[1]*100:.1f}% 方差解释)', fontsize=10)
+        ax1.set_title('PC1 vs PC2 散点图（颜色=年份）', fontsize=11)
+        ax1.axhline(y=0, color='gray', linewidth=0.5, linestyle='--')
+        ax1.axvline(x=0, color='gray', linewidth=0.5, linestyle='--')
+        ax1.grid(True, alpha=0.3)
+
+        # ===== 右图：载荷热力图（展示各主成分由哪些指标驱动）=====
+        ax2 = axes[1]
+
+        # 取前6个主成分（解释大部分方差）和 top 10 高载荷指标
+        n_components_show = min(6, len(explained_var))
+        loadings = pca.components_[:n_components_show]  # shape: (n_comp, n_features)
+
+        # 计算每个指标在所有展示的主成分上的最大绝对载荷，取 top 10
+        max_abs_load = np.max(np.abs(loadings), axis=0)
+        top_idx = np.argsort(max_abs_load)[::-1][:12]  # 最多12个
+        top_features = [valid_cols[i] for i in top_idx]
+
+        # 提取这些指标的载荷矩阵
+        loadings_subset = loadings[:, top_idx]  # shape: (n_comp, top_n)
+
+        # 标签：中文名
+        feature_labels = [self.FIELD_CN_NAMES.get(f.replace('_pct', ''), f) for f in top_features]
+
+        # 语义标签：根据载荷推断每个PC的经济含义
+        pc_themes = self._interpret_pc(loadings, valid_cols)
+        comp_labels = [
+            f'PC{i+1} {pc_themes[i]}\n({explained_var[i]*100:.1f}%)'
+            for i in range(n_components_show)
+        ]
+
+        # 用 imshow 绘制热力图
+        im = ax2.imshow(loadings_subset, cmap='RdBu_r', aspect='auto', vmin=-1, vmax=1)
+
+        # 标注数值
+        for i in range(n_components_show):
+            for j in range(len(top_features)):
+                val = loadings_subset[i, j]
+                color = 'white' if abs(val) > 0.6 else 'black'
+                ax2.text(j, i, f'{val:.2f}', ha='center', va='center',
+                        fontsize=6.5, color=color, fontweight='bold')
+
+        ax2.set_xticks(range(len(top_features)))
+        ax2.set_xticklabels(feature_labels, rotation=45, ha='right', fontsize=7)
+        ax2.set_yticks(range(n_components_show))
+        ax2.set_yticklabels(comp_labels, fontsize=8)
+        ax2.set_xlabel('宏观经济指标', fontsize=10)
+        ax2.set_title('主成分载荷矩阵（驱动各主成分的关键指标）', fontsize=11)
+
+        # 色条
+        cbar = fig.colorbar(im, ax=ax2, shrink=0.8, pad=0.02)
+        cbar.set_label('载荷值', fontsize=8)
+
+        plt.tight_layout()
+        return self._fig_to_bytesio(fig)
+
+    def gen_chart17_rolling_corr(self, df):
+        """图17：滚动相关性（12个月窗口），选中高相关对"""
+        title = '图17：滚动相关性分析（12个月窗口）'
+        pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
+        if len(pct_cols) < 4:
+            logger.warning("PCT字段不足，跳过滚动相关性分析")
+            return None
+
+        # 筛选有足够有效数据的列
+        valid_cols = [c for c in pct_cols if df[c].notna().sum() > len(df) * 0.5]
+        if len(valid_cols) < 4:
+            logger.warning("PCT有效列不足，跳过滚动相关性")
+            return None
+
+        # 找相关系数最高的3对（门槛|r|>=0.3）
+        corr_df = df[valid_cols].dropna().corr()
+        pairs = []
+        for i in range(len(corr_df.columns)):
+            for j in range(i + 1, len(corr_df.columns)):
+                val = corr_df.iloc[i, j]
+                if pd.notna(val) and abs(val) >= 0.3:
+                    pairs.append((abs(val), corr_df.columns[i], corr_df.columns[j], val))
+        pairs.sort(key=lambda x: x[0], reverse=True)
+        top_pairs = pairs[:3]
+
+        if len(top_pairs) < 1:
+            logger.warning("未找到高相关对(|r|>=0.3)，跳过滚动相关性")
+            return None
+
+        fig, axes = plt.subplots(len(top_pairs), 1, figsize=(16, 4 * len(top_pairs)))
+        if len(top_pairs) == 1:
+            axes = [axes]
+        fig.suptitle(title, fontsize=14, fontweight='bold', color='#1a1a2e')
+
+        window = 12  # 12个月滚动窗口
+        x = range(len(df))
+        labels = self._make_trade_month_labels(df)
+
+        for idx, (abs_val, col_a, col_b, raw_val) in enumerate(top_pairs):
+            ax = axes[idx]
+            rolling_corr = df[col_a].rolling(window=window).corr(df[col_b])
+
+            name_a = self.FIELD_CN_NAMES.get(col_a.replace('_pct', ''), col_a)
+            name_b = self.FIELD_CN_NAMES.get(col_b.replace('_pct', ''), col_b)
+
+            ax.plot(x, rolling_corr.values, color=self.CHART_COLORS[idx % len(self.CHART_COLORS)],
+                    linewidth=0.9, alpha=0.8,
+                    label=f'{name_a} vs {name_b} (静态r={raw_val:.2f})')
+            ax.axhline(y=raw_val, color='gray', linewidth=0.5, linestyle='--', alpha=0.5)
+            ax.axhline(y=0, color='black', linewidth=0.4, linestyle='-')
+            ax.axhline(y=0.7, color='green', linewidth=0.4, linestyle=':', alpha=0.5)
+            ax.axhline(y=-0.7, color='red', linewidth=0.4, linestyle=':', alpha=0.5)
+
+            ax.set_ylabel(f'滚动相关系数 (window={window})', fontsize=9)
+            ax.legend(fontsize=8, loc='upper right')
+            ax.grid(True, alpha=0.3)
+            ax.set_ylim(-1.05, 1.05)
+
+            # 填色
+            ax.fill_between(x, 0, rolling_corr.values,
+                           where=rolling_corr.values > 0,
+                           color='green', alpha=0.08)
+            ax.fill_between(x, 0, rolling_corr.values,
+                           where=rolling_corr.values < 0,
+                           color='red', alpha=0.08)
+
+            self._set_chart_style(ax, range(len(df)), labels, ylabel='相关系数', xlabel='月份')
+
+        plt.tight_layout()
+        return self._fig_to_bytesio(fig)
+
+    def gen_rolling_corr_pair_charts(self, df):
+        """生成所有|r|>=0.3的独立滚动相关系数图，每对一张独立图表"""
+        pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
+        if len(pct_cols) < 4:
+            return []
+
+        valid_cols = [c for c in pct_cols if df[c].notna().sum() > len(df) * 0.5]
+        if len(valid_cols) < 4:
+            return []
+
+        corr_df = df[valid_cols].dropna().corr()
+        pairs = []
+        for i in range(len(corr_df.columns)):
+            for j in range(i + 1, len(corr_df.columns)):
+                val = corr_df.iloc[i, j]
+                if pd.notna(val) and abs(val) >= 0.3:
+                    pairs.append((abs(val), corr_df.columns[i], corr_df.columns[j], val))
+        pairs.sort(key=lambda x: x[0], reverse=True)
+
+        if not pairs:
+            logger.warning("未找到高相关对(|r|>=0.3)，跳过滚动相关系数分解图")
+            return []
+
+        window = 12
+        x = range(len(df))
+        labels = self._make_trade_month_labels(df)
+
+        results = []
+        for idx, (abs_val, col_a, col_b, raw_val) in enumerate(pairs):
+            fig, ax = plt.subplots(figsize=(16, 4.5))
+
+            rolling_corr = df[col_a].rolling(window=window).corr(df[col_b])
+
+            name_a = self.FIELD_CN_NAMES.get(col_a.replace('_pct', ''), col_a)
+            name_b = self.FIELD_CN_NAMES.get(col_b.replace('_pct', ''), col_b)
+
+            ax.plot(x, rolling_corr.values, color=self.CHART_COLORS[0],
+                    linewidth=1.0, alpha=0.85, label=f'{name_a} vs {name_b}')
+            ax.axhline(y=raw_val, color='gray', linewidth=0.5, linestyle='--', alpha=0.5,
+                       label=f'静态相关系数 r={raw_val:.2f}')
+            ax.axhline(y=0, color='black', linewidth=0.4, linestyle='-')
+            ax.axhline(y=0.7, color='green', linewidth=0.4, linestyle=':', alpha=0.5)
+            ax.axhline(y=-0.7, color='red', linewidth=0.4, linestyle=':', alpha=0.5)
+
+            ax.fill_between(x, 0, rolling_corr.values,
+                           where=rolling_corr.values > 0,
+                           color='green', alpha=0.08)
+            ax.fill_between(x, 0, rolling_corr.values,
+                           where=rolling_corr.values < 0,
+                           color='red', alpha=0.08)
+
+            ax.set_title(f'{name_a} vs {name_b} — 滚动相关系数 (12个月窗口)', fontsize=12, fontweight='bold')
+            self._set_chart_style(ax, range(len(df)), labels, ylabel='滚动相关系数', xlabel='月份')
+            ax.set_ylim(-1.05, 1.05)
+            ax.legend(fontsize=8, loc='upper right')
+
+            plt.tight_layout()
+            key = f'rolling_pair_{idx}'
+            results.append((key, f'{name_a} vs {name_b} (r={raw_val:.2f})', self._fig_to_bytesio(fig)))
+
+        logger.info(f"🔗 生成 {len(results)} 张滚动相关系数分解图")
+        return results
+
+    def _get_pca_analysis(self, df):
+        """PCA 文字分析，含每个主成分语义解读"""
+        pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
+        if len(pct_cols) < 4:
+            return ["PCT字段不足，无法进行PCA分析。"]
+
+        valid_cols = [c for c in pct_cols if df[c].notna().sum() > len(df) * 0.3]
+        if len(valid_cols) < 4:
+            return ["PCA有效列不足。"]
+
+        data = df[valid_cols].dropna()
+        if len(data) < 10:
+            return [f"PCA有效样本不足({len(data)}行)。"]
+
+        scaler = StandardScaler()
+        scaled = scaler.fit_transform(data)
+        pca = PCA(n_components=0.95)
+        pca.fit(scaled)
+
+        explained = pca.explained_variance_ratio_
+        cumsum = np.cumsum(explained)
+
+        n_95 = next((i + 1 for i, v in enumerate(cumsum) if v >= 0.95), len(explained))
+        n_80 = next((i + 1 for i, v in enumerate(cumsum) if v >= 0.80), len(explained))
+
+        # 语义解读
+        pc_themes = self._interpret_pc(pca.components_[:6], valid_cols)
+
+        lines = [
+            f"【PCA 主成分分析】",
+            f"前{n_80}个主成分解释了80%的方差，前{n_95}个主成分解释了95%的方差（共{len(explained)}个主成分）。",
+            f"主成分的语义标签根据高载荷指标自动推断（取各PC正负向Top3指标所属经济领域投票决定）。",
+            f"",
+            f"各主成分经济含义（带%为方差解释比例）：",
+        ]
+
+        n_show = min(6, len(explained), len(pc_themes))
+        for i in range(n_show):
+            feat_series = pd.Series(pca.components_[i], index=valid_cols)
+            top_pos = feat_series.nlargest(3)
+            top_neg = feat_series.nsmallest(3)
+            pos_names = [self.FIELD_CN_NAMES.get(c.replace('_pct', ''), c) for c in top_pos.index]
+            neg_names = [self.FIELD_CN_NAMES.get(c.replace('_pct', ''), c) for c in top_neg.index]
+            pos_str = '、'.join([f"{n}(+{v:.2f})" for n, v in zip(pos_names, top_pos.values)])
+            neg_str = '、'.join([f"{n}({v:.2f})" for n, v in zip(neg_names, top_neg.values)])
+            lines.append(
+                f"PC{i+1}【{pc_themes[i]}】({explained[i]*100:.1f}%): "
+                f"正向→ {pos_str}；"
+                f"负向→ {neg_str}。"
+            )
+
+        lines.append("")
+        lines.append(
+            f"注：PC6（{pc_themes[5] if len(pc_themes) > 5 else ''}）仅解释{explained[5]*100:.1f}%的方差，"
+            f"属于次要维度，其高载荷指标（如委托贷款）在该PC上虽然显著，但整体解释力有限，"
+            f"不宜过度外推其经济含义。"
+        )
+
+        lines.append("")
+        lines.append(
+            f"PCA结果说明宏观经济指标的环比变化可以由{n_95}个潜在因子驱动，"
+            f"在后续建模中可考虑降维至{n_95}维以消除冗余。"
+        )
+        return lines
+
+    def _get_rolling_corr_analysis(self, df):
+        """滚动相关性文字分析"""
+        pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
+        if len(pct_cols) < 4:
+            return ["PCT字段不足，无法进行滚动相关性分析。"]
+
+        valid_cols = [c for c in pct_cols if df[c].notna().sum() > len(df) * 0.5]
+        if len(valid_cols) < 4:
+            return ["PCT有效列不足，无法进行滚动相关性分析。"]
+
+        corr_df = df[valid_cols].dropna().corr()
+        pairs = []
+        for i in range(len(corr_df.columns)):
+            for j in range(i + 1, len(corr_df.columns)):
+                val = corr_df.iloc[i, j]
+                if pd.notna(val) and abs(val) >= 0.3:
+                    pairs.append((abs(val), corr_df.columns[i], corr_df.columns[j], val))
+        pairs.sort(key=lambda x: x[0], reverse=True)
+
+        lines = [
+            "【滚动相关性分析（12个月窗口）】",
+            "滚动相关性展示了两个指标之间相关系数的时变特征，",
+            "揭示了经济周期不同阶段下指标间联动关系的动态演化。",
+        ]
+        if pairs:
+            window = 12
+            top3 = pairs[:3]
+            for _, col_a, col_b, raw_val in top3:
+                rolling = df[col_a].rolling(window=window).corr(df[col_b])
+                rolling_max = rolling.max()
+                rolling_min = rolling.min()
+                rolling_std = rolling.std()
+                name_a = self.FIELD_CN_NAMES.get(col_a.replace('_pct', ''), col_a)
+                name_b = self.FIELD_CN_NAMES.get(col_b.replace('_pct', ''), col_b)
+                lines.append(
+                    f"{name_a} vs {name_b}：静态相关系数{raw_val:.2f}，"
+                    f"滚动相关系数区间[{rolling_min:.2f}, {rolling_max:.2f}]，"
+                    f"标准差{rolling_std:.2f}，{'关系稳定。' if rolling_std < 0.2 else '关系波动较大，受经济周期切换影响显著。'}"
+                )
+        else:
+            lines.append("未发现强相关(|r|>=0.3)的指标对。")
+        return lines
 
     def _get_summary(self, df):
         """综述分析"""
@@ -495,7 +950,8 @@ class MacroEconomicIndicatorReport:
             f"覆盖 {len(self.ALL_RAW_FIELDS)} 个宏观经济指标（含原始值与环比增幅），",
             f"时间跨度为 {df['trade_month'].min()} 至 {df['trade_month'].max()}。",
             "",
-            "报告含13张图表：指标原始值（绝对值/同比）折线图 → 环比增幅折线图 → 相关系数热力图。",
+            "报告含15张图表 + 2张进阶分析图（PCA主成分分析 + 滚动相关性），",
+            "指标原始值（绝对值/同比）折线图 → 环比增幅折线图 → 相关系数热力图 → 进阶分析。",
             "环比增幅 = (当期值 - 前期值) / 前期值，反映各项指标的边际变化速率。",
             "",
         ]
@@ -849,14 +1305,26 @@ class MacroEconomicIndicatorReport:
         return lines
 
     def _get_chart14_analysis(self, df):
-        """图14：原始值相关系数 专业分析"""
+        """图14：原始值相关系数 + VIF 分析"""
         raw_cols = [c for c in self.ALL_RAW_FIELDS if c in df.columns]
-        return self._corr_analysis(df, raw_cols, "原始值")
+        lines = self._corr_analysis(df, raw_cols, "原始值")
+        # 追加 VIF 分析
+        vif_lines = self._vif_analysis(df, raw_cols, "原始值")
+        if len(vif_lines) > 1:
+            lines.append("")
+            lines.extend(vif_lines)
+        return lines
 
     def _get_chart15_analysis(self, df):
-        """图15：PCT相关系数 专业分析"""
+        """图15：PCT相关系数 + VIF 分析"""
         pct_cols = [c for c in self.ALL_PCT_FIELDS if c in df.columns]
-        return self._corr_analysis(df, pct_cols, "环比增幅")
+        lines = self._corr_analysis(df, pct_cols, "环比增幅")
+        # 追加 VIF 分析
+        vif_lines = self._vif_analysis(df, pct_cols, "环比增幅")
+        if len(vif_lines) > 1:
+            lines.append("")
+            lines.extend(vif_lines)
+        return lines
 
     def _corr_analysis(self, df, cols, label):
         """通用相关系数分析"""
@@ -1062,7 +1530,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
                 story.append(Paragraph(line, styles['normal']))
         story.append(Spacer(1, 0.2 * inch))
 
-    def _generate_pdf_report(self, df, chart_buffers, ai_analysis):
+    def _generate_pdf_report(self, df, chart_buffers, ai_analysis, rolling_pair_charts=None):
         """生成完整 PDF 报告（reportlab，不保存中间图片）"""
         styles = self._build_pdf_styles()
 
@@ -1144,6 +1612,10 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
              self._get_chart14_analysis, '十五、'),
             ('chart15_heatmap_pct', '图15：指标环比增幅 相关系数热力图',
              self._get_chart15_analysis, '十六、'),
+            ('chart16_pca', '图16：PCA 主成分分析（基于环比增幅）',
+             self._get_pca_analysis, '十七、'),
+            ('chart17_rolling_corr', '图17：滚动相关性分析（12个月窗口）',
+             self._get_rolling_corr_analysis, '十八、'),
         ]
 
         for i, (buf_key, chart_title, analysis_fn, section_label) in enumerate(chart_config):
@@ -1165,9 +1637,28 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
 
             story.append(PageBreak())
 
+        # ===== 滚动相关系数分解图（每对一张独立图表）=====
+        if rolling_pair_charts:
+            story.append(Paragraph('十九、滚动相关系数分解图', styles['h1']))
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph(
+                '以下展示所有|r|≥0.3的指标对的12个月滚动相关系数时变特征。'
+                '灰色虚线标记静态相关系数，绿色/红色虚线标记±0.7参考线。',
+                ParagraphStyle('Note', parent=styles['normal'], fontSize=9,
+                               textColor=colors.HexColor('#555555'))
+            ))
+            story.append(Spacer(1, 0.15 * inch))
+            for i, (buf_key, pair_title, pair_buf) in enumerate(rolling_pair_charts):
+                sub_num = i + 1
+                story.append(Paragraph(f'图18.{sub_num}: {pair_title} 滚动相关系数', styles['h2']))
+                img = RLImage(pair_buf, width=page_width, height=page_width * 0.30)
+                story.append(img)
+                story.append(Spacer(1, 0.12 * inch))
+            story.append(PageBreak())
+
         # ===== AI 分析 =====
         if ai_analysis:
-            story.append(Paragraph('十七、AI 宏观分析师：年度截面数据专业分析', styles['h1']))
+            story.append(Paragraph('二十、AI 宏观分析师：年度截面数据专业分析', styles['h1']))
             story.append(Spacer(1, 0.15 * inch))
             for line in ai_analysis.strip().split('\n'):
                 if line.strip():
@@ -1175,7 +1666,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
         story.append(PageBreak())
 
         # ===== 风险提示 =====
-        story.append(Paragraph('十八、风险提示', styles['h1']))
+        story.append(Paragraph('二十一、风险提示', styles['h1']))
         story.append(Spacer(1, 0.15 * inch))
         risk_text = (
             "本报告基于历史宏观经济数据进行量化分析，仅供参考，不构成投资建议。"
@@ -1217,7 +1708,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
 
             # Step 3: 生成图表（BytesIO）+ 专业分析 + AI 分析
             logger.info("=" * 60)
-            logger.info("Step 3/4: 生成13张图表 & 专业分析 & AI 分析")
+            logger.info("Step 3/4: 生成15张图表 + 2张进阶分析图 & 专业分析 & AI 分析")
             logger.info("=" * 60)
 
             chart_buffers = {}
@@ -1253,8 +1744,17 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
             chart_buffers['chart14_heatmap_raw'] = self.gen_chart14_heatmap_raw(df)
             chart_buffers['chart15_heatmap_pct'] = self.gen_chart15_heatmap_pct(df)
 
+            # 图16: PCA 主成分分析
+            chart_buffers['chart16_pca'] = self.gen_chart16_pca(df)
+
+            # 图17: 滚动相关性
+            chart_buffers['chart17_rolling_corr'] = self.gen_chart17_rolling_corr(df)
+
+            # 图18+: 滚动相关系数分解图（每对一张独立图表）
+            rolling_pair_charts = self.gen_rolling_corr_pair_charts(df)
+
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
-            logger.info(f"Charts generated: {chart_count}/15")
+            logger.info(f"Charts generated: {chart_count}/{17 + len(rolling_pair_charts)}")
 
             # AI 分析
             ai_analysis = self._generate_ai_macro_analysis(df)
@@ -1265,7 +1765,7 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
             logger.info("=" * 60)
             logger.info("Step 4/4: 生成 PDF 报告")
             logger.info("=" * 60)
-            pdf_path = self._generate_pdf_report(df, chart_buffers, ai_analysis)
+            pdf_path = self._generate_pdf_report(df, chart_buffers, ai_analysis, rolling_pair_charts)
 
             logger.info("\n" + "=" * 80)
             logger.info("✅ 宏观经济指标环比分析报告 生成完成！")
