@@ -13,15 +13,19 @@ class MacroEconomicIndicatorAnalysis:
     """宏观经济指标数据生成类
 
     流程：
-    1. 从 ClickHouse 拉取月度宏观数据（多表 JOIN）
-    2. 前向填充缺失值
-    3. 计算每条数据的环比增幅 _pct
-    4. 写入 tb_macro_economic_indicator
+    1. 从 ClickHouse 拉取日频宏观数据（多表 LEFT JOIN）
+    2. 重采样为月度（取月末最后交易日值）
+    3. 前向填充缺失值
+    4. 计算每条数据的环比增幅 _pct
+    5. 写入 tb_macro_economic_indicator
     """
 
     # 需要计算 _pct 环比增幅的字段
     PCT_FIELDS = [
         'shibor_3m_eom', 'lpr_5y_eom', 'ust_y10_eom',
+        'shibor_on', 'shibor_1w', 'shibor_1m', 'shibor_1y',
+        'lpr_1y',
+        'ust_y2', 'ust_y30',
         'm1_yoy', 'm2_yoy', 'cpi_yoy',
         'forex_reserves', 'gold_reserves',
         'exports_yoy', 'imports_yoy',
@@ -29,9 +33,10 @@ class MacroEconomicIndicatorAnalysis:
         'corporate_bonds', 'equity_financing',
         'usdcnh_bid_close', 'usdcnh_ask_close',
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
-        'gdp_yoy',
+        'gdp_yoy', 'gdp_pi_yoy', 'gdp_si_yoy', 'gdp_ti_yoy',
         'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
         'hsi_close', 'twii_close', 'ks11_close', 'n225_close',
+        'vix_close',
     ]
 
     TARGET_TABLE = 'tb_macro_economic_indicator'
@@ -47,246 +52,175 @@ class MacroEconomicIndicatorAnalysis:
         logger.info("%s.%s: %s" % (className, functionName, event))
 
     def fetch_macro_data(self):
-        """从 ClickHouse 拉取宏观月度数据
+        """从 ClickHouse 拉取宏观日频数据（多表 LEFT JOIN）
 
         返回:
-        - df: 宏观指标 DataFrame，按 trade_month 升序
+        - df: 日频宏观指标 DataFrame，按 trade_date 升序
         """
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName=sys._getframe().f_code.co_name,
-                          event="Fetching macro economic data from ClickHouse")
+                          event="Fetching daily macro economic data from ClickHouse")
 
         today = CommonParameters.today
 
         sql = f"""
-        WITH
-        money_monthly AS (
-            SELECT
-                trade_date AS yyyymm,
-                max(m1_yoy) AS m1_yoy,
-                max(m2_yoy) AS m2_yoy
-            FROM indexsysdb.cn_money_supply
-            GROUP BY trade_date
-        ),
-        cpi_monthly AS (
-            SELECT
-                trade_date AS yyyymm,
-                max(nt_yoy) AS cpi_yoy
-            FROM indexsysdb.df_tushare_cn_cpi
-            GROUP BY trade_date
-        ),
-        fx_gold_monthly AS (
-            SELECT
-                month AS yyyymm,
-                max(forex_reserves_value) AS forex_reserves,
-                max(gold_reserves_value)  AS gold_reserves
-            FROM indexsysdb.df_macro_china_fx_gold
-            GROUP BY month
-        ),
-        trade_monthly AS (
-            SELECT
-                month AS yyyymm,
-                max(monthly_exports_yoy) AS exports_yoy,
-                max(monthly_imports_yoy) AS imports_yoy
-            FROM indexsysdb.df_macro_china_hgjck
-            GROUP BY month
-        ),
-        shrzgm_monthly AS (
-            SELECT
-                month AS yyyymm,
-                max(total_shrzgm)                                       AS total_shrzgm,
-                max(rmb_loan)                                           AS rmb_loan,
-                max(entrusted_loan)                                     AS entrusted_loan,
-                max(trust_loan)                                         AS trust_loan,
-                max(corporate_bonds)                                    AS corporate_bonds,
-                max(non_financial_enterprise_domestic_equity_financing) AS equity_financing
-            FROM indexsysdb.df_macro_china_shrzgm
-            GROUP BY month
-        ),
-        fx_daily_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(bid_close, trade_date) AS usdcnh_bid_close,
-                argMax(ask_close, trade_date) AS usdcnh_ask_close
-            FROM indexsysdb.df_tushare_fx_daily
-            WHERE ts_code = 'USDCNH.FXCM'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        cb_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(cn_yield_2y, trade_date)  AS cn_yield_2y,
-                argMax(cn_yield_5y, trade_date)  AS cn_yield_5y,
-                argMax(cn_yield_10y, trade_date) AS cn_yield_10y
-            FROM indexsysdb.df_akshare_bond_zh_us_rate
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        gdp_quarterly AS (
-            SELECT
-                quarter,
-                max(gdp_yoy) AS gdp_yoy
-            FROM indexsysdb.df_tushare_cn_gdp
-            GROUP BY quarter
-        ),
-        usdx_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(USDX_index, trade_date) AS usdx_index
-            FROM indexsysdb.df_tushare_usd_index_daily
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        gold_monthly AS (
-            SELECT
-                substring(replaceAll(date, '-', ''), 1, 6) AS yyyymm,
-                argMax(close, replaceAll(date, '-', '')) AS gold_close
-            FROM indexsysdb.df_akshare_futures_foreign_hist
-            WHERE symbol = 'GC'
-            GROUP BY substring(replaceAll(date, '-', ''), 1, 6)
-        ),
-        dji_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS dji_close
-            FROM indexsysdb.df_tushare_index_global
-            WHERE ts_code = 'DJI'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        sh_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS sh_close
-            FROM indexsysdb.df_tushare_cn_index_daily
-            WHERE ts_code = '000001.SH'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        sz_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS sz_close
-            FROM indexsysdb.df_tushare_cn_index_daily
-            WHERE ts_code = '399001.SZ'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        hsi_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS hsi_close
-            FROM indexsysdb.df_tushare_index_global
-            WHERE ts_code = 'HSI'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        twii_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS twii_close
-            FROM indexsysdb.df_tushare_index_global
-            WHERE ts_code = 'TWII'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        ks11_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS ks11_close
-            FROM indexsysdb.df_tushare_index_global
-            WHERE ts_code = 'KS11'
-            GROUP BY substring(trade_date, 1, 6)
-        ),
-        n225_monthly AS (
-            SELECT
-                substring(trade_date, 1, 6) AS yyyymm,
-                argMax(close, trade_date) AS n225_close
-            FROM indexsysdb.df_tushare_index_global
-            WHERE ts_code = 'N225'
-            GROUP BY substring(trade_date, 1, 6)
-        )
         SELECT
-            toUInt32(cal.trade_year) AS trade_year,
-            toUInt32(concat(cal.trade_year, lpad(cal.trade_month, 2, '0'))) AS trade_month,
-            max(cal.trade_date) AS last_trade_date,
-            argMax(shibor.tenor_3m, cal.trade_date) AS shibor_3m_eom,
-            argMax(lpr.tenor_5y, cal.trade_date) AS lpr_5y_eom,
-            argMax(ust.y10, cal.trade_date) AS ust_y10_eom,
-            max(mm.m1_yoy) AS m1_yoy,
-            max(mm.m2_yoy) AS m2_yoy,
-            max(cpi.cpi_yoy) AS cpi_yoy,
-            max(fx.forex_reserves) AS forex_reserves,
-            max(fx.gold_reserves)  AS gold_reserves,
-            max(tr.exports_yoy) AS exports_yoy,
-            max(tr.imports_yoy) AS imports_yoy,
-            max(shr.total_shrzgm)   AS total_shrzgm,
-            max(shr.rmb_loan)       AS rmb_loan,
-            max(shr.entrusted_loan) AS entrusted_loan,
-            max(shr.trust_loan)     AS trust_loan,
-            max(shr.corporate_bonds) AS corporate_bonds,
-            max(shr.equity_financing) AS equity_financing,
-            max(fxd.usdcnh_bid_close) AS usdcnh_bid_close,
-            max(fxd.usdcnh_ask_close) AS usdcnh_ask_close,
-            max(cb.cn_yield_2y)  AS cn_yield_2y,
-            max(cb.cn_yield_5y)  AS cn_yield_5y,
-            max(cb.cn_yield_10y) AS cn_yield_10y,
-            max(gdp.gdp_yoy) AS gdp_yoy,
-            max(udx.usdx_index) AS usdx_index,
-            max(gld.gold_close) AS gold_close,
-            max(dji.dji_close) AS dji_close,
-            max(sh.sh_close) AS sh_close,
-            max(sz.sz_close) AS sz_close,
-            max(hsi.hsi_close) AS hsi_close,
-            max(twii.twii_close) AS twii_close,
-            max(ks11.ks11_close) AS ks11_close,
-            max(n225.n225_close) AS n225_close
+            cal.trade_date AS trade_date,
+            cal.trade_month AS trade_month,
+            cal.trade_year AS trade_year,
+            cal.quarter AS quarter,
+            shibor.tenor_on    AS shibor_on,
+            shibor.tenor_1w    AS shibor_1w,
+            shibor.tenor_1m    AS shibor_1m,
+            shibor.tenor_3m    AS shibor_3m,
+            shibor.tenor_1y    AS shibor_1y,
+            lpr.tenor_1y       AS lpr_1y,
+            lpr.tenor_5y       AS lpr_5y,
+            ust.y2             AS ust_y2,
+            ust.y10            AS ust_y10,
+            ust.y30            AS ust_y30,
+            ms.m1_yoy          AS m1_yoy,
+            ms.m2_yoy          AS m2_yoy,
+            cpi.nt_yoy         AS cpi_yoy,
+            fg.forex_reserves_value  AS forex_reserves,
+            fg.gold_reserves_value   AS gold_reserves,
+            hj.monthly_exports_yoy   AS exports_yoy,
+            hj.monthly_imports_yoy   AS imports_yoy,
+            shr.total_shrzgm         AS total_shrzgm,
+            shr.rmb_loan             AS rmb_loan,
+            shr.entrusted_loan       AS entrusted_loan,
+            shr.trust_loan           AS trust_loan,
+            shr.corporate_bonds      AS corporate_bonds,
+            shr.non_financial_enterprise_domestic_equity_financing AS equity_financing,
+            fx.bid_close       AS usdcnh_bid_close,
+            fx.ask_close       AS usdcnh_ask_close,
+            cb.cn_yield_2y  AS cn_yield_2y,
+            cb.cn_yield_5y  AS cn_yield_5y,
+            cb.cn_yield_10y AS cn_yield_10y,
+            gdp.gdp_yoy          AS gdp_yoy,
+            gdp.pi_yoy         AS gdp_pi_yoy,
+            gdp.si_yoy         AS gdp_si_yoy,
+            gdp.ti_yoy         AS gdp_ti_yoy,
+            udx.USDX_index      AS usdx_index,
+            gold.close          AS gold_close,
+            dji.close           AS dji_close,
+            sh.close            AS sh_close,
+            sz.close            AS sz_close,
+            hsi.close           AS hsi_close,
+            twii.close          AS twii_close,
+            ks11.close          AS ks11_close,
+            n225.close          AS n225_close,
+            vix.close           AS vix_close
         FROM indexsysdb.df_sys_calendar cal
-        ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
+        LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
             ON cal.trade_date = shibor.trade_date
-        ANY LEFT JOIN indexsysdb.df_tushare_shibor_lpr_daily lpr
+        LEFT JOIN indexsysdb.df_tushare_shibor_lpr_daily lpr
             ON cal.trade_date = lpr.trade_date
-        ANY LEFT JOIN indexsysdb.df_tushare_us_treasury_yield_cruve ust
+        LEFT JOIN indexsysdb.df_tushare_us_treasury_yield_cruve ust
             ON cal.trade_date = ust.trade_date
-        ANY LEFT JOIN money_monthly mm
-            ON substring(cal.trade_date, 1, 6) = mm.yyyymm
-        ANY LEFT JOIN cpi_monthly cpi
-            ON substring(cal.trade_date, 1, 6) = cpi.yyyymm
-        ANY LEFT JOIN fx_gold_monthly fx
-            ON substring(cal.trade_date, 1, 6) = fx.yyyymm
-        ANY LEFT JOIN trade_monthly tr
-            ON substring(cal.trade_date, 1, 6) = tr.yyyymm
-        ANY LEFT JOIN shrzgm_monthly shr
-            ON substring(cal.trade_date, 1, 6) = shr.yyyymm
-        ANY LEFT JOIN fx_daily_monthly fxd
-            ON substring(cal.trade_date, 1, 6) = fxd.yyyymm
-        ANY LEFT JOIN cb_monthly cb
-            ON substring(cal.trade_date, 1, 6) = cb.yyyymm
-        ANY LEFT JOIN gdp_quarterly gdp
+        LEFT JOIN indexsysdb.cn_money_supply ms
+            ON substring(cal.trade_date, 1, 6) = ms.trade_date
+        LEFT JOIN indexsysdb.df_tushare_cn_cpi cpi
+            ON substring(cal.trade_date, 1, 6) = cpi.trade_date
+        LEFT JOIN indexsysdb.df_macro_china_fx_gold fg
+            ON substring(cal.trade_date, 1, 6) = fg.month
+        LEFT JOIN indexsysdb.df_macro_china_hgjck hj
+            ON substring(cal.trade_date, 1, 6) = hj.month
+        LEFT JOIN indexsysdb.df_macro_china_shrzgm shr
+            ON substring(cal.trade_date, 1, 6) = shr.month
+        LEFT JOIN indexsysdb.df_tushare_fx_daily fx
+            ON cal.trade_date = fx.trade_date AND fx.ts_code = 'USDCNH.FXCM'
+        LEFT JOIN indexsysdb.df_akshare_bond_zh_us_rate cb
+            ON cal.trade_date = cb.trade_date
+        LEFT JOIN indexsysdb.df_tushare_cn_gdp gdp
             ON concat(cal.trade_year, 'Q', cal.quarter) = gdp.quarter
-        ANY LEFT JOIN usdx_monthly udx
-            ON substring(cal.trade_date, 1, 6) = udx.yyyymm
-        ANY LEFT JOIN gold_monthly gld
-            ON substring(cal.trade_date, 1, 6) = gld.yyyymm
-        ANY LEFT JOIN dji_monthly dji
-            ON substring(cal.trade_date, 1, 6) = dji.yyyymm
-        ANY LEFT JOIN sh_monthly sh
-            ON substring(cal.trade_date, 1, 6) = sh.yyyymm
-        ANY LEFT JOIN sz_monthly sz
-            ON substring(cal.trade_date, 1, 6) = sz.yyyymm
-        ANY LEFT JOIN hsi_monthly hsi
-            ON substring(cal.trade_date, 1, 6) = hsi.yyyymm
-        ANY LEFT JOIN twii_monthly twii
-            ON substring(cal.trade_date, 1, 6) = twii.yyyymm
-        ANY LEFT JOIN ks11_monthly ks11
-            ON substring(cal.trade_date, 1, 6) = ks11.yyyymm
-        ANY LEFT JOIN n225_monthly n225
-            ON substring(cal.trade_date, 1, 6) = n225.yyyymm
-        WHERE cal.trade_date BETWEEN '20100101' AND '{today}'
-        GROUP BY
-            toUInt32(cal.trade_year),
-            toUInt32(concat(cal.trade_year, lpad(cal.trade_month, 2, '0')))
-        ORDER BY
-            toUInt32(cal.trade_year),
-            toUInt32(concat(cal.trade_year, lpad(cal.trade_month, 2, '0')))
+        LEFT JOIN indexsysdb.df_tushare_usd_index_daily udx
+            ON cal.trade_date = udx.trade_date
+        LEFT JOIN indexsysdb.df_akshare_futures_foreign_hist gold
+            ON cal.trade_date = replaceAll(gold.date, '-', '') AND gold.symbol = 'GC'
+        LEFT JOIN indexsysdb.df_tushare_index_global dji
+            ON cal.trade_date = dji.trade_date AND dji.ts_code = 'DJI'
+        LEFT JOIN indexsysdb.df_tushare_cn_index_daily sh
+            ON cal.trade_date = sh.trade_date AND sh.ts_code = '000001.SH'
+        LEFT JOIN indexsysdb.df_tushare_cn_index_daily sz
+            ON cal.trade_date = sz.trade_date AND sz.ts_code = '399001.SZ'
+        LEFT JOIN indexsysdb.df_tushare_index_global hsi
+            ON cal.trade_date = hsi.trade_date AND hsi.ts_code = 'HSI'
+        LEFT JOIN indexsysdb.df_tushare_index_global twii
+            ON cal.trade_date = twii.trade_date AND twii.ts_code = 'TWII'
+        LEFT JOIN indexsysdb.df_tushare_index_global ks11
+            ON cal.trade_date = ks11.trade_date AND ks11.ts_code = 'KS11'
+        LEFT JOIN indexsysdb.df_tushare_index_global n225
+            ON cal.trade_date = n225.trade_date AND n225.ts_code = 'N225'
+        LEFT JOIN indexsysdb.df_cboe_vix vix
+            ON cal.trade_date = replaceAll(vix.date, '-', '')
+        WHERE cal.trade_date >= '20100101' and cal.trade_date <= '{today}'
+        ORDER BY cal.trade_date
         """
 
         df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
-        logger.info(f"Fetched {len(df)} rows of macro economic data")
+        logger.info(f"Fetched {len(df)} rows of daily macro economic data")
         return df
+
+    def _resample_to_monthly(self, df):
+        """将日频数据重采样为月度数据（取月末最后交易日值）
+
+        按 YYYYMM 分组，对每个指标取该月最后一个非空值。
+        部分字段重命名以兼容下游：shibor_3m→shibor_3m_eom, lpr_5y→lpr_5y_eom, ust_y10→ust_y10_eom
+
+        参数:
+        - df: 日频 DataFrame，含 trade_date 列
+
+        返回:
+        - df_monthly: 月度 DataFrame，含 trade_year, trade_month, last_trade_date
+        """
+        self.writeLogInfo(className=self.__class__.__name__,
+                          functionName=sys._getframe().f_code.co_name,
+                          event="Resampling daily data to monthly (end-of-month)")
+
+        # 确保按日期排序
+        df = df.sort_values('trade_date').reset_index(drop=True)
+
+        # 构造 YYYYMM 列用于分组
+        df['yyyymm'] = df['trade_date'].astype(str).str[:6]
+
+        # 数值列（排除 key 列）
+        key_cols = ['trade_date', 'trade_year', 'trade_month', 'quarter', 'yyyymm']
+        value_cols = [c for c in df.columns if c not in key_cols]
+
+        # 取月末最后非空值
+        def _last_non_null(series):
+            non_null = series.dropna()
+            return non_null.iloc[-1] if len(non_null) > 0 else np.nan
+
+        agg_dict = {col: _last_non_null for col in value_cols}
+        agg_dict['trade_date'] = 'max'  # 当月最后交易日
+
+        df_monthly = df.groupby('yyyymm').agg(agg_dict).reset_index()
+
+        # 重命名 trade_date → last_trade_date
+        df_monthly = df_monthly.rename(columns={'trade_date': 'last_trade_date'})
+
+        # 构造 trade_year, trade_month
+        df_monthly['trade_year'] = df_monthly['yyyymm'].str[:4].astype(int)
+        df_monthly['trade_month'] = df_monthly['yyyymm'].astype(int)
+
+        # 对日频取值字段添加 _eom 后缀以兼容下游
+        eom_rename = {
+            'shibor_3m': 'shibor_3m_eom',
+            'lpr_5y': 'lpr_5y_eom',
+            'ust_y10': 'ust_y10_eom',
+        }
+        df_monthly = df_monthly.rename(columns=eom_rename)
+
+        # 整理输出列顺序
+        result_cols = ['trade_year', 'trade_month', 'last_trade_date']
+        result_cols += [c for c in df_monthly.columns
+                        if c not in result_cols and c != 'yyyymm']
+        df_monthly = df_monthly[result_cols].sort_values('trade_month').reset_index(drop=True)
+
+        logger.info(f"Resampled: {len(df)} daily rows -> {len(df_monthly)} monthly rows")
+        return df_monthly
 
     def forward_fill_missing(self, df):
         """前向填充缺失数据（将0也视为缺失，按 trade_month 排序取前一阶段非0值）
@@ -399,6 +333,16 @@ class MacroEconomicIndicatorAnalysis:
             cn_yield_5y Float64,
             cn_yield_10y Float64,
             gdp_yoy Float64,
+            shibor_on Float64,
+            shibor_1w Float64,
+            shibor_1m Float64,
+            shibor_1y Float64,
+            lpr_1y Float64,
+            ust_y2 Float64,
+            ust_y30 Float64,
+            gdp_pi_yoy Float64,
+            gdp_si_yoy Float64,
+            gdp_ti_yoy Float64,
             shibor_3m_eom_pct Float64,
             lpr_5y_eom_pct Float64,
             ust_y10_eom_pct Float64,
@@ -421,6 +365,16 @@ class MacroEconomicIndicatorAnalysis:
             cn_yield_5y_pct Float64,
             cn_yield_10y_pct Float64,
             gdp_yoy_pct Float64,
+            shibor_on_pct Float64,
+            shibor_1w_pct Float64,
+            shibor_1m_pct Float64,
+            shibor_1y_pct Float64,
+            lpr_1y_pct Float64,
+            ust_y2_pct Float64,
+            ust_y30_pct Float64,
+            gdp_pi_yoy_pct Float64,
+            gdp_si_yoy_pct Float64,
+            gdp_ti_yoy_pct Float64,
             usdx_index Float64,
             gold_close Float64,
             dji_close Float64,
@@ -430,6 +384,7 @@ class MacroEconomicIndicatorAnalysis:
             twii_close Float64,
             ks11_close Float64,
             n225_close Float64,
+            vix_close Float64,
             usdx_index_pct Float64,
             gold_close_pct Float64,
             dji_close_pct Float64,
@@ -438,7 +393,8 @@ class MacroEconomicIndicatorAnalysis:
             hsi_close_pct Float64,
             twii_close_pct Float64,
             ks11_close_pct Float64,
-            n225_close_pct Float64
+            n225_close_pct Float64,
+            vix_close_pct Float64
         )
         ENGINE = MergeTree()
         ORDER BY (trade_month)
@@ -465,9 +421,13 @@ class MacroEconomicIndicatorAnalysis:
                           functionName=sys._getframe().f_code.co_name,
                           event="Starting macro economic indicator data generation")
 
-        # Step 1: 拉取数据
-        logger.info("\n📊 Step 1/4: Fetching macro data from ClickHouse...")
+        # Step 1: 拉取日频数据
+        logger.info("\n📊 Step 1/4: Fetching daily macro data from ClickHouse...")
         df = self.fetch_macro_data()
+
+        # Step 1.5: 日频→月度 重采样（取月末最后交易日值）
+        logger.info("\n📅 Step 1.5/4: Resampling daily data to monthly...")
+        df = self._resample_to_monthly(df)
 
         # Step 2: 前向填充缺失值
         logger.info("\n🔧 Step 2/4: Forward filling missing data...")

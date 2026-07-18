@@ -49,6 +49,9 @@ class MacroEconomicIndicatorReport:
     # 所有 _pct 字段
     ALL_PCT_FIELDS = [
         'shibor_3m_eom_pct', 'lpr_5y_eom_pct', 'ust_y10_eom_pct',
+        'shibor_on_pct', 'shibor_1w_pct', 'shibor_1m_pct', 'shibor_1y_pct',
+        'lpr_1y_pct',
+        'ust_y2_pct', 'ust_y30_pct',
         'm1_yoy_pct', 'm2_yoy_pct', 'cpi_yoy_pct',
         'forex_reserves_pct', 'gold_reserves_pct',
         'exports_yoy_pct', 'imports_yoy_pct',
@@ -56,14 +59,18 @@ class MacroEconomicIndicatorReport:
         'trust_loan_pct', 'corporate_bonds_pct', 'equity_financing_pct',
         'usdcnh_bid_close_pct', 'usdcnh_ask_close_pct',
         'cn_yield_2y_pct', 'cn_yield_5y_pct', 'cn_yield_10y_pct',
-        'gdp_yoy_pct',
+        'gdp_yoy_pct', 'gdp_pi_yoy_pct', 'gdp_si_yoy_pct', 'gdp_ti_yoy_pct',
         'usdx_index_pct', 'gold_close_pct', 'dji_close_pct',
         'sh_close_pct', 'sz_close_pct',
         'hsi_close_pct', 'twii_close_pct', 'ks11_close_pct', 'n225_close_pct',
+        'vix_close_pct',
     ]
 
     ALL_RAW_FIELDS = [
         'shibor_3m_eom', 'lpr_5y_eom', 'ust_y10_eom',
+        'shibor_on', 'shibor_1w', 'shibor_1m', 'shibor_1y',
+        'lpr_1y',
+        'ust_y2', 'ust_y30',
         'm1_yoy', 'm2_yoy', 'cpi_yoy',
         'forex_reserves', 'gold_reserves',
         'exports_yoy', 'imports_yoy',
@@ -71,14 +78,20 @@ class MacroEconomicIndicatorReport:
         'trust_loan', 'corporate_bonds', 'equity_financing',
         'usdcnh_bid_close', 'usdcnh_ask_close',
         'cn_yield_2y', 'cn_yield_5y', 'cn_yield_10y',
-        'gdp_yoy',
+        'gdp_yoy', 'gdp_pi_yoy', 'gdp_si_yoy', 'gdp_ti_yoy',
         'usdx_index', 'gold_close', 'dji_close', 'sh_close', 'sz_close',
         'hsi_close', 'twii_close', 'ks11_close', 'n225_close',
+        'vix_close',
     ]
 
     FIELD_CN_NAMES = {
         'shibor_3m_eom': 'SHIBOR 3M', 'lpr_5y_eom': 'LPR 5Y',
-        'ust_y10_eom': '美国10Y国债', 'm1_yoy': 'M1同比', 'm2_yoy': 'M2同比',
+        'ust_y10_eom': '美国10Y国债',
+        'shibor_on': 'SHIBOR O/N', 'shibor_1w': 'SHIBOR 1W',
+        'shibor_1m': 'SHIBOR 1M', 'shibor_1y': 'SHIBOR 1Y',
+        'lpr_1y': 'LPR 1Y',
+        'ust_y2': '美国2Y国债', 'ust_y30': '美国30Y国债',
+        'm1_yoy': 'M1同比', 'm2_yoy': 'M2同比',
         'cpi_yoy': 'CPI同比', 'forex_reserves': '外汇储备(亿美元)',
         'gold_reserves': '黄金储备(万盎司)', 'exports_yoy': '出口同比',
         'imports_yoy': '进口同比', 'total_shrzgm': '社会融资规模(亿)',
@@ -88,12 +101,21 @@ class MacroEconomicIndicatorReport:
         'usdcnh_ask_close': 'USDCNH卖出价', 'cn_yield_2y': '国债2Y收益率',
         'cn_yield_5y': '国债5Y收益率', 'cn_yield_10y': '国债10Y收益率',
         'gdp_yoy': 'GDP同比',
+        'gdp_pi_yoy': 'GDP第一产业同比', 'gdp_si_yoy': 'GDP第二产业同比',
+        'gdp_ti_yoy': 'GDP第三产业同比',
         'usdx_index': '美元指数', 'gold_close': '黄金期货GC',
         'dji_close': '道琼斯工业', 'sh_close': '上证综指', 'sz_close': '深证成指',
+        'shibor_on_pct': 'SHIBOR O/N环比', 'shibor_1w_pct': 'SHIBOR 1W环比',
+        'shibor_1m_pct': 'SHIBOR 1M环比', 'shibor_1y_pct': 'SHIBOR 1Y环比',
+        'lpr_1y_pct': 'LPR 1Y环比',
+        'ust_y2_pct': '美国2Y国债环比', 'ust_y30_pct': '美国30Y国债环比',
         'usdx_index_pct': '美元指数环比', 'gold_close_pct': '黄金GC环比',
         'dji_close_pct': '道琼斯环比', 'sh_close_pct': '上证综指环比', 'sz_close_pct': '深证成指环比',
         'hsi_close': '恒生指数', 'twii_close': '台湾加权', 'ks11_close': '韩国综合', 'n225_close': '日经225',
         'hsi_close_pct': '恒生指数环比', 'twii_close_pct': '台湾加权环比', 'ks11_close_pct': '韩国综合环比', 'n225_close_pct': '日经225环比',
+        'gdp_pi_yoy_pct': 'GDP第一产业环比', 'gdp_si_yoy_pct': 'GDP第二产业环比',
+        'gdp_ti_yoy_pct': 'GDP第三产业环比',
+        'vix_close': 'VIX恐慌指数', 'vix_close_pct': 'VIX环比',
     }
 
     CHART_COLORS = [
@@ -331,6 +353,8 @@ class MacroEconomicIndicatorReport:
             'cn_yield_10y': '国债10Y收益率(%)',
             'gdp_yoy': 'GDP同比(%)',
             'cpi_yoy': 'CPI同比(%)',
+            'vix_close': 'VIX恐慌指数',
+            'usdx_index': '美元指数',
         }, title, figsize=(15, 7), ylabel='%')
 
     def gen_chart7_yields_pct(self, df):
@@ -350,6 +374,8 @@ class MacroEconomicIndicatorReport:
         return self._draw_line_chart(df, {
             'exports_yoy': '出口同比(%)',
             'imports_yoy': '进口同比(%)',
+            'vix_close': 'VIX恐慌指数',
+            'usdx_index': '美元指数',
         }, title, figsize=(14, 6), ylabel='同比(%)')
 
     def gen_chart9_trade_pct(self, df):
@@ -358,6 +384,8 @@ class MacroEconomicIndicatorReport:
         return self._draw_line_chart(df, {
             'exports_yoy_pct': '出口环比',
             'imports_yoy_pct': '进口环比',
+            'vix_close_pct': 'VIX环比',
+            'usdx_index_pct': '美元指数环比',
         }, title, figsize=(14, 6), ylabel='环比增幅')
 
     def gen_chart10_financing_raw(self, df):
@@ -395,6 +423,8 @@ class MacroEconomicIndicatorReport:
             'n225_close': '日经225',
             'sh_close': '上证综指',
             'sz_close': '深证成指',
+            'vix_close': 'VIX恐慌指数',
+            'usdx_index': '美元指数',
         }, title, figsize=(18, 8), ylabel='收盘价')
 
     def gen_chart13_market_pct(self, df):
@@ -408,6 +438,8 @@ class MacroEconomicIndicatorReport:
             'n225_close_pct': '日经225环比',
             'sh_close_pct': '上证综指环比',
             'sz_close_pct': '深证成指环比',
+            'vix_close_pct': 'VIX环比',
+            'usdx_index_pct': '美元指数环比',
         }, title, figsize=(18, 8), ylabel='环比增幅')
 
     def gen_chart14_heatmap_raw(self, df):

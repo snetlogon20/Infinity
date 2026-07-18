@@ -89,8 +89,26 @@ where ts_code = 'N225'
 trade_date  20260709
 
 
+--美国非农就业率 数据只到2025年
+select * from indexsysdb.df_macro_usa_non_farm
+order by date desc
+date 2024-06-07
+
+--美国非农就业率 数据只到2025年
+select * from df_macro_usa_non_farm
+order by date desc
+date 2024-06-07
+
+--恐慌指数
+select * from df_macro_usa_unemployment_rate
+order by date desc
+date 2025-09-05
+
+select * from indexsysdb.df_cboe_vix
+order by date desc
+date 2026-07-17
 -- ============================================================
--- 宏观经济指标宽表：以 df_sys_calendar 为左表，关联所有宏观数据
+-- 宏观经济指标日频宽表：以 df_sys_calendar 为左表，关联所有宏观数据
 -- 用于相关系数 & 线性回归分析
 -- ============================================================
 -- 【修正说明】基于实际数据样本修正 JOIN KEY：
@@ -184,7 +202,9 @@ SELECT
     hsi.close           AS hsi_close,
     twii.close          AS twii_close,
     ks11.close          AS ks11_close,
-    n225.close          AS n225_close
+    n225.close          AS n225_close,
+    -- ==================== 日频：恐慌指数VIX ====================
+    vix.close           AS vix_close
 FROM indexsysdb.df_sys_calendar cal
 -- 日频：直连 trade_date（均为 YYYYMMDD）
 LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
@@ -242,6 +262,9 @@ LEFT JOIN indexsysdb.df_tushare_index_global ks11
 -- 日频：日经225 N225，trade_date='20260709'
 LEFT JOIN indexsysdb.df_tushare_index_global n225
     ON cal.trade_date = n225.trade_date AND n225.ts_code = 'N225'
+-- 日频：恐慌指数VIX，date='YYYY-MM-DD'格式
+LEFT JOIN indexsysdb.df_cboe_vix vix
+    ON cal.trade_date = replaceAll(vix.date, '-', '')
 WHERE cal.trade_date >= '20100101' and cal.trade_date <= '20260710'
 ORDER BY cal.trade_date desc 
 
@@ -402,6 +425,14 @@ n225_monthly AS (
     FROM indexsysdb.df_tushare_index_global
     WHERE ts_code = 'N225'
     GROUP BY substring(trade_date, 1, 6)
+),
+-- 恐慌指数VIX月度预聚合（取月末最后交易日值），date格式 YYYY-MM-DD
+vix_monthly AS (
+    SELECT
+        substring(replaceAll(date, '-', ''), 1, 6) AS yyyymm,
+        argMax(close, replaceAll(date, '-', '')) AS vix_close
+    FROM indexsysdb.df_cboe_vix
+    GROUP BY substring(replaceAll(date, '-', ''), 1, 6)
 )
 SELECT
     toUInt32(cal.trade_year) AS trade_year,
@@ -449,7 +480,9 @@ SELECT
     -- 韩国综合月末值
     max(ks11.ks11_close) AS ks11_close,
     -- 日经225月末值
-    max(n225.n225_close) AS n225_close
+    max(n225.n225_close) AS n225_close,
+    -- 恐慌指数VIX月末值
+    max(vix.vix_close) AS vix_close
 FROM indexsysdb.df_sys_calendar cal
 ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
     ON cal.trade_date = shibor.trade_date
@@ -491,6 +524,8 @@ ANY LEFT JOIN ks11_monthly ks11
     ON substring(cal.trade_date, 1, 6) = ks11.yyyymm
 ANY LEFT JOIN n225_monthly n225
     ON substring(cal.trade_date, 1, 6) = n225.yyyymm
+ANY LEFT JOIN vix_monthly vix
+    ON substring(cal.trade_date, 1, 6) = vix.yyyymm
 WHERE cal.trade_date BETWEEN '20100101' AND '20260710'
 GROUP BY
     toUInt32(cal.trade_year),

@@ -45,6 +45,18 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     twii_close Float64 COMMENT '台湾加权月末收盘价',
     ks11_close Float64 COMMENT '韩国综合月末收盘价',
     n225_close Float64 COMMENT '日经225月末收盘价',
+    vix_close Float64 COMMENT '恐慌指数VIX月末值',
+    -- === 新增日频衍生月度指标 ===
+    shibor_on Float64 COMMENT 'SHIBOR O/N 月末值(%)',
+    shibor_1w Float64 COMMENT 'SHIBOR 1W 月末值(%)',
+    shibor_1m Float64 COMMENT 'SHIBOR 1M 月末值(%)',
+    shibor_1y Float64 COMMENT 'SHIBOR 1Y 月末值(%)',
+    lpr_1y Float64 COMMENT 'LPR 1Y 月末值(%)',
+    ust_y2 Float64 COMMENT '美国国债2Y 月末收益率(%)',
+    ust_y30 Float64 COMMENT '美国国债30Y 月末收益率(%)',
+    gdp_pi_yoy Float64 COMMENT 'GDP第一产业同比(%)',
+    gdp_si_yoy Float64 COMMENT 'GDP第二产业同比(%)',
+    gdp_ti_yoy Float64 COMMENT 'GDP第三产业同比(%)',
     -- === 环比增幅 (当期-前期)/前期，小数表示 ===
     shibor_3m_eom_pct Float64 COMMENT 'SHIBOR 3M 环比增幅',
     lpr_5y_eom_pct Float64 COMMENT 'LPR 5Y 环比增幅',
@@ -76,7 +88,19 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     hsi_close_pct Float64 COMMENT '恒生指数 环比增幅',
     twii_close_pct Float64 COMMENT '台湾加权 环比增幅',
     ks11_close_pct Float64 COMMENT '韩国综合 环比增幅',
-    n225_close_pct Float64 COMMENT '日经225 环比增幅'
+    n225_close_pct Float64 COMMENT '日经225 环比增幅',
+    vix_close_pct Float64 COMMENT '恐慌指数VIX 环比增幅',
+    -- === 新增日频衍生月度指标_环比 ===
+    shibor_on_pct Float64 COMMENT 'SHIBOR O/N 环比增幅',
+    shibor_1w_pct Float64 COMMENT 'SHIBOR 1W 环比增幅',
+    shibor_1m_pct Float64 COMMENT 'SHIBOR 1M 环比增幅',
+    shibor_1y_pct Float64 COMMENT 'SHIBOR 1Y 环比增幅',
+    lpr_1y_pct Float64 COMMENT 'LPR 1Y 环比增幅',
+    ust_y2_pct Float64 COMMENT '美国国债2Y 环比增幅',
+    ust_y30_pct Float64 COMMENT '美国国债30Y 环比增幅',
+    gdp_pi_yoy_pct Float64 COMMENT 'GDP第一产业 环比增幅',
+    gdp_si_yoy_pct Float64 COMMENT 'GDP第二产业 环比增幅',
+    gdp_ti_yoy_pct Float64 COMMENT 'GDP第三产业 环比增幅'
 )
 ENGINE=MergeTree()
 ORDER BY (trade_month)
