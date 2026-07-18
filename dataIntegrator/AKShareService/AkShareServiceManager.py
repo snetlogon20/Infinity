@@ -16,6 +16,7 @@ from dataIntegrator.AKShareService.AkShareStockYjbbEmService import AkShareStock
 from dataIntegrator.AKShareService.AkShareFinancialDataIndicatorService import AkShareFinancialDataIndicatorService
 from dataIntegrator.AKShareService.AkShareMacroUsaUnemploymentRateService import AkShareMacroUsaUnemploymentRateService
 from dataIntegrator.AKShareService.AkShareMacroUsaNonFarmService import AkShareMacroUsaNonFarmService
+from dataIntegrator.AKShareService.AkShareCboeVixService import AkShareCboeVixService
 from dataIntegrator.AKShareService.AkShareJobLogger import AkShareJobLogger
 from dataIntegrator.common.FileType import FileType
 
@@ -743,6 +744,56 @@ class AkShareServiceManager():
         logger.info("callAkShareMacroUsaNonFarmService ended...")
 
     @classmethod
+    def callAkShareCboeVixService(self):
+        """
+        调用 CBOE VIX 恐慌指数历史数据服务（1990年至今）
+        """
+        logger.info("callAkShareCboeVixService started...")
+
+        # VIX数据全部历史数据（1990年至今）
+        file_path = os.path.join(CommonParameters.outBoundPath, 'cboe_vix.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callAkShareCboeVixService')
+
+            akShareService = AkShareCboeVixService()
+
+            # 获取数据（不需要日期参数，拉取全部历史数据）
+            dataFrame = akShareService.prepareDataFrame()
+
+            # 保存到磁盘
+            akShareService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+
+            # 从磁盘读取
+            dataFrame = akShareService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+
+            # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
+            if not dataFrame.empty:
+                min_date = dataFrame['date'].min()
+                max_date = dataFrame['date'].max()
+                akShareService.deleteDateFromClickHouse(min_date, max_date)
+
+            # 转换数据格式
+            dataFrame = akShareService.transformDataFrame(dataFrame)
+
+            # 保存到 ClickHouse
+            akShareService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callAkShareCboeVixService ended...")
+
+    @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
@@ -750,6 +801,7 @@ class AkShareServiceManager():
             start_date = "20240101"
             end_date = CommonParameters.today
 
+            self.callAkShareCboeVixService()                                                                ## 恐慌指数VIX
             self.callAkShareSpotHistSGEService(start_date, end_date)                                ## 上金所现货
             self.callAkShareFuturesForeignHistService(symbol='XAG', file_suffix='XAG')                ## 白银
             self.callAkShareFuturesForeignHistService(symbol='GC', file_suffix='GC')                  ## 黄金
