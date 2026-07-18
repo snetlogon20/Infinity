@@ -26,6 +26,7 @@ from dataIntegrator.TuShareService.TuShareConvertBondBasicService import TuShare
 from dataIntegrator.TuShareService.TuShareConvertBondDailyService import TuShareConvertBondDailyService
 from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import TushareUSTreasuryYieldCurveService
 from dataIntegrator.TuShareService.TuShareIndexGlobalService import TuShareIndexGlobalService
+from dataIntegrator.TuShareService.TuShareOptBasicService import TuShareOptBasicService
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 from dataIntegrator.TuShareService.TuShareJobLogger import TuShareJobLogger
@@ -750,6 +751,48 @@ class TuShareServiceManager():
             job_logger.end_job_failed(str(e), traceback.format_exc())
             raise e
 
+    @classmethod
+    def callTuShareOptBasicService(self, param_dict):
+        """
+        刷新期权基础信息数据
+        参考 TuShareOptBasicServiceTest.refresh_opt_basic
+        由于 opt_basic 是全量数据，不需要日期范围
+        """
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareOptBasicService", param_dict)
+        
+        try:
+            logger.info("callTuShareOptBasicService started...")
+
+            exchange = param_dict.get("exchange", "")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_opt_basic.csv")
+
+            tuShareService = TuShareOptBasicService()
+            dataFrame = tuShareService.prepareDataFrame(exchange=exchange)
+
+            if dataFrame.empty:
+                logger.warning("期权基础信息数据为空，跳过处理")
+                job_logger.end_job_success(records_processed=0)
+                return
+
+            logger.info(f"获取到 {len(dataFrame)} 条期权基础信息记录")
+
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+
+            # 先删除旧数据，再插入新数据
+            tuShareService.deleteDateFromClickHouse()
+            tuShareService.saveDateToClickHouse()
+
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info(f"✅ 期权基础信息处理完成，共 {len(dataFrame)} 条记录")
+            logger.info("callTuShareOptBasicService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            logger.error(f"❌ 期权基础信息处理失败：{str(e)}")
+            raise e
+
     #@classmethod
     def callTuShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
@@ -781,7 +824,8 @@ class TuShareServiceManager():
                 "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},
                 "callTuShareConvertBondBasicService": {},
                 "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},
-                "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date}
+                "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},
+                "callTuShareOptBasicService": {"exchange": ""}
             }
 
             # 按顺序调用方法
