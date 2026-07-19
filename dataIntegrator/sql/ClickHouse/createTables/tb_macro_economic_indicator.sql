@@ -13,6 +13,8 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     m1_yoy Float64 COMMENT 'M1 同比(%)',
     m2_yoy Float64 COMMENT 'M2 同比(%)',
     cpi_yoy Float64 COMMENT 'CPI 同比(%)',
+    ppi_yoy Float64 COMMENT 'PPI 同比(%)',
+    pmi030000 Float64 COMMENT '中国综合PMI:产出指数',
     -- === 外储 & 黄金 ===
     forex_reserves Float64 COMMENT '外汇储备(亿美元)',
     gold_reserves Float64 COMMENT '黄金储备(亿美元)',
@@ -64,6 +66,8 @@ CREATE TABLE indexsysdb.tb_macro_economic_indicator (
     m1_yoy_pct Float64 COMMENT 'M1 环比增幅',
     m2_yoy_pct Float64 COMMENT 'M2 环比增幅',
     cpi_yoy_pct Float64 COMMENT 'CPI 环比增幅',
+    ppi_yoy_pct Float64 COMMENT 'PPI 环比增幅',
+    pmi030000_pct Float64 COMMENT '中国综合PMI 环比增幅',
     forex_reserves_pct Float64 COMMENT '外汇储备 环比增幅',
     gold_reserves_pct Float64 COMMENT '黄金储备 环比增幅',
     exports_yoy_pct Float64 COMMENT '出口 环比增幅',

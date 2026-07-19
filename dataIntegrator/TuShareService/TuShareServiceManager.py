@@ -13,6 +13,8 @@ from dataIntegrator.TuShareService.TushareShiborLPRDailyService import TushareSh
 from dataIntegrator.TuShareService.TushareCNGDPService import TushareCNGDPService
 from dataIntegrator.TuShareService.TushareCNMondySupplyService import TushareCNMondySupplyService
 from dataIntegrator.TuShareService.TushareCNCPIService import TushareCNCPIService
+from dataIntegrator.TuShareService.TuShareCNPPIService import TuShareCNPPIService
+from dataIntegrator.TuShareService.TuShareCNPMIService import TuShareCNPMIService
 from dataIntegrator.TuShareService.TuShareUSStockDailyService import TuShareUSStockDailyService
 from dataIntegrator.TuShareService.TuShareFutureBasicInformationService import TuShareFutureBasicInformationService
 from dataIntegrator.TuShareService.TuShareFutureDailyService import TuShareFutureDailyService
@@ -251,6 +253,58 @@ class TuShareServiceManager():
 
             job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
             logger.info("callTushareCNCPIService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
+
+    @classmethod
+    def callTushareCNPPIService(self, param_dict):
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareCNPPIService", param_dict)
+        
+        try:
+            logger.info("callTushareCNPPIService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNPPI_20220507.csv")
+
+            tuShareService = TuShareCNPPIService()
+            dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+            tuShareService.deleteDateFromClickHouse(start_date,end_date)
+            tuShareService.saveDateToClickHouse()
+
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareCNPPIService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise e
+
+    @classmethod
+    def callTushareCNPMIService(self, param_dict):
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTushareCNPMIService", param_dict)
+        
+        try:
+            logger.info("callTushareCNPMIService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+            csvFilePath = os.path.join(CommonParameters.outBoundPath,"df_tushare_df_tushare_CNPMI_20220507.csv")
+
+            tuShareService = TuShareCNPMIService()
+            dataFrame = tuShareService.prepareDataFrame(start_date,end_date)
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+            tuShareService.deleteDateFromClickHouse(start_date,end_date)
+            tuShareService.saveDateToClickHouse()
+
+            job_logger.end_job_success(records_processed=len(dataFrame) if not dataFrame.empty else 0)
+            logger.info("callTushareCNPMIService ended...")
 
         except Exception as e:
             job_logger.end_job_failed(str(e), traceback.format_exc())
@@ -864,29 +918,34 @@ class TuShareServiceManager():
             start_quarter = self.calendarService.calculate_quarter(start_date) # "2026Q1"
             end_quarter  = self.calendarService.calculate_quarter(end_date) # "2026Q1"
 
+            start_month = self.calendarService.calculate_month(start_date)  # "201001"
+            end_month   = self.calendarService.calculate_month(end_date)  # "202607"
+
             param_method_dict = {
-                "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
-                "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
-                "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},
-                "callTushareCNMondySupplyService": {"start_date": start_date, "end_date": end_date},  # 保持原方法名
-                "callTushareCNCPIService": {"start_date": start_date, "end_date": end_date},
-                "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},
-                "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},
-                "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
-                "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
-                "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
-                "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
-                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareConvertBondBasicService": {},
-                "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},
-                "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareOptBasicService": {"exchange": ""},
-                "callTuShareOptDailyService": {"exchange": "", "start_date": start_date, "end_date": end_date}
+                # "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
+                # "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
+                # "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
+                # "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
+                # "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},
+                # "callTushareCNMondySupplyService": {"start_date": start_month, "end_date": end_month},  # 保持原方法名
+                # "callTushareCNCPIService": {"start_date": start_month, "end_date": end_month},
+                "callTushareCNPPIService": {"start_date": start_month, "end_date": end_month},
+                "callTushareCNPMIService": {"start_date": start_month, "end_date": end_month},
+                # "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},
+                # "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},
+                # "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
+                # "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
+                # "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
+                # "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
+                # "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
+                # "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
+                # "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
+                # "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},
+                # "callTuShareConvertBondBasicService": {},
+                # "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},
+                # "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},
+                # "callTuShareOptBasicService": {"exchange": ""},
+                # "callTuShareOptDailyService": {"exchange": "", "start_date": start_date, "end_date": end_date}
             }
 
             # 按顺序调用方法

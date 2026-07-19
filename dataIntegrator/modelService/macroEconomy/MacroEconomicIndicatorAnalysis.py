@@ -306,114 +306,12 @@ class MacroEconomicIndicatorAnalysis:
                           functionName=sys._getframe().f_code.co_name,
                           event=f"Saving to {self.TARGET_TABLE}")
 
-        # 删除旧表
-        del_sql = f"DROP TABLE IF EXISTS indexsysdb.{self.TARGET_TABLE}"
+        # 删除旧数据（不删表结构）
+        del_sql = f"ALTER TABLE indexsysdb.{self.TARGET_TABLE} DELETE WHERE 1=1"
         ClickhouseService.execute_sql(del_sql)
-        logger.info(f"Dropped table {self.TARGET_TABLE} if existed")
+        logger.info(f"Deleted all data from {self.TARGET_TABLE}")
 
-        # 执行标准建表 SQL（保留 UInt32 / Float64 等精确类型）
-        create_sql = f"""
-        CREATE TABLE indexsysdb.{self.TARGET_TABLE} (
-            trade_year UInt32,
-            trade_month UInt32,
-            last_trade_date String,
-            shibor_3m_eom Float64,
-            lpr_5y_eom Float64,
-            ust_y10_eom Float64,
-            m1_yoy Float64,
-            m2_yoy Float64,
-            cpi_yoy Float64,
-            ppi_yoy Float64,
-            pmi030000 Float64,
-            forex_reserves Float64,
-            gold_reserves Float64,
-            exports_yoy Float64,
-            imports_yoy Float64,
-            total_shrzgm Float64,
-            rmb_loan Float64,
-            entrusted_loan Float64,
-            trust_loan Float64,
-            corporate_bonds Float64,
-            equity_financing Float64,
-            usdcnh_bid_close Float64,
-            usdcnh_ask_close Float64,
-            cn_yield_2y Float64,
-            cn_yield_5y Float64,
-            cn_yield_10y Float64,
-            gdp_yoy Float64,
-            shibor_on Float64,
-            shibor_1w Float64,
-            shibor_1m Float64,
-            shibor_1y Float64,
-            lpr_1y Float64,
-            ust_y2 Float64,
-            ust_y30 Float64,
-            gdp_pi_yoy Float64,
-            gdp_si_yoy Float64,
-            gdp_ti_yoy Float64,
-            shibor_3m_eom_pct Float64,
-            lpr_5y_eom_pct Float64,
-            ust_y10_eom_pct Float64,
-            m1_yoy_pct Float64,
-            m2_yoy_pct Float64,
-            cpi_yoy_pct Float64,
-            ppi_yoy_pct Float64,
-            pmi030000_pct Float64,
-            forex_reserves_pct Float64,
-            gold_reserves_pct Float64,
-            exports_yoy_pct Float64,
-            imports_yoy_pct Float64,
-            total_shrzgm_pct Float64,
-            rmb_loan_pct Float64,
-            entrusted_loan_pct Float64,
-            trust_loan_pct Float64,
-            corporate_bonds_pct Float64,
-            equity_financing_pct Float64,
-            usdcnh_bid_close_pct Float64,
-            usdcnh_ask_close_pct Float64,
-            cn_yield_2y_pct Float64,
-            cn_yield_5y_pct Float64,
-            cn_yield_10y_pct Float64,
-            gdp_yoy_pct Float64,
-            shibor_on_pct Float64,
-            shibor_1w_pct Float64,
-            shibor_1m_pct Float64,
-            shibor_1y_pct Float64,
-            lpr_1y_pct Float64,
-            ust_y2_pct Float64,
-            ust_y30_pct Float64,
-            gdp_pi_yoy_pct Float64,
-            gdp_si_yoy_pct Float64,
-            gdp_ti_yoy_pct Float64,
-            usdx_index Float64,
-            gold_close Float64,
-            dji_close Float64,
-            sh_close Float64,
-            sz_close Float64,
-            hsi_close Float64,
-            twii_close Float64,
-            ks11_close Float64,
-            n225_close Float64,
-            vix_close Float64,
-            usdx_index_pct Float64,
-            gold_close_pct Float64,
-            dji_close_pct Float64,
-            sh_close_pct Float64,
-            sz_close_pct Float64,
-            hsi_close_pct Float64,
-            twii_close_pct Float64,
-            ks11_close_pct Float64,
-            n225_close_pct Float64,
-            vix_close_pct Float64
-        )
-        ENGINE = MergeTree()
-        ORDER BY (trade_month)
-        SETTINGS index_granularity = 8192
-        """
-        ClickhouseService.execute_sql(create_sql)
-        logger.info(f"Created table {self.TARGET_TABLE}")
-
-        # 写入数据（表已存在，save_dataframe_to_clickhouse 会直接 INSERT）
+        # 写入数据（save_dataframe_to_clickhouse 会直接 INSERT）
         ClickhouseService.save_dataframe_to_clickhouse(
             dataframe=df,
             table_name=self.TARGET_TABLE,

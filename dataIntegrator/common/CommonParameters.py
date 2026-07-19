@@ -70,7 +70,7 @@ class CommonParameters():
     IS_STREAMLIT_ON = False
     # IS_STREAMLIT_ON = True
 
-    IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    IF_ENABLE_MOCKED_AI = False   # use stored mocked AI answer
     # IF_ENABLE_MOCKED_AI = False  # use real AI answer
 
     # STOCK_LIST=[

@@ -56,6 +56,7 @@ class MacroEconomicIndicatorReport:
         'lpr_1y_pct',
         'ust_y2_pct', 'ust_y30_pct',
         'm1_yoy_pct', 'm2_yoy_pct', 'cpi_yoy_pct',
+        'ppi_yoy_pct', 'pmi030000_pct',
         'forex_reserves_pct', 'gold_reserves_pct',
         'exports_yoy_pct', 'imports_yoy_pct',
         'total_shrzgm_pct', 'rmb_loan_pct', 'entrusted_loan_pct',
@@ -75,6 +76,7 @@ class MacroEconomicIndicatorReport:
         'lpr_1y',
         'ust_y2', 'ust_y30',
         'm1_yoy', 'm2_yoy', 'cpi_yoy',
+        'ppi_yoy', 'pmi030000',
         'forex_reserves', 'gold_reserves',
         'exports_yoy', 'imports_yoy',
         'total_shrzgm', 'rmb_loan', 'entrusted_loan',
@@ -95,7 +97,8 @@ class MacroEconomicIndicatorReport:
         'lpr_1y': 'LPR 1Y',
         'ust_y2': '美国2Y国债', 'ust_y30': '美国30Y国债',
         'm1_yoy': 'M1同比', 'm2_yoy': 'M2同比',
-        'cpi_yoy': 'CPI同比', 'forex_reserves': '外汇储备(亿美元)',
+        'cpi_yoy': 'CPI同比', 'ppi_yoy': 'PPI同比', 'pmi030000': '综合PMI',
+        'forex_reserves': '外汇储备(亿美元)',
         'gold_reserves': '黄金储备(万盎司)', 'exports_yoy': '出口同比',
         'imports_yoy': '进口同比', 'total_shrzgm': '社会融资规模(亿)',
         'rmb_loan': '人民币贷款(亿)', 'entrusted_loan': '委托贷款(亿)',
@@ -112,6 +115,7 @@ class MacroEconomicIndicatorReport:
         'shibor_1m_pct': 'SHIBOR 1M环比', 'shibor_1y_pct': 'SHIBOR 1Y环比',
         'lpr_1y_pct': 'LPR 1Y环比',
         'ust_y2_pct': '美国2Y国债环比', 'ust_y30_pct': '美国30Y国债环比',
+        'ppi_yoy_pct': 'PPI环比', 'pmi030000_pct': '综合PMI环比',
         'usdx_index_pct': '美元指数环比', 'gold_close_pct': '黄金GC环比',
         'dji_close_pct': '道琼斯环比', 'sh_close_pct': '上证综指环比', 'sz_close_pct': '深证成指环比',
         'hsi_close': '恒生指数', 'twii_close': '台湾加权', 'ks11_close': '韩国综合', 'n225_close': '日经225',
@@ -314,19 +318,25 @@ class MacroEconomicIndicatorReport:
         return self._draw_line_chart(df, field_map, title, figsize=(22, 11), ylabel='环比增幅')
 
     def gen_chart2_money_raw(self, df):
-        """图2：m1_yoy, m2_yoy（绝对值）"""
-        title = '图2：货币供应量 M1/M2 同比（原始值）'
+        """图2：m1_yoy, m2_yoy, cpi_yoy, ppi_yoy, pmi030000（绝对值）"""
+        title = '图2：货币供应量 M1/M2 与 CPI/PPI/PMI 同比（原始值）'
         return self._draw_line_chart(df, {
             'm1_yoy': 'M1同比(%)',
             'm2_yoy': 'M2同比(%)',
+            'cpi_yoy': 'CPI同比(%)',
+            'ppi_yoy': 'PPI同比(%)',
+            'pmi030000': '综合PMI',
         }, title, figsize=(14, 6), ylabel='同比(%)')
 
     def gen_chart3_money_pct(self, df):
-        """图3：m1_yoy_pct, m2_yoy_pct"""
-        title = '图3：货币供应量 M1/M2 环比增幅'
+        """图3：m1_yoy_pct, m2_yoy_pct, cpi_yoy_pct, ppi_yoy_pct, pmi030000_pct"""
+        title = '图3：货币供应量 M1/M2 与 CPI/PPI/PMI 环比增幅'
         return self._draw_line_chart(df, {
             'm1_yoy_pct': 'M1环比增幅',
             'm2_yoy_pct': 'M2环比增幅',
+            'cpi_yoy_pct': 'CPI环比增幅',
+            'ppi_yoy_pct': 'PPI环比增幅',
+            'pmi030000_pct': '综合PMI环比',
         }, title, figsize=(14, 6), ylabel='环比增幅')
 
     def gen_chart4_forex_raw(self, df):
@@ -557,7 +567,7 @@ class MacroEconomicIndicatorReport:
             '货币/信贷': ['m1', 'm2', 'shibor', 'lpr', 'rmb_loan', 'entrusted_loan',
                         'trust_loan', 'corporate_bonds', 'equity_financing', 'total_shrzgm'],
             '外部/贸易': ['exports', 'imports', 'usdx', 'usdcnh', 'forex', 'gold'],
-            '增长/通胀': ['cpi', 'gdp_yoy', 'cn_yield'],
+            '增长/通胀': ['cpi', 'gdp_yoy', 'cn_yield', 'ppi', 'pmi'],
             '市场/风险': ['dji', 'hsi', 'sh_close', 'sz_close', 'n225', 'ks11', 'twii', 'vix', 'gold_close'],
             '海外利率': ['ust_y'],
             'GDP结构': ['gdp_pi', 'gdp_si', 'gdp_ti'],
@@ -1017,10 +1027,10 @@ class MacroEconomicIndicatorReport:
         return lines
 
     def _get_chart2_analysis(self, df):
-        """图2：M1/M2 原始值"""
+        """图2：M1/M2 与 CPI/PPI/PMI 原始值"""
         lines = []
+        recent = df.tail(12)
         if 'm1_yoy' in df.columns and 'm2_yoy' in df.columns:
-            recent = df.tail(12)
             m1_last = recent['m1_yoy'].dropna().iloc[-1]
             m2_last = recent['m2_yoy'].dropna().iloc[-1]
             diff = m1_last - m2_last
@@ -1034,10 +1044,27 @@ class MacroEconomicIndicatorReport:
                 f"历史极值方面，M1最低 {m1_min:.2f}%，M2最低 {m2_min:.2f}%，"
                 f"当前水平距历史低点已有显著回升/延续低位震荡。"
             )
+        if 'cpi_yoy' in df.columns:
+            cpi_last = recent['cpi_yoy'].dropna().iloc[-1]
+            lines.append(
+                f"【CPI同比】当前 {cpi_last:.2f}%，{'通胀温和。' if cpi_last < 3 else '通胀压力上升。'}"
+            )
+        if 'ppi_yoy' in df.columns:
+            ppi_last = recent['ppi_yoy'].dropna().iloc[-1]
+            lines.append(
+                f"【PPI同比】当前 {ppi_last:.2f}%，"
+                f"{'工业品价格回升，企业利润改善。' if ppi_last > 0 else '工业品价格下行，反映需求偏弱。'}"
+            )
+        if 'pmi030000' in df.columns:
+            pmi_last = recent['pmi030000'].dropna().iloc[-1]
+            lines.append(
+                f"【综合PMI】当前 {pmi_last:.2f}，"
+                f"{'高于荣枯线，经济扩张中。' if pmi_last > 50 else '低于荣枯线，经济收缩。'}"
+            )
         return lines
 
     def _get_chart3_analysis(self, df):
-        """图3：M1/M2 环比增幅"""
+        """图3：M1/M2 与 CPI/PPI/PMI 环比增幅"""
         recent = df.tail(12)
         lines = []
         m1_last = df['m1_yoy_pct'].dropna().iloc[-1] if 'm1_yoy_pct' in df.columns else None
@@ -1059,6 +1086,18 @@ class MacroEconomicIndicatorReport:
                 lines.append(
                     f"近期趋势：M1环比{m1_trend}，M2环比{m2_trend}，需持续关注货币政策传导效果。"
                 )
+        if 'cpi_yoy_pct' in df.columns:
+            cpi_last = recent['cpi_yoy_pct'].dropna().iloc[-1]
+            label = "通胀压力" if cpi_last > 0.002 else ("通缩风险" if cpi_last < -0.002 else "物价相对稳定")
+            lines.append(f"【CPI环比】{cpi_last * 100:.2f}%，当前呈现{label}特征。")
+        if 'ppi_yoy_pct' in df.columns:
+            ppi_last = recent['ppi_yoy_pct'].dropna().iloc[-1]
+            direction = "上涨" if ppi_last > 0 else "下跌"
+            lines.append(f"【PPI环比】{direction} {abs(ppi_last) * 100:.2f}%。")
+        if 'pmi030000_pct' in df.columns:
+            pmi_last = recent['pmi030000_pct'].dropna().iloc[-1]
+            direction = "回升" if pmi_last > 0 else "回落"
+            lines.append(f"【综合PMI环比】{direction} {abs(pmi_last) * 100:.2f}。")
         return lines
 
     def _get_chart4_analysis(self, df):
@@ -1410,7 +1449,7 @@ class MacroEconomicIndicatorReport:
         prompt = f"""你是一位从业25年的资深宏观经济首席分析师，曾任职于央行研究局和大型宏观对冲基金。请以专业、严谨、有前瞻性的视角分析以下中国宏观经济年度数据。
 
 数据为每年12月末截面数据，{df_ye['trade_month'].min()}-{df_ye['trade_month'].max()}，共{n_years}年。字段：
-- 货币市场：SHIBOR 3M、LPR 5Y、M1/M2同比、CPI同比、USDCNH汇率
+- 货币市场：SHIBOR 3M、LPR 5Y、M1/M2同比、CPI同比、PPI同比、综合PMI、USDCNH汇率
 - 国债收益率：2Y/5Y/10Y
 - 外部：美国10Y国债、美元指数、外汇储备、黄金储备、黄金期货GC价格、进出口同比
 - 全球股指：道琼斯工业、恒生指数、台湾加权、韩国综合、日经225、上证综指、深证成指
@@ -1421,18 +1460,21 @@ class MacroEconomicIndicatorReport:
 {data_block}
 
 请完成以下分析，每条100-200字，结构清晰：
-1.【经济周期定位】当前中国经济处于什么周期阶段？结合GDP/M1-M2剪刀差/CPI变化趋势判断
+1.【经济周期定位】当前中国经济处于什么周期阶段？结合GDP/M1-M2剪刀差/CPI/PPI/PMI变化趋势判断
 2.【货币政策评估】SHIBOR/LPR/国债收益率走势反映的货币政策取向及流动性环境
 3.【外部环境】美国利率、美元指数、人民币汇率、外汇储备、黄金价格、进出口数据揭示的外部压力与机遇
 4.【全球市场联动】道琼斯/恒生/台湾加权/韩国综合/日经225/上证综指/深证成指的走势特征及亚太-美股跨境联动性分析
 5.【融资结构变迁】社会融资规模及各分项的结构变化说明，企业融资偏好演变
 6.【前瞻判断】未来1-2年宏观经济最可能的走势及主要风险点
 7.【资产配置启示】当前宏观环境下对固收/权益/大宗商品（含黄金）的配置建议
+8.【你作为中国经济专家对中国的看法】你要从中的角度来分析中国的经济参数，请用中文直接给出分析内容。
+9.【美国对中国的看法】你要从美国的角度来分析中国的经济参数，请用中文直接给出分析内容。
 
 请用中文直接给出分析内容，以编号和标题开头。"""
 
         logger.info(f"=============== AI 宏观经济分析 Prompt（{n_years}年数据）===============")
         logger.info(f"Prompt 长度: {len(prompt)} 字符")
+        logger.info(f"Prompt : {prompt}")
 
         if CommonParameters.IF_ENABLE_MOCKED_AI:
             logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析")
@@ -1455,27 +1497,7 @@ class MacroEconomicIndicatorReport:
         m2 = last_row.get('m2_yoy', 'N/A')
 
         return f"""(模拟 AI 宏观经济分析报告)
-
-1.【经济周期定位】
-当前中国GDP同比为{gdp}%，M1同比{m1}%，M2同比{m2}%。综合来看经济处于企稳复苏阶段，但力度仍需观察。M1-M2剪刀差变化表明企业投资意愿存在分化。
-
-2.【货币政策评估】
-SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。国债收益率曲线形态反映市场对中长期经济增长的预期。流动性整体合理充裕。
-
-3.【外部环境】
-美国利率维持高位对人民币汇率形成压力，但外汇储备充足提供了缓冲。美元指数与黄金价格联动反映全球风险偏好的变化。进出口数据显示外需存在不确定性，贸易结构持续优化。
-
-4.【全球市场联动】
-道琼斯指数、恒生指数、台湾加权、韩国综合、日经225、上证综指与深证成指呈现出一定的联动特征，但A股受国内政策影响更大。美股走强对全球风险偏好形成支撑，亚太各市场因经济结构差异表现分化，A股估值相对低位为中长期配置提供安全边际。
-
-5.【融资结构变迁】
-社会融资规模中，人民币贷款仍占主导，企业债券和股权融资占比逐步提升，反映直接融资市场的发展。信托贷款和委托贷款在监管收紧下有所收缩。
-
-6.【前瞻判断】
-未来1-2年，预计经济将延续结构性转型路径。主要风险点包括：房地产市场调整、地方政府债务化解、外部需求波动、以及地缘政治不确定性。
-
-7.【资产配置启示】
-固收：中短久期利率债具备配置价值，信用债需精选；权益：关注科技、消费、高端制造等结构性机会；大宗商品：黄金作为避险资产值得关注，工业金属需跟踪基建力度。
+Nil
 
 (以上为模拟 AI 分析)"""
 
@@ -1584,9 +1606,9 @@ SHIBOR和LPR的走势显示央行维持稳健偏宽松的货币政策取向。�
         chart_config = [
             ('chart1_all', '图1：宏观经济指标环比增幅全景',
              self._get_chart1_analysis, '二、'),
-            ('chart2_money_raw', '图2：货币供应量 M1/M2 同比（原始值）',
+            ('chart2_money_raw', '图2：货币供应量 M1/M2 与 CPI/PPI/PMI 同比（原始值）',
              self._get_chart2_analysis, '三、'),
-            ('chart3_money_pct', '图3：货币供应量 M1/M2 环比增幅',
+            ('chart3_money_pct', '图3：货币供应量 M1/M2 与 CPI/PPI/PMI 环比增幅',
              self._get_chart3_analysis, '四、'),
             ('chart4_forex_raw', '图4：外汇储备 & 黄金储备 & 黄金期货GC（原始值）',
              self._get_chart4_analysis, '五、'),
