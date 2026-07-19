@@ -8,4 +8,4 @@ class SystemBatchStatusReportTest:
 
 if __name__ == "__main__":
     report = SystemBatchStatusReport()
-    report.generate_report()
+    report.generate_report(target_date="2026-07-18")
