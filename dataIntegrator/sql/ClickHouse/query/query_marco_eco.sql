@@ -107,6 +107,12 @@ date 2025-09-05
 select * from indexsysdb.df_cboe_vix
 order by date desc
 date 2026-07-17
+
+select * from df_tushare_cn_ppi order by trade_date desc
+trade_date  202606
+
+select * from df_tushare_cn_pmi order by trade_date desc
+trade_date  202606
 -- ============================================================
 -- 宏观经济指标日频宽表：以 df_sys_calendar 为左表，关联所有宏观数据
 -- 用于相关系数 & 线性回归分析
@@ -131,6 +137,8 @@ date 2026-07-17
 --   df_macro_china_exports_yoy   date        1982-02-01
 --   df_tushare_cn_gdp            quarter     2018Q1     (YYYYQN)
 --   df_macro_china_shrzgm        month       201501     (YYYYMM)
+--   df_tushare_cn_ppi            trade_date  202606     (YYYYMM, 月频)
+--   df_tushare_cn_pmi            trade_date  202606     (YYYYMM, 月频)
 --   df_tushare_fx_daily          trade_date  20200102   (YYYYMMDD), filter ts_code='USDCNH.FXCM'
 --   df_akshare_bond_zh_us_rate   trade_date  19901219   (YYYYMMDD), 中美国债收益率日频
 --   df_tushare_usd_index_daily   trade_date  20200101   (YYYYMMDD), 美元指数
@@ -163,6 +171,8 @@ SELECT
     ms.m1_yoy,
     ms.m2_yoy,
     cpi.nt_yoy         AS cpi_yoy,
+    ppi.ppi_yoy        AS ppi_yoy,
+    pmi.pmi030000      AS pmi030000,
     -- ==================== 月频：外储 & 黄金 ====================
     fg.forex_reserves_value  AS forex_reserves,
     fg.gold_reserves_value   AS gold_reserves,
@@ -218,6 +228,12 @@ LEFT JOIN indexsysdb.cn_money_supply ms
     ON substring(cal.trade_date, 1, 6) = ms.trade_date
 LEFT JOIN indexsysdb.df_tushare_cn_cpi cpi
     ON substring(cal.trade_date, 1, 6) = cpi.trade_date
+-- 月频：PPI工业生产者出厂价格指数，trade_date='202606'
+LEFT JOIN indexsysdb.df_tushare_cn_ppi ppi
+    ON substring(cal.trade_date, 1, 6) = ppi.trade_date
+-- 月频：PMI采购经理人指数（中国综合PMI），trade_date='202606'
+LEFT JOIN indexsysdb.df_tushare_cn_pmi pmi
+    ON substring(cal.trade_date, 1, 6) = pmi.trade_date
 -- 月频：month 已存为 YYYYMM（如 "200801"），直接匹配
 LEFT JOIN indexsysdb.df_macro_china_fx_gold fg
     ON substring(cal.trade_date, 1, 6) = fg.month
@@ -285,6 +301,22 @@ cpi_monthly AS (
         trade_date AS yyyymm,
         max(nt_yoy) AS cpi_yoy
     FROM indexsysdb.df_tushare_cn_cpi
+    GROUP BY trade_date
+),
+-- PPI 月度预聚合（仅取 ppi_yoy）
+ppi_monthly AS (
+    SELECT
+        trade_date AS yyyymm,
+        max(ppi_yoy) AS ppi_yoy
+    FROM indexsysdb.df_tushare_cn_ppi
+    GROUP BY trade_date
+),
+-- PMI 月度预聚合（仅取 pmi030000 中国综合PMI）
+pmi_monthly AS (
+    SELECT
+        trade_date AS yyyymm,
+        max(pmi030000) AS pmi030000
+    FROM indexsysdb.df_tushare_cn_pmi
     GROUP BY trade_date
 ),
 -- 外储 & 黄金
@@ -444,6 +476,8 @@ SELECT
     max(mm.m1_yoy) AS m1_yoy,
     max(mm.m2_yoy) AS m2_yoy,
     max(cpi.cpi_yoy) AS cpi_yoy,
+    max(ppi.ppi_yoy) AS ppi_yoy,
+    max(pmi.pmi030000) AS pmi030000,
     max(fx.forex_reserves) AS forex_reserves,
     max(fx.gold_reserves)  AS gold_reserves,
     max(tr.exports_yoy) AS exports_yoy,
@@ -494,6 +528,10 @@ ANY LEFT JOIN money_monthly mm
     ON substring(cal.trade_date, 1, 6) = mm.yyyymm
 ANY LEFT JOIN cpi_monthly cpi
     ON substring(cal.trade_date, 1, 6) = cpi.yyyymm
+ANY LEFT JOIN ppi_monthly ppi
+    ON substring(cal.trade_date, 1, 6) = ppi.yyyymm
+ANY LEFT JOIN pmi_monthly pmi
+    ON substring(cal.trade_date, 1, 6) = pmi.yyyymm
 ANY LEFT JOIN fx_gold_monthly fx
     ON substring(cal.trade_date, 1, 6) = fx.yyyymm
 ANY LEFT JOIN trade_monthly tr

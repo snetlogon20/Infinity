@@ -26,7 +26,7 @@ class MacroEconomicIndicatorAnalysis:
         'shibor_on', 'shibor_1w', 'shibor_1m', 'shibor_1y',
         'lpr_1y',
         'ust_y2', 'ust_y30',
-        'm1_yoy', 'm2_yoy', 'cpi_yoy',
+        'm1_yoy', 'm2_yoy', 'cpi_yoy', 'ppi_yoy', 'pmi030000',
         'forex_reserves', 'gold_reserves',
         'exports_yoy', 'imports_yoy',
         'total_shrzgm', 'rmb_loan', 'entrusted_loan', 'trust_loan',
@@ -82,6 +82,8 @@ class MacroEconomicIndicatorAnalysis:
             ms.m1_yoy          AS m1_yoy,
             ms.m2_yoy          AS m2_yoy,
             cpi.nt_yoy         AS cpi_yoy,
+            ppi.ppi_yoy        AS ppi_yoy,
+            pmi.pmi030000      AS pmi030000,
             fg.forex_reserves_value  AS forex_reserves,
             fg.gold_reserves_value   AS gold_reserves,
             hj.monthly_exports_yoy   AS exports_yoy,
@@ -122,6 +124,10 @@ class MacroEconomicIndicatorAnalysis:
             ON substring(cal.trade_date, 1, 6) = ms.trade_date
         LEFT JOIN indexsysdb.df_tushare_cn_cpi cpi
             ON substring(cal.trade_date, 1, 6) = cpi.trade_date
+        LEFT JOIN indexsysdb.df_tushare_cn_ppi ppi
+            ON substring(cal.trade_date, 1, 6) = ppi.trade_date
+        LEFT JOIN indexsysdb.df_tushare_cn_pmi pmi
+            ON substring(cal.trade_date, 1, 6) = pmi.trade_date
         LEFT JOIN indexsysdb.df_macro_china_fx_gold fg
             ON substring(cal.trade_date, 1, 6) = fg.month
         LEFT JOIN indexsysdb.df_macro_china_hgjck hj
@@ -317,6 +323,8 @@ class MacroEconomicIndicatorAnalysis:
             m1_yoy Float64,
             m2_yoy Float64,
             cpi_yoy Float64,
+            ppi_yoy Float64,
+            pmi030000 Float64,
             forex_reserves Float64,
             gold_reserves Float64,
             exports_yoy Float64,
@@ -349,6 +357,8 @@ class MacroEconomicIndicatorAnalysis:
             m1_yoy_pct Float64,
             m2_yoy_pct Float64,
             cpi_yoy_pct Float64,
+            ppi_yoy_pct Float64,
+            pmi030000_pct Float64,
             forex_reserves_pct Float64,
             gold_reserves_pct Float64,
             exports_yoy_pct Float64,
