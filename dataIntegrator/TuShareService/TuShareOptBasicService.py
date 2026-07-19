@@ -1,6 +1,8 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
 from dataIntegrator import CommonLib
+import pandas as pd
+
 
 logger = CommonLib.logger
 
