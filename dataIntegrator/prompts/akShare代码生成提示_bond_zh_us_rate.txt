@@ -8,49 +8,78 @@ AkShareSpotHistSGEService.py:继承了AkShareService，然后专门针对df_aksh
 AkShareSpotHistSGEServiceTest.py：AkShareSpotHistSGEService 的测试类
 
 现在我需要你根据以上模板， 根据以下接口的定义
-1. 接口名称：bond_zh_us_rate
+1. 接口名称：cboe_vix
 
-描述: 东方财富-数据中心-经济数据-中美国债收益率历史数据
+描述: 恐慌指数
 
-限量: 单次获取从 start_date 开始至今的所有交易日数据，最早可追溯至 1990-12-19
+限量: 从 https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv 中读取
 
 输入参数
 
-名称	类型	描述
-start_date	str	数据起始日期，格式如 "19901219"（默认）
+https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
 
 输出参数
 
 名称	类型	描述
-日期	object	交易日日期
-中国国债收益率2年	float64	中国2年期国债收益率（%）
-中国国债收益率5年	float64	中国5年期国债收益率（%）
-中国国债收益率10年	float64	中国10年期国债收益率（%）
-中国国债收益率30年	float64	中国30年期国债收益率（%）
-中国国债收益率10年-2年	float64	中国10年期与2年期国债收益率利差
-中国GDP年增率	float64	中国GDP年度增长率（%）
-美国国债收益率2年	float64	美国2年期国债收益率（%）
-美国国债收益率5年	float64	美国5年期国债收益率（%）
-美国国债收益率10年	float64	美国10年期国债收益率（%）
-美国国债收益率30年	float64	美国30年期国债收益率（%）
-美国国债收益率10年-2年	float64	美国10年期与2年期国债收益率利差
-美国GDP年增率	float64	美国GDP年度增长率（%）
+object  Float64 Float64 Float64 Float64
+DATE	OPEN	HIGH	LOW	CLOSE
+1990-01-02 00:00:00	17.24	17.24	17.24	17.24
+1990-01-03 00:00:00	18.19	18.19	18.19	18.19
+1990-01-04 00:00:00	19.22	19.22	19.22	19.22
+1990-01-05 00:00:00	20.11	20.11	20.11	20.11
+1990-01-08 00:00:00	20.26	20.26	20.26	20.26
+
 
 2. 接口示例
+    这个程序有点特殊， 因为AKSHARE中没有相关的接口， 所以我需要你在prepareDataFrame中参考 # 通过HTTPS拉取数据 部分的代码，并融合到 prepareDataFrame 的代码中。
+    这个代码已经经过测试，没有问题。
 
-    import akshare as ak
+        #@classmethod
+    def prepareDataFrame(self, start_date=None, end_date=None):
+        logger.info("prepareData started")
 
-    bond_zh_us_rate_df = ak.bond_zh_us_rate(start_date="19901219")
-    print(bond_zh_us_rate_df)
+        try:
+            # 调用 AKShare API 获取美国非农就业人数月度数据
+            # 每月新增就业人数，是观测美国劳动力市场最核心的指标
+            dataFrame = self.ak.macro_usa_non_farm()
+
+            # 重命名列以匹配数据库字段
+            dataFrame = dataFrame.rename(columns={'日期': 'date', '今值': 'value'})
+            dataFrame = dataFrame[['date', 'value']]
+
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+
+        logger.info("prepareData completed")
+        return dataFrame
+
+        # 通过HTTPS拉取数据
+        import pandas as pd
+
+        url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
+
+        try:
+            df = pd.read_csv(
+                url,
+                parse_dates=["DATE"],
+                dayfirst=False,          # 美式 M/D/Y
+                infer_datetime_format=True
+            )
+            print(df.tail())             # 看最新几条
+            print(f"\n数据起止: {df['DATE'].min().date()} ~ {df['DATE'].max().date()}")
+        except Exception as e:
+            print("拉取失败:", e)
 
 2.  数据样例
 
-          日期  中国国债收益率2年  中国国债收益率5年  ...  美国国债收益率30年  美国国债收益率10年-2年  美国GDP年增率
-0  1990-12-19       NaN       NaN  ...        8.19             0.79      NaN
-1  1990-12-20       NaN       NaN  ...        8.22             0.80      NaN
-2  1990-12-21       NaN       NaN  ...        8.28             0.81      NaN
-3  1990-12-24       NaN       NaN  ...        8.36             0.85      NaN
-4  1990-12-26       NaN       NaN  ...        8.30             0.88      NaN
+DATE	OPEN	HIGH	LOW	CLOSE
+1990-01-02 00:00:00	17.24	17.24	17.24	17.24
+1990-01-03 00:00:00	18.19	18.19	18.19	18.19
+1990-01-04 00:00:00	19.22	19.22	19.22	19.22
+1990-01-05 00:00:00	20.11	20.11	20.11	20.11
+1990-01-08 00:00:00	20.26	20.26	20.26	20.26
+
 
 完成以下任务：
 1. 按照 SQL template，参考 df_akshare_spot_hist_sge.sql 生成 clickhouse 语法建表的语句。

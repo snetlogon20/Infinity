@@ -228,6 +228,24 @@ class CalendarService(CommonLib.CommonLib):
             cls.writeLogError(e, className=cls.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
 
+    def calculate_month(cls, date):
+        """
+        根据 end_date 计算对应的月份，格式为 yyyyMM
+        :param date: 字符串格式 'yyyymmdd'
+        :return: 月份字符串 'yyyyMM'
+        """
+        try:
+            # 将字符串转换为 datetime 对象
+            date_obj = datetime.strptime(date, '%Y%m%d')
+            year = date_obj.year
+            month = date_obj.month
+
+            return f"{year}{month:02d}"
+        except Exception as e:
+            # 静态方法中无法访问实例方法，直接打印错误
+            cls.writeLogError(e, className=cls.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+
 
 
     def find_data_by_given_dataframe_and_date_offset(self, original_dataFrame, formatted_start_date, next_n_working_days):
@@ -311,3 +329,32 @@ class CalendarService(CommonLib.CommonLib):
         date = (datetime.strptime(end_date_str, '%Y%m%d') - timedelta(days=days)).strftime('%Y%m%d')
 
         return date
+
+    def calculate_dates_between_start_end_date(self, start_date_str, end_date_str):
+        """
+        计算日期列表
+
+        Args:
+            start_date_str: 起始日期字符串，格式 'YYYYMMDD'
+            end_date_str: 结束日期字符串，格式 'YYYYMMDD'
+
+        Returns:
+            日期字符串列表，从 start_date_str 到 end_date_str，格式 'YYYYMMDD'
+        """
+
+        try:
+            start_dt = datetime.strptime(start_date_str, '%Y%m%d')
+            end_dt = datetime.strptime(end_date_str, '%Y%m%d')
+
+            trade_date_list = []
+            current_dt = start_dt
+            while current_dt <= end_dt:
+                trade_date_list.append(current_dt.strftime('%Y%m%d'))
+                current_dt += timedelta(days=1)
+
+            return trade_date_list
+
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name,
+                               event="calculate_dates_between_start_end_date failed")
+            raise e

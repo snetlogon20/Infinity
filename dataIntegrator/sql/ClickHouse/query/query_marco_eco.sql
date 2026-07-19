@@ -89,8 +89,32 @@ where ts_code = 'N225'
 trade_date  20260709
 
 
+--美国非农就业率 数据只到2025年
+select * from indexsysdb.df_macro_usa_non_farm
+order by date desc
+date 2024-06-07
+
+--美国非农就业率 数据只到2025年
+select * from df_macro_usa_non_farm
+order by date desc
+date 2024-06-07
+
+--恐慌指数
+select * from df_macro_usa_unemployment_rate
+order by date desc
+date 2025-09-05
+
+select * from indexsysdb.df_cboe_vix
+order by date desc
+date 2026-07-17
+
+select * from df_tushare_cn_ppi order by trade_date desc
+trade_date  202606
+
+select * from df_tushare_cn_pmi order by trade_date desc
+trade_date  202606
 -- ============================================================
--- 宏观经济指标宽表：以 df_sys_calendar 为左表，关联所有宏观数据
+-- 宏观经济指标日频宽表：以 df_sys_calendar 为左表，关联所有宏观数据
 -- 用于相关系数 & 线性回归分析
 -- ============================================================
 -- 【修正说明】基于实际数据样本修正 JOIN KEY：
@@ -113,6 +137,8 @@ trade_date  20260709
 --   df_macro_china_exports_yoy   date        1982-02-01
 --   df_tushare_cn_gdp            quarter     2018Q1     (YYYYQN)
 --   df_macro_china_shrzgm        month       201501     (YYYYMM)
+--   df_tushare_cn_ppi            trade_date  202606     (YYYYMM, 月频)
+--   df_tushare_cn_pmi            trade_date  202606     (YYYYMM, 月频)
 --   df_tushare_fx_daily          trade_date  20200102   (YYYYMMDD), filter ts_code='USDCNH.FXCM'
 --   df_akshare_bond_zh_us_rate   trade_date  19901219   (YYYYMMDD), 中美国债收益率日频
 --   df_tushare_usd_index_daily   trade_date  20200101   (YYYYMMDD), 美元指数
@@ -145,6 +171,8 @@ SELECT
     ms.m1_yoy,
     ms.m2_yoy,
     cpi.nt_yoy         AS cpi_yoy,
+    ppi.ppi_yoy        AS ppi_yoy,
+    pmi.pmi030000      AS pmi030000,
     -- ==================== 月频：外储 & 黄金 ====================
     fg.forex_reserves_value  AS forex_reserves,
     fg.gold_reserves_value   AS gold_reserves,
@@ -184,7 +212,9 @@ SELECT
     hsi.close           AS hsi_close,
     twii.close          AS twii_close,
     ks11.close          AS ks11_close,
-    n225.close          AS n225_close
+    n225.close          AS n225_close,
+    -- ==================== 日频：恐慌指数VIX ====================
+    vix.close           AS vix_close
 FROM indexsysdb.df_sys_calendar cal
 -- 日频：直连 trade_date（均为 YYYYMMDD）
 LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
@@ -198,6 +228,12 @@ LEFT JOIN indexsysdb.cn_money_supply ms
     ON substring(cal.trade_date, 1, 6) = ms.trade_date
 LEFT JOIN indexsysdb.df_tushare_cn_cpi cpi
     ON substring(cal.trade_date, 1, 6) = cpi.trade_date
+-- 月频：PPI工业生产者出厂价格指数，trade_date='202606'
+LEFT JOIN indexsysdb.df_tushare_cn_ppi ppi
+    ON substring(cal.trade_date, 1, 6) = ppi.trade_date
+-- 月频：PMI采购经理人指数（中国综合PMI），trade_date='202606'
+LEFT JOIN indexsysdb.df_tushare_cn_pmi pmi
+    ON substring(cal.trade_date, 1, 6) = pmi.trade_date
 -- 月频：month 已存为 YYYYMM（如 "200801"），直接匹配
 LEFT JOIN indexsysdb.df_macro_china_fx_gold fg
     ON substring(cal.trade_date, 1, 6) = fg.month
@@ -242,6 +278,9 @@ LEFT JOIN indexsysdb.df_tushare_index_global ks11
 -- 日频：日经225 N225，trade_date='20260709'
 LEFT JOIN indexsysdb.df_tushare_index_global n225
     ON cal.trade_date = n225.trade_date AND n225.ts_code = 'N225'
+-- 日频：恐慌指数VIX，date='YYYY-MM-DD'格式
+LEFT JOIN indexsysdb.df_cboe_vix vix
+    ON cal.trade_date = replaceAll(vix.date, '-', '')
 WHERE cal.trade_date >= '20100101' and cal.trade_date <= '20260710'
 ORDER BY cal.trade_date desc 
 
@@ -262,6 +301,22 @@ cpi_monthly AS (
         trade_date AS yyyymm,
         max(nt_yoy) AS cpi_yoy
     FROM indexsysdb.df_tushare_cn_cpi
+    GROUP BY trade_date
+),
+-- PPI 月度预聚合（仅取 ppi_yoy）
+ppi_monthly AS (
+    SELECT
+        trade_date AS yyyymm,
+        max(ppi_yoy) AS ppi_yoy
+    FROM indexsysdb.df_tushare_cn_ppi
+    GROUP BY trade_date
+),
+-- PMI 月度预聚合（仅取 pmi030000 中国综合PMI）
+pmi_monthly AS (
+    SELECT
+        trade_date AS yyyymm,
+        max(pmi030000) AS pmi030000
+    FROM indexsysdb.df_tushare_cn_pmi
     GROUP BY trade_date
 ),
 -- 外储 & 黄金
@@ -402,6 +457,14 @@ n225_monthly AS (
     FROM indexsysdb.df_tushare_index_global
     WHERE ts_code = 'N225'
     GROUP BY substring(trade_date, 1, 6)
+),
+-- 恐慌指数VIX月度预聚合（取月末最后交易日值），date格式 YYYY-MM-DD
+vix_monthly AS (
+    SELECT
+        substring(replaceAll(date, '-', ''), 1, 6) AS yyyymm,
+        argMax(close, replaceAll(date, '-', '')) AS vix_close
+    FROM indexsysdb.df_cboe_vix
+    GROUP BY substring(replaceAll(date, '-', ''), 1, 6)
 )
 SELECT
     toUInt32(cal.trade_year) AS trade_year,
@@ -413,6 +476,8 @@ SELECT
     max(mm.m1_yoy) AS m1_yoy,
     max(mm.m2_yoy) AS m2_yoy,
     max(cpi.cpi_yoy) AS cpi_yoy,
+    max(ppi.ppi_yoy) AS ppi_yoy,
+    max(pmi.pmi030000) AS pmi030000,
     max(fx.forex_reserves) AS forex_reserves,
     max(fx.gold_reserves)  AS gold_reserves,
     max(tr.exports_yoy) AS exports_yoy,
@@ -449,7 +514,9 @@ SELECT
     -- 韩国综合月末值
     max(ks11.ks11_close) AS ks11_close,
     -- 日经225月末值
-    max(n225.n225_close) AS n225_close
+    max(n225.n225_close) AS n225_close,
+    -- 恐慌指数VIX月末值
+    max(vix.vix_close) AS vix_close
 FROM indexsysdb.df_sys_calendar cal
 ANY LEFT JOIN indexsysdb.df_tushare_shibor_daily shibor
     ON cal.trade_date = shibor.trade_date
@@ -461,6 +528,10 @@ ANY LEFT JOIN money_monthly mm
     ON substring(cal.trade_date, 1, 6) = mm.yyyymm
 ANY LEFT JOIN cpi_monthly cpi
     ON substring(cal.trade_date, 1, 6) = cpi.yyyymm
+ANY LEFT JOIN ppi_monthly ppi
+    ON substring(cal.trade_date, 1, 6) = ppi.yyyymm
+ANY LEFT JOIN pmi_monthly pmi
+    ON substring(cal.trade_date, 1, 6) = pmi.yyyymm
 ANY LEFT JOIN fx_gold_monthly fx
     ON substring(cal.trade_date, 1, 6) = fx.yyyymm
 ANY LEFT JOIN trade_monthly tr
@@ -491,6 +562,8 @@ ANY LEFT JOIN ks11_monthly ks11
     ON substring(cal.trade_date, 1, 6) = ks11.yyyymm
 ANY LEFT JOIN n225_monthly n225
     ON substring(cal.trade_date, 1, 6) = n225.yyyymm
+ANY LEFT JOIN vix_monthly vix
+    ON substring(cal.trade_date, 1, 6) = vix.yyyymm
 WHERE cal.trade_date BETWEEN '20100101' AND '20260710'
 GROUP BY
     toUInt32(cal.trade_year),
