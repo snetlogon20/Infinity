@@ -182,9 +182,9 @@ class PortfolioMetricsAnalysis:
             
             # 根据市场类型和是否为指数选择正确的表和字段
             if self.market_symbol in ['SPY']:
-                # 美国市场统一使用 df_tushare_us_stock_daily 表，字段为 close_point
-                table_name = 'df_tushare_us_stock_daily'
-                close_field = 'close_point'
+                # 美国市场统一使用 df_akshare_stock_us_daily 表，字段为 close
+                table_name = 'df_akshare_stock_us_daily'
+                close_field = 'close'
             elif is_market_index:
                 # 中国市场指数使用 df_tushare_cn_index_daily 表，字段为 close
                 table_name = 'df_tushare_cn_index_daily'
@@ -194,15 +194,19 @@ class PortfolioMetricsAnalysis:
                 table_name = 'df_tushare_stock_daily'
                 close_field = 'close'
             
+            # 将 YYYYMMDD 格式转为 YYYY-MM-DD 以匹配 akshare 表的 date 字段
+            start_date_fmt = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
+            end_date_fmt = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
+            
             sql = f"""
             SELECT
-                trade_date as trade_date,
+                date as trade_date,
                 {close_field} as close_point
             FROM {table_name}
-            WHERE ts_code = '{stock}'
-              AND trade_date >= '{start_date}'
-              AND trade_date <= '{end_date}'
-            ORDER BY trade_date ASC
+            WHERE symbol = '{stock}'
+              AND date >= '{start_date_fmt}'
+              AND date <= '{end_date_fmt}'
+            ORDER BY date ASC
             """
             
             from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -530,10 +534,10 @@ class PortfolioMetricsAnalysis:
         
         # 根据市场类型和资产类型选择正确的表
         if self.market_symbol in ['SPY']:
-            # 美国市场使用 df_tushare_us_stock_daily 表
-            table_name = 'df_tushare_us_stock_daily'
-            date_field = 'trade_date'
-            symbol_field = 'ts_code'
+            # 美国市场使用 df_akshare_stock_us_daily 表
+            table_name = 'df_akshare_stock_us_daily'
+            date_field = 'date'
+            symbol_field = 'symbol'
         elif self.market_symbol in ['GC', 'XAG', 'XAU', 'CL', 'OIL', 'NG']:
             # 美国/国际商品使用 df_akshare_futures_foreign_hist 表
             table_name = 'df_akshare_futures_foreign_hist'
