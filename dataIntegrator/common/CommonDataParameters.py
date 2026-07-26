@@ -25,9 +25,10 @@ class CommonDataParameters():
     CN_INDEX_LIST = [
         '000001.SH',  # 上证指数
         '399001.SZ',  # 深证成指
-        '000300.SH',  # 沪深300
+        '000016.SH',  # 上证50（HO期权标的）
+        '000300.SH',  # 沪深300（IO期权标的）
         '000905.SH',  # 中证500
-        '000852.SH',  # 中证1000
+        '000852.SH',  # 中证1000（MO期权标的）
         '399006.SZ',  # 创业板指
     ]
 
@@ -222,6 +223,39 @@ class CommonDataParameters():
         {'ts_code': '603228.SH', 'name': '景旺电子'},
 
         {'ts_code': '600522.SH', 'name': '中天科技'},
+
+        # ==================== ETF50 新增成分股 ====================
+        {'ts_code': '600030.SH', 'name': '中信证券'}, #EFT50
+        {'ts_code': '600031.SH', 'name': '三一重工'}, #EFT50
+        {'ts_code': '600036.SH', 'name': '招商银行'}, #EFT50
+        {'ts_code': '600050.SH', 'name': '中国联通'}, #EFT50
+        {'ts_code': '600089.SH', 'name': '特变电工'}, #EFT50
+        {'ts_code': '600111.SH', 'name': '北方稀土'}, #EFT50
+        {'ts_code': '600150.SH', 'name': '中国船舶'}, #EFT50
+        {'ts_code': '600406.SH', 'name': '国电南瑞'}, #EFT50
+        {'ts_code': '600760.SH', 'name': '中航沈飞'}, #EFT50
+        {'ts_code': '600887.SH', 'name': '伊利股份'}, #EFT50
+        {'ts_code': '601088.SH', 'name': '中国神华'}, #EFT50
+        {'ts_code': '601127.SH', 'name': '赛力斯'}, #EFT50
+        {'ts_code': '601166.SH', 'name': '兴业银行'}, #EFT50
+        {'ts_code': '601211.SH', 'name': '国泰海通'}, #EFT50
+        {'ts_code': '601318.SH', 'name': '中国平安'}, #EFT50
+        {'ts_code': '601328.SH', 'name': '交通银行'}, #EFT50
+        {'ts_code': '601398.SH', 'name': '工商银行'}, #EFT50
+        {'ts_code': '601600.SH', 'name': '中国铝业'}, #EFT50
+        {'ts_code': '601601.SH', 'name': '中国太保'}, #EFT50
+        {'ts_code': '601628.SH', 'name': '中国人寿'}, #EFT50
+        {'ts_code': '601688.SH', 'name': '华泰证券'}, #EFT50
+        {'ts_code': '601728.SH', 'name': '中国电信'}, #EFT50
+        {'ts_code': '601888.SH', 'name': '中国中免'}, #EFT50
+        {'ts_code': '601899.SH', 'name': '紫金矿业'}, #EFT50
+        {'ts_code': '603019.SH', 'name': '中科曙光'}, #EFT50
+        {'ts_code': '603993.SH', 'name': '洛阳钼业'}, #EFT50
+        {'ts_code': '688008.SH', 'name': '澜起科技'}, #EFT50
+        {'ts_code': '688012.SH', 'name': '中微公司'}, #EFT50
+        {'ts_code': '688111.SH', 'name': '金山办公'}, #EFT50
+        {'ts_code': '688565.SH', 'name': '豪威集团'}, #EFT50
+        {'ts_code': '688981.SH', 'name': '中芯国际'}, #EFT50
     ]
 
     REFRESH_US_STOCK_LIST = [

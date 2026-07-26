@@ -1,0 +1,135 @@
+"""
+期权日线指标计算服务 - 测试入口
+
+运行方式：
+    python -m dataIntegrator.modelService.option.TuShareOptDailyIndicatorServiceTest
+
+测试策略：
+    1. 先拉取少量数据进行验证
+    2. 打印各个指标的分位数/分布
+"""
+
+from datetime import datetime, timedelta
+
+from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.option.TuShareOptDailyIndicatorAnalyst import TuShareOptDailyIndicatorAnalyst
+
+logger = CommonLib.logger
+
+
+class TuShareOptDailyIndicatorManager:
+    """期权日线指标计算服务测试类"""
+
+    def __init__(self):
+        self.service = TuShareOptDailyIndicatorAnalyst()
+        logger.info("TuShareOptDailyIndicatorServiceTest.__init__: Test initialized")
+
+    def run(self, start_date=None, end_date=None,
+                 call_put=None, exercise_type=None, ts_code_filter=None):
+        """运行测试
+
+        Args:
+            start_date: 期权日线 & 指数行情起始日期 YYYYMMDD
+            end_date: 期权日线 & 指数行情截止日期 YYYYMMDD
+            call_put: 行权方向 'C'/'P'，None 不过滤
+            exercise_type: 行权方式 '欧式'/'美式'，None 不过滤
+            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+        """
+        logger.info("=" * 80)
+        logger.info("TuShareOptDailyIndicatorServiceTest.test_run: Starting test")
+        logger.info("=" * 80)
+
+        if end_date is None:
+            end_date = CommonParameters.today  # e.g., 20260719
+        if start_date is None:
+            # 默认取近 30 天
+            start_dt = datetime.strptime(end_date, '%Y%m%d') - timedelta(days=30)
+            start_date = start_dt.strftime('%Y%m%d')
+
+        logger.info(f"Test date range: {start_date} ~ {end_date}")
+
+        # ---- Step 1: 拉取数据 ----
+        logger.info("\n📥 Step 1: Fetching data...")
+        df_option_data = self.service.fetch_data(
+            start_date=start_date, end_date=end_date,
+            call_put=call_put, exercise_type=exercise_type, ts_code_filter=ts_code_filter
+        )
+        logger.info(f"Fetched {len(df_option_data)} rows, {len(df_option_data.columns)} columns")
+
+        if len(df_option_data) == 0:
+            logger.warning("No data fetched, test aborted")
+            return df_option_data
+
+        # 打印原始数据概览
+        logger.info("\n原始数据前 5 行（关键列）:")
+        key_cols = ['ts_code', 'trade_date', 'call_put', 'exercise_price',
+                    'opt_multiplier', 'close', 'spot_price', 'maturity_date']
+        available_key_cols = [c for c in key_cols if c in df_option_data.columns]
+        logger.info(f"\n{df_option_data[available_key_cols].head().to_string()}")
+
+        # ---- Step 2: 分步计算并验证 ----
+        logger.info("\n🧮 Step 2: Calculating indicators step by step...")
+
+        # 2a: 盘面硬指标
+        logger.info("\n--- Level 1: Trading P&L ---")
+        df_option_data = self.service._calc_trading_metrics(df_option_data)
+        trading_cols = ['mtm_pnl_close', 'mtm_pnl_settle', 'point_change',
+                        'pct_change', 'turnover_ratio', 'avg_unit_price']
+        logger.info(f"Sample:\n{df_option_data[trading_cols].head(10).to_string()}")
+        logger.info(f"NaN counts:\n{df_option_data[trading_cols].isna().sum()}")
+
+        # 2b: 时间指标
+        logger.info("\n--- Level 2: Time Metrics ---")
+        df_option_data = self.service._calc_time_metrics(df_option_data)
+        time_cols = ['days_to_maturity', 'years_to_maturity_calendar', 'years_to_maturity_trading']
+        logger.info(f"Sample:\n{df_option_data[time_cols].head(10).to_string()}")
+        logger.info(f"Stats:\n{df_option_data[time_cols].describe()}")
+
+        # 2c: 价态
+        logger.info("\n--- Level 3: Moneyness ---")
+        df_option_data = self.service._calc_moneyness(df_option_data)
+        money_cols = ['moneyness_status', 'moneyness_log']
+        logger.info(f"Sample:\n{df_option_data[money_cols].head(10).to_string()}")
+        logger.info(f"Status distribution:\n{df_option_data['moneyness_status'].value_counts()}")
+
+        # 2d: 隐含波动率 & Greeks
+        logger.info("\n--- Level 4 & 5: Implied Vol & Greeks ---")
+        df_option_data = self.service._calc_implied_vol_and_greeks(df_option_data)
+        greek_cols = ['implied_vol', 'bs_theoretical_price',
+                       'd1', 'd2', 'nd1', 'nd2',
+                       'delta', 'gamma', 'vega', 'theta', 'rho']
+        logger.info(f"Sample:\n{df_option_data[['ts_code', 'trade_date', 'call_put', 'spot_price', 'close'] + greek_cols].head(10).to_string()}")
+        logger.info(f"IV stats:\n{df_option_data['implied_vol'].describe()}")
+        iv_count = df_option_data['implied_vol'].notna().sum()
+        logger.info(f"IV computed for {iv_count}/{len(df_option_data)} rows")
+
+        # ---- 验证示例数据（用实际数据做自洽性检查） ----
+        logger.info("\n--- Sample Validation ---")
+        # 选一个有 IV 的行做完整自洽验证
+        valid_iv = df_option_data[df_option_data['implied_vol'].notna()]
+        if len(valid_iv) > 0:
+            sample_row = valid_iv.iloc[0]
+            c = sample_row['close']
+            pc = sample_row['pre_close']
+            s = sample_row['settle']
+            ps = sample_row['pre_settle']
+            mul = sample_row['opt_multiplier']
+            logger.info(f"Contract: {sample_row['ts_code']}, Trade Date: {sample_row['trade_date']}")
+            logger.info(f"  close={c:.1f}, pre_close={pc:.1f}, settle={s:.1f}, pre_settle={ps:.1f}, multiplier={mul}")
+            logger.info(f"  mtm_pnl_close = ({c:.1f} - {pc:.1f}) * {mul} = {(c - pc) * mul:.1f}, Computed: {sample_row['mtm_pnl_close']:.1f}")
+            logger.info(f"  mtm_pnl_settle = ({s:.1f} - {ps:.1f}) * {mul} = {(s - ps) * mul:.1f}, Computed: {sample_row['mtm_pnl_settle']:.1f}")
+            logger.info(f"  point_change = {c:.1f} - {pc:.1f} = {c - pc:.1f}, Computed: {sample_row['point_change']:.1f}")
+            logger.info(f"  pct_change = ({c:.1f}/{pc:.1f} - 1) * 100 = {(c/pc - 1)*100:.2f}%, Computed: {sample_row['pct_change']:.2f}%")
+            logger.info(f"  days_to_maturity = maturity_date - trade_date, Computed: {sample_row['days_to_maturity']}")
+            logger.info(f"  implied_vol: {sample_row['implied_vol']:.6f}, delta: {sample_row['delta']:.4f}, gamma: {sample_row['gamma']:.6f}")
+            logger.info(f"  d1: {sample_row['d1']:.6f}, d2: {sample_row['d2']:.6f}, N(d1): {sample_row['nd1']:.6f}, N(d2): {sample_row['nd2']:.6f}")
+
+        # ---- Step 3: 保存 ----
+        logger.info("\n💾 Step 3: Saving to ClickHouse...")
+        self.service.save_to_clickhouse(df_option_data, call_put=call_put, ts_code_filter=ts_code_filter)
+
+        logger.info("\n" + "=" * 80)
+        logger.info("✅ Test completed!")
+        logger.info("=" * 80)
+
+        return df_option_data

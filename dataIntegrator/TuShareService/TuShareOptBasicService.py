@@ -1,6 +1,6 @@
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 import pandas as pd
 
 
@@ -32,9 +32,12 @@ class TuShareOptBasicService(TuShareService):
             row_count = len(self.dataFrame)
             logger.info(f"成功获取期权基础信息数据，共 {row_count} 行")
 
+            # 添加 trade_date 列，值为当天日期
+            self.dataFrame['trade_date'] = CommonParameters.today
+
             # 确保列名与数据库定义一致
             expected_columns = [
-                'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
+                'trade_date', 'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
                 'opt_code', 'opt_type', 'call_put', 'exercise_type',
                 'exercise_price', 'opt_multiplier', 's_month', 'maturity_date',
                 'list_price', 'list_date', 'delist_date', 'last_edate',
@@ -59,7 +62,7 @@ class TuShareOptBasicService(TuShareService):
         try:
             # 定义 ClickHouse 表中所有字段及其类型
             table_columns = [
-                'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
+                'trade_date', 'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
                 'opt_code', 'opt_type', 'call_put', 'exercise_type',
                 'exercise_price', 'opt_multiplier', 's_month', 'maturity_date',
                 'list_price', 'list_date', 'delist_date', 'last_edate',
@@ -68,7 +71,7 @@ class TuShareOptBasicService(TuShareService):
 
             # String 类型字段
             string_columns = [
-                'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
+                'trade_date', 'ts_code', 'symbol', 'exchange', 'name', 'per_unit',
                 'opt_code', 'opt_type', 'call_put', 'exercise_type',
                 's_month', 'maturity_date', 'list_date', 'delist_date',
                 'last_edate', 'last_ddate', 'quote_unit', 'min_price_chg'
@@ -114,13 +117,14 @@ class TuShareOptBasicService(TuShareService):
     @classmethod
     def deleteDateFromClickHouse(self):
         """
-        由于 opt_basic 是全量数据（按交易所），删除旧数据后重新插入
+        按 trade_date 删除当天数据，避免覆盖历史数据
         """
         logger.info("deleteDateFromClickHouse started")
 
         try:
-            del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_basic DELETE WHERE 1=1"
+            del_sql = f"ALTER TABLE indexsysdb.df_tushare_opt_basic DELETE WHERE trade_date = '{CommonParameters.today}'"
             self.clickhouseClient.execute(del_sql)
+            logger.info(f"已删除 trade_date = {CommonParameters.today} 的旧数据")
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e

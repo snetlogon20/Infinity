@@ -1,6 +1,9 @@
---drop table indexsysdb.df_tushare_opt_basic
+--drop table indexsysdb.df_tushare_opt_basic  --#此表不可以随意drop, 因为删了历史数据就没了
+--ALTER TABLE indexsysdb.df_tushare_opt_basic DELETE WHERE 1=1;
+--ALTER TABLE indexsysdb.df_tushare_opt_basic DELETE WHERE trade_date = '20251224';
 CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_opt_basic
 (
+    `trade_date` String COMMENT '交易日期(YYYYMMDD)',
     `ts_code` String COMMENT 'TS代码',
     `symbol` String COMMENT '交易代码',
     `exchange` String COMMENT '交易市场',
@@ -22,5 +25,5 @@ CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_opt_basic
     `quote_unit` String COMMENT '报价单位',
     `min_price_chg` String COMMENT '最小价格波幅'
 ) ENGINE = MergeTree
-ORDER BY (ts_code, exchange, list_date)
+ORDER BY (trade_date, ts_code, exchange, list_date)
 SETTINGS index_granularity = 8192;
