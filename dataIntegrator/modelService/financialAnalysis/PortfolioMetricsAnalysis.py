@@ -27,6 +27,7 @@ import statsmodels.api as sm
 from openpyxl.chart import LineChart, Reference
 from openpyxl.chart.series import Series
 from scipy.optimize import minimize
+import matplotlib.pyplot as plt
 
 logger = CommonLib.logger
 
@@ -163,11 +164,33 @@ class PortfolioMetricsAnalysis:
             market_type = "CN"
             market_symbol = "000001.SH"
 
+        elif stock_type == "cn_sse_50":
+            stocks = [
+                '000016.SH',
+                # 金融地产
+                '600519.SH', '600036.SH', '601318.SH', '601166.SH', '601398.SH',
+                '601288.SH', '601328.SH', '601628.SH', '601601.SH', '600030.SH',
+                '601688.SH', '601211.SH', '601668.SH', '600887.SH', '600809.SH',
+                '601888.SH',
+                # 能源与原材料
+                '601857.SH', '600028.SH', '601088.SH', '601899.SH', '600111.SH',
+                '600309.SH', '603993.SH', '601600.SH',
+                # 信息技术与高端制造
+                '688256.SH', '688981.SH', '688041.SH', '688012.SH', '688008.SH',
+                '688111.SH', '603986.SH', '688565.SH', '603019.SH', '600183.SH',
+                '600760.SH', '600150.SH', '600031.SH', '600089.SH',
+                # 公用事业与其他
+                '600900.SH', '600406.SH', '600396.SH', '600050.SH', '601728.SH',
+                '601127.SH', '600276.SH', '603259.SH',
+            ]
+            market_type = "CN"
+            market_symbol = "000016.SH"
+
         else:
             raise ValueError(
                 f"不支持的股票类型: {stock_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
-                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']")
+                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', 'cn_sse_50']")
 
         return stocks, market_type, market_symbol
 
@@ -180,33 +203,39 @@ class PortfolioMetricsAnalysis:
         for stock in stocks:
             is_market_index = (stock == self.market_symbol)
             
-            # 根据市场类型和是否为指数选择正确的表和字段
+            # 根据市场类型和是否为指数选择正确的表、字段和日期格式
             if self.market_symbol in ['SPY']:
-                # 美国市场统一使用 df_akshare_stock_us_daily 表，字段为 close
+                # 美国市场使用 df_akshare_stock_us_daily 表
                 table_name = 'df_akshare_stock_us_daily'
-                close_field = 'close'
+                date_field = 'date'
+                symbol_field = 'symbol'
+                # akshare 表 date 字段为 YYYY-MM-DD 格式，需转换
+                start_date_sql = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
+                end_date_sql = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
             elif is_market_index:
-                # 中国市场指数使用 df_tushare_cn_index_daily 表，字段为 close
+                # 中国市场指数使用 df_tushare_cn_index_daily 表
                 table_name = 'df_tushare_cn_index_daily'
-                close_field = 'close'
+                date_field = 'trade_date'
+                symbol_field = 'ts_code'
+                start_date_sql = start_date
+                end_date_sql = end_date
             else:
-                # 中国市场个股使用 df_tushare_stock_daily 表，字段为 close
+                # 中国市场个股使用 df_tushare_stock_daily 表
                 table_name = 'df_tushare_stock_daily'
-                close_field = 'close'
-            
-            # 将 YYYYMMDD 格式转为 YYYY-MM-DD 以匹配 akshare 表的 date 字段
-            start_date_fmt = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
-            end_date_fmt = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
+                date_field = 'trade_date'
+                symbol_field = 'ts_code'
+                start_date_sql = start_date
+                end_date_sql = end_date
             
             sql = f"""
             SELECT
-                date as trade_date,
-                {close_field} as close_point
+                {date_field} as trade_date,
+                close as close_point
             FROM {table_name}
-            WHERE symbol = '{stock}'
-              AND date >= '{start_date_fmt}'
-              AND date <= '{end_date_fmt}'
-            ORDER BY date ASC
+            WHERE {symbol_field} = '{stock}'
+              AND {date_field} >= '{start_date_sql}'
+              AND {date_field} <= '{end_date_sql}'
+            ORDER BY {date_field} ASC
             """
             
             from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -251,17 +280,17 @@ class PortfolioMetricsAnalysis:
     def calculate_daily_returns(self, dfs):
         """计算日收益率（对数收益率）"""
         logger.info("计算日收益率...")
-        
-        returns_df = pd.DataFrame()
-        
+
+        # 一次性收集所有收益率序列，避免逐列追加导致 DataFrame 碎片化
+        return_series = {}
         for stock, df in dfs.items():
             close_prices = df['close_point']
-            daily_return = np.log(close_prices / close_prices.shift(1))
-            returns_df[stock] = daily_return
-        
+            return_series[stock] = np.log(close_prices / close_prices.shift(1))
+
+        returns_df = pd.concat(return_series, axis=1)
         returns_df = returns_df.dropna()
         logger.info(f"收益率数据形状: {returns_df.shape}")
-        
+
         return returns_df
 
     def calculate_beta(self, stock_returns, market_returns):
@@ -305,6 +334,16 @@ class PortfolioMetricsAnalysis:
         
         if n_assets == 0 or stock_returns.empty:
             return {stock: np.nan for stock in stocks}
+
+        # 预检：观测数必须 ≥ 资产数 × 2，否则协方差矩阵奇异性太高，优化必然失败
+        n_observations = stock_returns.shape[0]
+        min_required = max(n_assets * 2, 20)
+        if n_observations < min_required:
+            logger.warning(
+                f"CML 优化跳过: 观测数({n_observations}) < 最低要求({min_required})，"
+                f"资产数={n_assets}，协方差矩阵无法可靠估计"
+            )
+            return {stock: np.nan for stock in stocks}
         
         # 计算协方差矩阵和预期收益
         cov_matrix = stock_returns.cov() * self.trading_days
@@ -331,23 +370,48 @@ class PortfolioMetricsAnalysis:
         initial_weights = np.array([1/n_assets] * n_assets)
         
         try:
-            # 优化
+            # 首先尝试 SLSQP 方法
             result = minimize(
                 neg_sharpe_ratio,
                 initial_weights,
                 method='SLSQP',
                 bounds=bounds,
                 constraints=constraints,
-                options={'maxiter': 1000, 'ftol': 1e-10}
+                options={'maxiter': 1000, 'ftol': 1e-8}
             )
-            
+
             if result.success:
                 optimal_weights = result.x
+                # 将极小的权重置零（< 1e-6 视为零）
+                optimal_weights[optimal_weights < 1e-6] = 0
+                # 重新归一化
+                w_sum = optimal_weights.sum()
+                if w_sum > 0:
+                    optimal_weights = optimal_weights / w_sum
                 weights_dict = {stocks[i]: optimal_weights[i] for i in range(n_assets)}
                 return weights_dict
             else:
-                logger.warning(f"CML 优化失败: {result.message}")
-                return {stock: np.nan for stock in stocks}
+                # SLSQP 失败时，回退到 trust-constr 方法（数值更稳健）
+                logger.warning(f"SLSQP 优化失败: {result.message}，尝试 trust-constr 回退...")
+                result2 = minimize(
+                    neg_sharpe_ratio,
+                    initial_weights,
+                    method='trust-constr',
+                    bounds=bounds,
+                    constraints=constraints,
+                    options={'maxiter': 1000, 'gtol': 1e-6}
+                )
+                if result2.success:
+                    optimal_weights = result2.x
+                    optimal_weights[optimal_weights < 1e-6] = 0
+                    w_sum = optimal_weights.sum()
+                    if w_sum > 0:
+                        optimal_weights = optimal_weights / w_sum
+                    weights_dict = {stocks[i]: optimal_weights[i] for i in range(n_assets)}
+                    return weights_dict
+                else:
+                    logger.warning(f"CML 优化失败 (trust-constr 回退也失败): {result2.message}")
+                    return {stock: np.nan for stock in stocks}
         
         except Exception as e:
             logger.warning(f"CML 权重计算异常: {str(e)}")
@@ -1410,22 +1474,46 @@ class PortfolioMetricsAnalysis:
                 rightIndent=10,
                 backColor=colors.lightyellow
             )
-            
+
+            # 子标题样式
+            sub_title_style = ParagraphStyle(
+                'SubTitleStyle',
+                parent=styles['Heading2'],
+                fontSize=13,
+                fontName=chinese_font,
+                spaceAfter=4,
+                spaceBefore=8,
+            )
+
+            # 正文样式
+            body_style = ParagraphStyle(
+                'BodyStyle',
+                parent=styles['Normal'],
+                fontSize=10,
+                fontName=chinese_font,
+                leading=13,
+                spaceAfter=6,
+            )
+
+            # 表格样式（用于 CML 权重列表）
+            from reportlab.platypus import Table, TableStyle
+            from reportlab.lib import colors as rl_colors
+
             # 构建 PDF 内容
             story = []
-            
+
             # 遍历每个 Pivot 指标
             for idx, (metric_col, sheet_name) in enumerate(pivot_metrics, 1):
                 logger.info(f"   📊 处理 {idx}/{len(pivot_metrics)}: {sheet_name}")
-                
+
                 # 创建 Pivot 数据
                 pivot_df = self._create_metric_pivot_table(results_df, metric_col)
-                
-                # 数值列保疙4位小数
+
+                # 数值列保留4位小数
                 numeric_cols = pivot_df.columns[pivot_df.columns != '回测日期']
                 for col in numeric_cols:
                     pivot_df[col] = pivot_df[col].round(4)
-                
+
                 # 生成图表图片
                 try:
                     chart_image = self._generate_chart_image(pivot_df, metric_col, sheet_name)
@@ -1433,28 +1521,94 @@ class PortfolioMetricsAnalysis:
                         # 添加标题
                         story.append(Paragraph(f"{sheet_name}", title_style))
                         story.append(Spacer(1, 0.3*cm))
-                        
+
                         # 添加图片（居中）
                         img = Image(chart_image)
-                        # 调整图片大小以适应横向页面
-                        img.drawWidth = 27*cm  # 横向A4宽度约29.7cm，减去边距
+                        img.drawWidth = 27*cm
                         img.drawHeight = 16*cm
                         story.append(img)
-                        
+
+                        # ========== CML Weight 特殊处理: 饼图 + 权重列表 ==========
+                        if metric_col == 'CML Weight':
+                            # 生成 CML 饼图
+                            pie_image = self._generate_cml_pie_chart(pivot_df, results_df)
+                            if pie_image:
+                                story.append(Spacer(1, 0.3*cm))
+                                story.append(Paragraph("📊 CML 最新权重分布（饼图）", sub_title_style))
+                                story.append(Spacer(1, 0.2*cm))
+                                pie_img = Image(pie_image)
+                                pie_img.drawWidth = 26*cm
+                                pie_img.drawHeight = 18*cm
+                                story.append(pie_img)
+
+                            # 生成 CML 权重排序列表
+                            latest_row = pivot_df.iloc[-1]
+                            cml_weights_list = []
+                            for col in numeric_cols:
+                                w = latest_row[col]
+                                if pd.notna(w) and w > 0:
+                                    # 提取股票简称
+                                    ts_code = col.split(' - ')[0].strip() if ' - ' in col else col
+                                    stock_name_short = col.split(' - ')[1].strip() if ' - ' in col and len(col.split(' - ')) >= 2 else ''
+                                    cml_weights_list.append({
+                                        'ts_code': ts_code,
+                                        'name': stock_name_short,
+                                        'weight': w
+                                    })
+
+                            if cml_weights_list:
+                                # 按权重从大到小排序
+                                cml_weights_list.sort(key=lambda x: x['weight'], reverse=True)
+
+                                story.append(Spacer(1, 0.3*cm))
+                                story.append(Paragraph("📋 CML 权重排序列表（从大到小）", sub_title_style))
+                                story.append(Spacer(1, 0.2*cm))
+
+                                # 构建表格数据
+                                table_header = ['排名', '股票代码', '股票名称', 'CML 权重']
+                                table_data = [table_header]
+                                for rank, item in enumerate(cml_weights_list, 1):
+                                    table_data.append([
+                                        str(rank),
+                                        item['ts_code'],
+                                        item['name'],
+                                        f"{item['weight']*100:.2f}%"
+                                    ])
+
+                                # 创建表格
+                                cml_table = Table(table_data, colWidths=[2*cm, 6*cm, 7*cm, 4*cm])
+                                cml_table.setStyle(TableStyle([
+                                    ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#2E86AB')),
+                                    ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                                    ('FONTNAME', (0, 0), (-1, -1), chinese_font),
+                                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                                    ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                                    ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+                                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                    ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.grey),
+                                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#E8F4F8')]),
+                                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                                ]))
+                                story.append(cml_table)
+
                         # 添加专业分析评论
+                        story.append(Spacer(1, 0.3*cm))
                         comment = self.generate_professional_comment(metric_col, pivot_df)
-                        # 将换行符转换为 HTML 格式
                         comment_html = comment.replace('\n', '<br/>')
                         story.append(Paragraph(comment_html, comment_style))
                         story.append(Spacer(1, 0.5*cm))
-                        
+
                         # 分页符（除了最后一个）
                         if idx < len(pivot_metrics):
                             story.append(PageBreak())
                 except Exception as e:
                     logger.warning(f"   ⚠️ 图表生成失败: {e}")
                     continue
-            
+
+            # ========== AI 分析页（已移除） ==========
+
             # 生成 PDF
             doc.build(story)
             
@@ -1509,8 +1663,34 @@ class PortfolioMetricsAnalysis:
                 else:
                     date_objects.append(datetime.strptime(date_str, '%Y%m%d'))
             
-            # 创建图表
-            fig, ax = plt.subplots(figsize=(14, 7))
+            # ========== 动态图表参数（根据资产数量自适应） ==========
+            num_assets = len(numeric_cols)
+            if num_assets <= 10:
+                ncol = num_assets
+                legend_fontsize = 7
+                bottom_margin = 0.12
+                fig_height = 7
+            elif num_assets <= 20:
+                ncol = 10
+                legend_fontsize = 6.5
+                legend_rows = -(-num_assets // ncol)  # ceiling division
+                bottom_margin = max(0.14, 0.10 + legend_rows * 0.04)
+                fig_height = max(7, 6 + legend_rows * 0.8)
+            elif num_assets <= 35:
+                ncol = 12
+                legend_fontsize = 5.5
+                legend_rows = -(-num_assets // ncol)
+                bottom_margin = max(0.16, 0.10 + legend_rows * 0.04)
+                fig_height = max(7, 6 + legend_rows * 0.8)
+            else:
+                ncol = 15
+                legend_fontsize = 5
+                legend_rows = -(-num_assets // ncol)
+                bottom_margin = max(0.18, 0.10 + legend_rows * 0.04)
+                fig_height = max(7, 6 + legend_rows * 0.8)
+
+            # 创建图表（动态高度）
+            fig, ax = plt.subplots(figsize=(14, fig_height))
             
             # 根据指标类型选择图表类型
             if metric_col == 'CML Weight':
@@ -1566,93 +1746,84 @@ class PortfolioMetricsAnalysis:
             # 设置标签格式
             plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=10)
             
-            # ========== 在每条线的末端添加股票标签 ==========
+            # ========== 在每条线的末端添加股票标签（仅前10名） ==========
             if len(pivot_df) > 0 and metric_col != 'CML Weight':
-                # 找到最后一个有效数据点的日期
                 last_date = date_objects[-1]
                 
-                # 为每条线添加标签
+                # 按最后一个值绝对值降序排列，仅取前 10 名
+                last_values = {}
                 for col in numeric_cols:
+                    lv = pivot_df[col].iloc[-1]
+                    if pd.notna(lv):
+                        last_values[col] = abs(lv)
+                top10_cols = sorted(last_values, key=last_values.get, reverse=True)[:10]
+                
+                for col in top10_cols:
                     last_value = pivot_df[col].iloc[-1]
-                    if pd.notna(last_value):
-                        # 在线的右端添加标签
-                        ax.text(last_date, last_value, f'  {col}', 
-                               fontsize=8, fontweight='normal',
-                               verticalalignment='center',
-                               horizontalalignment='left')
+                    ax.text(last_date, last_value, f'  {col}',
+                           fontsize=8, fontweight='normal',
+                           verticalalignment='center',
+                           horizontalalignment='left')
 
-            # ========== 在堆积图的右侧添加股票标签 ==========
+            # ========== 在堆积图的右侧添加股票标签（仅前10名） ==========
             if len(pivot_df) > 0 and metric_col == 'CML Weight':
-                # 找到最后一个有效数据点的日期
                 last_date = date_objects[-1]
                 
                 # 计算每个资产在最后一个日期的权重
                 final_weights = {}
-                for col_idx, col in enumerate(numeric_cols):
+                for col in numeric_cols:
                     last_weight = pivot_df[col].fillna(0).iloc[-1]
                     if last_weight > 0:
                         final_weights[col] = last_weight
                 
-                # 按权重降序排序
+                # 按权重降序排序，仅取前 10 名
                 sorted_weights = sorted(final_weights.items(), key=lambda x: x[1], reverse=True)
+                top10_weights = sorted_weights[:10]
                 
-                # 只显示权重 > 5% 的标签，并上下交替布局
-                label_threshold = 0.05  # 5% 阈值
-                for idx, (col, weight) in enumerate(sorted_weights):
-                    if weight >= label_threshold:
-                        # 找到该资产在numeric_cols中的索引
-                        col_idx_in_numeric = numeric_cols.tolist().index(col)
-                        
-                        # 计算累积高度（从下到上）
-                        cumulative_height = sum([pivot_df[numeric_cols[i]].fillna(0).iloc[-1] 
-                                                for i in range(col_idx_in_numeric + 1)])
-                        # 该层的中心位置
-                        y_center = cumulative_height - weight / 2
-                        
-                        # 根据索引决定标签在上方还是下方
-                        if idx % 2 == 0:
-                            y_offset = weight * 0.3  # 向上偏移
-                            va = 'bottom'
-                        else:
-                            y_offset = -weight * 0.3  # 向下偏移
-                            va = 'top'
-                        
-                        # 在堆积层的右侧添加标签
-                        ax.text(last_date, y_center + y_offset, f'{col}', 
-                               fontsize=6, fontweight='normal',
-                               verticalalignment=va,
-                               horizontalalignment='left',
-                               bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='none'))
+                for idx, (col, weight) in enumerate(top10_weights):
+                    # 找到该资产在 numeric_cols 中的索引
+                    col_idx_in_numeric = numeric_cols.tolist().index(col)
+                    
+                    # 计算累积高度（从下到上）
+                    cumulative_height = sum([pivot_df[numeric_cols[i]].fillna(0).iloc[-1]
+                                            for i in range(col_idx_in_numeric + 1)])
+                    # 该层的中心位置
+                    y_center = cumulative_height - weight / 2
+                    
+                    # 根据索引决定标签在上方还是下方
+                    if idx % 2 == 0:
+                        y_offset = weight * 0.3  # 向上偏移
+                        va = 'bottom'
+                    else:
+                        y_offset = -weight * 0.3  # 向下偏移
+                        va = 'top'
+                    
+                    # 在堆积层的右侧添加标签
+                    ax.text(last_date, y_center + y_offset, f'{col}',
+                           fontsize=6, fontweight='normal',
+                           verticalalignment=va,
+                           horizontalalignment='left',
+                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='none'))
             
             # 添加网格线
             ax.grid(True, linestyle='--', alpha=0.5)
             
-            # ========== 在图表底部添加图例标签（平铺显示） ==========
+            # ========== 在图表底部添加图例标签（平铺显示，动态参数） ==========
             if len(numeric_cols) > 0:
-                # 计算需要的列数（根据资产数量动态调整）
-                num_assets = len(numeric_cols)
-                if num_assets <= 10:
-                    ncol = num_assets  # 资产少时，每行显示所有
-                elif num_assets <= 20:
-                    ncol = 10  # 中等数量，每行10个
-                else:
-                    ncol = 15  # 大量资产，每行15个
-                
-                # 在图表底部添加图例（平铺显示，带颜色线条）
-                ax.legend(loc='upper center', 
-                         bbox_to_anchor=(0.5, -0.15),  # 位置在图表底部
-                         ncol=ncol,  # 列数
-                         fontsize=7,  # 字体大小
-                         markerscale=0.8,  # 标记大小
-                         columnspacing=0.8,  # 列间距
-                         handlelength=1.5,  # 线条长度
-                         handletextpad=0.4,  # 线条和文字间距
-                         framealpha=0.9,  # 透明度
-                         borderaxespad=0.5)  # 边框间距
+                ax.legend(loc='upper center',
+                         bbox_to_anchor=(0.5, -0.15),
+                         ncol=ncol,
+                         fontsize=legend_fontsize,
+                         markerscale=0.8,
+                         columnspacing=0.8,
+                         handlelength=1.5,
+                         handletextpad=0.4,
+                         framealpha=0.9,
+                         borderaxespad=0.5)
             
-            # 调整布局，为底部图例留出足够空间
-            fig.autofmt_xdate(bottom=0.2)  # 自动格式化日期，底部留出空间
-            plt.tight_layout(rect=[0, 0.12, 1, 1])  # 调整布局，为底部图例留出12%的空间
+            # 调整布局，为底部图例留出动态空间
+            fig.autofmt_xdate(bottom=0.2)
+            plt.tight_layout(rect=[0, bottom_margin, 1, 1])
             
             # 保存到内存缓冲区
             buf = BytesIO()
@@ -1667,7 +1838,141 @@ class PortfolioMetricsAnalysis:
             import traceback
             logger.error(traceback.format_exc())
             return None
-    
+
+    def _generate_cml_pie_chart(self, pivot_df, results_df):
+        """
+        生成 CML 权重饼图（仅显示最新日期非零权重的股票）
+        带引导线标签 + 内部百分比 + 右侧图例，参照 Excel 饼图风格
+
+        参数:
+        - pivot_df: CML Weight Pivot 数据 DataFrame
+        - results_df: 原始结果 DataFrame（含股票号和股票名）
+
+        返回:
+        - image_bytes: 图片字节流
+        """
+        try:
+            import math
+            plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+            plt.rcParams['axes.unicode_minus'] = False
+
+            # 获取最新日期的 CML 权重
+            if pivot_df.empty or len(pivot_df) == 0:
+                return None
+
+            latest_row = pivot_df.iloc[-1]
+            numeric_cols = pivot_df.columns[pivot_df.columns != '回测日期']
+
+            # 提取非零且非 NaN 的权重
+            weights_data = {}
+            for col in numeric_cols:
+                w = latest_row[col]
+                if pd.notna(w) and w > 0:
+                    weights_data[col] = w * 100  # 转为百分比
+
+            if not weights_data:
+                logger.warning("饼图生成: 没有非零权重的股票")
+                return None
+
+            # 按权重降序排列
+            weights_sorted = dict(sorted(weights_data.items(), key=lambda x: x[1], reverse=True))
+
+            # 准备标签数据
+            external_labels = []
+            label_texts = []     # 引导线标签文本
+            sizes = []
+            for stock_name, weight in weights_sorted.items():
+                parts = stock_name.split(' - ')
+                ts_code = parts[0].strip()
+                stock_short_name = parts[1].strip() if len(parts) >= 2 else ''
+                external_labels.append(f"{ts_code} {stock_short_name}".strip())
+                # 引导线标签格式: "601398.SH - 工商银行, 27%"
+                label_texts.append(f"{ts_code} - {stock_short_name}, {weight:.0f}%")
+                sizes.append(weight)
+
+            # 创建饼图
+            fig, ax = plt.subplots(figsize=(14, 10))
+
+            colors = plt.cm.tab20(np.linspace(0, 1, len(sizes)))
+
+            # 百分比放在饼图内部
+            wedges, texts, autotexts = ax.pie(
+                sizes, labels=None, autopct='%1.1f%%',
+                colors=colors, startangle=90,
+                pctdistance=0.65,
+                wedgeprops=dict(edgecolor='white', linewidth=1)
+            )
+
+            # 设置内部百分比文字样式
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontsize(8)
+                autotext.set_fontweight('bold')
+
+            # ========== 引导线标签（Excel 风格） ==========
+            bbox_props = dict(boxstyle="round,pad=0.2", fc="white", ec="black", lw=0.5)
+            arrow_props = dict(arrowstyle="-", color="gray", lw=0.8, connectionstyle="arc3,rad=0")
+
+            for i, (wedge, label_text, weight) in enumerate(zip(wedges, label_texts, sizes)):
+                # 计算饼图扇区中心角度
+                theta1, theta2 = wedge.theta1, wedge.theta2
+                angle = np.radians((theta1 + theta2) / 2)
+
+                # 标签锚点：饼图外缘
+                x_wedge = np.cos(angle)
+                y_wedge = np.sin(angle)
+
+                # 标签放置位置（延伸出去）
+                label_distance = 1.35
+                x_label = label_distance * x_wedge
+                y_label = label_distance * y_wedge
+
+                # 水平对齐：右侧标签左对齐，左侧标签右对齐
+                horizontalalignment = 'left' if x_wedge >= 0 else 'right'
+
+                # < 3% 的小扇区字号缩小
+                fontsize = 6 if weight < 3 else 8
+
+                ax.annotate(
+                    label_text,
+                    xy=(x_wedge, y_wedge),           # 箭头指向饼图边缘
+                    xytext=(x_label * 1.15, y_label * 1.15),  # 文字位置再远一点
+                    fontsize=fontsize,
+                    fontweight='normal',
+                    horizontalalignment=horizontalalignment,
+                    verticalalignment='center',
+                    bbox=bbox_props,
+                    arrowprops=arrow_props,
+                )
+
+            # 添加图例（股票代码 + 名称），保留在右侧
+            ax.legend(
+                wedges, external_labels,
+                title="股票代码 名称",
+                loc="center left",
+                bbox_to_anchor=(1.2, 0.5),
+                fontsize=7,
+                title_fontsize=9,
+                frameon=False
+            )
+
+            ax.set_title('CML 最优权重分布 (最新日期)', fontsize=14, fontweight='bold', pad=20)
+
+            plt.tight_layout()
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            plt.close(fig)
+
+            return buf
+
+        except Exception as e:
+            logger.warning(f"CML 饼图生成异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+
     def generate_professional_comment(self, metric_col, pivot_df):
         """
         为指定指标生成专业的分析评论（委托给 PortfolioMetricsAnalysisReport）
