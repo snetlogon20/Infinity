@@ -337,7 +337,7 @@ if __name__ == "__main__":
         {
             "name": "中国上证ETF50组合",
             "stock_type": "cn_sse_50",
-            "start_date": CommonDataParameters.get_start_date(days=30),
+            "start_date": CommonDataParameters.get_start_date(days=720),
             "end_date": CommonParameters.today,
             "interest_country": "CN",
             "market_type": "CN"
