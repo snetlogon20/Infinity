@@ -137,11 +137,33 @@ class PortfolioMetricsAnalysisTest:
             market_type = "CN"
             market_symbol = "000001.SH"
 
+        elif stock_type == "cn_sse_50":
+            stocks = [
+                '000016.SH',
+                # 金融地产
+                '600519.SH', '600036.SH', '601318.SH', '601166.SH', '601398.SH',
+                '601288.SH', '601328.SH', '601628.SH', '601601.SH', '600030.SH',
+                '601688.SH', '601211.SH', '601668.SH', '600887.SH', '600809.SH',
+                '601888.SH',
+                # 能源与原材料
+                '601857.SH', '600028.SH', '601088.SH', '601899.SH', '600111.SH',
+                '600309.SH', '603993.SH', '601600.SH',
+                # 信息技术与高端制造
+                '688256.SH', '688981.SH', '688041.SH', '688012.SH', '688008.SH',
+                '688111.SH', '603986.SH', '688565.SH', '603019.SH', '600183.SH',
+                '600760.SH', '600150.SH', '600031.SH', '600089.SH',
+                # 公用事业与其他
+                '600900.SH', '600406.SH', '600396.SH', '600050.SH', '601728.SH',
+                '601127.SH', '600276.SH', '603259.SH',
+            ]
+            market_type = "CN"
+            market_symbol = "000016.SH"
+
         else:
             raise ValueError(
                 f"不支持的股票类型: {stock_type}。"
                 f"支持的类型: ['us_tech', 'us_finance', 'us_mixed', 'us_custom', "
-                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom']")
+                f"'cn_blue_chip', 'cn_tech', 'cn_consumer', 'cn_financial', 'cn_energy', 'cn_custom', 'cn_sse_50']")
 
         return stocks, market_type, market_symbol
 
@@ -216,14 +238,14 @@ if __name__ == "__main__":
 
     # 定义报告配置（参考 CMLAnalysisTest）
     report_configs = [
-        {
-            "name": "美国科技股",
-            "stock_type": "us_tech",
-            "start_date": CommonDataParameters.get_start_date(days=720),
-            "end_date": CommonParameters.today,
-            "interest_country": "US",
-            "market_type": "US"
-        },
+        # {
+        #     "name": "美国科技股",
+        #     "stock_type": "us_tech",
+        #     "start_date": CommonDataParameters.get_start_date(days=720),
+        #     "end_date": CommonParameters.today,
+        #     "interest_country": "US",
+        #     "market_type": "US"
+        # },
         # {
         #     "name": "美国科技股",
         #     "stock_type": "us_tech",
@@ -312,6 +334,14 @@ if __name__ == "__main__":
         #     "interest_country": "CN",
         #     "market_type": "CN"
         # },
+        {
+            "name": "中国上证ETF50组合",
+            "stock_type": "cn_sse_50",
+            "start_date": CommonDataParameters.get_start_date(days=720),
+            "end_date": CommonParameters.today,
+            "interest_country": "CN",
+            "market_type": "CN"
+        },
     ]
 
     all_results = []

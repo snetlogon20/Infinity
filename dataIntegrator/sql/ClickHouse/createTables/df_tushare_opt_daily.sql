@@ -1,4 +1,6 @@
 --drop table indexsysdb.df_tushare_opt_daily
+--ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE 1=1;
+--ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE trade_date = '20251224';
 CREATE TABLE IF NOT EXISTS indexsysdb.df_tushare_opt_daily
 (
     `ts_code` String COMMENT 'TS合约代码',
