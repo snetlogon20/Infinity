@@ -25,7 +25,16 @@ class TuShareOptDailyService(TuShareService):
         logger.info("prepareData started")
 
         try:
-            if ts_code:
+            if ts_code and trade_date:
+                # 按合约代码 + 交易日期查询
+                self.dataFrame = self.pro.opt_daily(
+                    ts_code=ts_code,
+                    trade_date=trade_date,
+                    exchange=exchange
+                )
+                row_count = len(self.dataFrame)
+                logger.info(f"成功获取期权 {ts_code} 在 {trade_date} 的日线数据，共 {row_count} 行")
+            elif ts_code:
                 # 按合约代码 + 日期范围查询
                 self.dataFrame = self.pro.opt_daily(
                     ts_code=ts_code,
@@ -162,24 +171,31 @@ class TuShareOptDailyService(TuShareService):
         logger.info("saveDateToClickHouse completed")
 
     @classmethod
-    def deleteDateFromClickHouse(self, ts_code="", start_date="", end_date=""):
+    def deleteDateFromClickHouse(self, ts_code="", trade_date="", start_date="", end_date=""):
         """
         从 ClickHouse 删除指定条件下的期权日线数据
 
         Args:
             ts_code: 合约代码（可选）
-            start_date: 开始日期 (YYYYMMDD)
-            end_date: 结束日期 (YYYYMMDD)
+            trade_date: 交易日期 YYYYMMDD（可选）
+            start_date: 开始日期 YYYYMMDD（可选）
+            end_date: 结束日期 YYYYMMDD（可选）
         """
         logger.info("deleteDateFromClickHouse started")
 
         try:
-            if ts_code and start_date and end_date:
+            if ts_code and trade_date:
+                # 按 ts_code + trade_date 删除
+                del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE ts_code = '%s' AND trade_date = '%s'" % (ts_code, trade_date)
+            elif ts_code and start_date and end_date:
                 # 删除指定合约在指定日期范围的数据
                 del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE ts_code = '%s' AND trade_date >= '%s' AND trade_date <= '%s'" % (ts_code, start_date, end_date)
             elif ts_code:
                 # 删除指定合约的所有数据
                 del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE ts_code = '%s'" % ts_code
+            elif trade_date:
+                # 按 trade_date 删除全天的数据
+                del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE trade_date = '%s'" % trade_date
             elif start_date and end_date:
                 # 删除指定日期范围的所有数据
                 del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE trade_date >= '%s' AND trade_date <= '%s'" % (start_date, end_date)

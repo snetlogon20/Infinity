@@ -1,10 +1,18 @@
--- D:\workspace_python\infinity\dataIntegrator\sql\ClickHouse\createTables\tb_tushare_opt_daily_indicator.sql
 -- 期权日线指标分析表（含盘面指标、时间指标、价态、隐含波动率、Greeks）
 -- 数据来源：df_tushare_opt_daily + df_tushare_opt_basic
+-- 支持多日增量写入：按 trade_date 增量删除后插入，可追溯历史波动
 --drop table indexsysdb.tb_tushare_opt_daily_indicator
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator DELETE WHERE 1=1;
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator DELETE WHERE trade_date = '20251224';
+
+-- 增量 DDL: 已有表新增 d1/d2/N(d1)/N(d2) 列
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN d1 Float64 COMMENT 'BS模型d1参数: (ln(S/K)+(r+0.5*sigma^2)*T)/(sigma*sqrt(T))';
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN d2 Float64 COMMENT 'BS模型d2参数: d1-sigma*sqrt(T)';
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN nd1 Float64 COMMENT 'BS模型N(d1): 标准正态累积分布值';
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN nd2 Float64 COMMENT 'BS模型N(d2): 标准正态累积分布值';
 CREATE TABLE indexsysdb.tb_tushare_opt_daily_indicator (
-    ts_code String COMMENT 'TS合约代码(来自opt_daily)',
     trade_date String COMMENT '交易日期(YYYYMMDD)',
+    ts_code String COMMENT 'TS合约代码(来自opt_daily)',
     call_put String COMMENT '期权类型(C=认购/P=认沽)',
     exercise_price Float64 COMMENT '行权价',
     opt_multiplier Float64 COMMENT '合约单位(乘数)',
@@ -39,8 +47,12 @@ CREATE TABLE indexsysdb.tb_tushare_opt_daily_indicator (
     gamma Float64 COMMENT 'Gamma: Delta对S的敏感度',
     vega Float64 COMMENT 'Vega: IV变动1%的权利金变化',
     theta Float64 COMMENT 'Theta: 每日时间衰减(元/天)',
-    rho Float64 COMMENT 'Rho: 利率敏感度'
+    rho Float64 COMMENT 'Rho: 利率敏感度',
+    d1 Float64 COMMENT 'BS模型d1参数: (ln(S/K)+(r+0.5*sigma^2)*T)/(sigma*sqrt(T))',
+    d2 Float64 COMMENT 'BS模型d2参数: d1-sigma*sqrt(T)',
+    nd1 Float64 COMMENT 'BS模型N(d1): 标准正态累积分布值',
+    nd2 Float64 COMMENT 'BS模型N(d2): 标准正态累积分布值'
 )
 ENGINE = MergeTree()
-ORDER BY (ts_code, trade_date)
+ORDER BY (trade_date, ts_code)
 SETTINGS index_granularity = 8192;

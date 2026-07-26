@@ -55,6 +55,7 @@ class TuShareOptDailyServiceTest(TuShareService):
             logger.info("开始删除 ClickHouse 中的旧数据...")
             tuShareService.deleteDateFromClickHouse(
                 ts_code=ts_code if ts_code else "",
+                trade_date=trade_date if trade_date else "",
                 start_date=start_date if start_date else "",
                 end_date=end_date if end_date else ""
             )
@@ -81,15 +82,14 @@ class TuShareOptDailyServiceTest(TuShareService):
         )
 
     @classmethod
-    def test_by_ts_code(self, ts_code="10001313.SH", start_date="20261201", end_date="20261218"):
+    def test_by_ts_code(self, ts_code="10001313.SH", trade_date="20261201"):
         """
-        按合约代码测试期权日线数据
+        按合约代码 + 交易日期测试期权日线数据
         """
-        logger.info(f"按合约代码查询: {ts_code}")
+        logger.info(f"按合约代码 + 交易日期查询: {ts_code}, {trade_date}")
         self.refresh_opt_daily(
             ts_code=ts_code,
-            start_date=start_date,
-            end_date=end_date
+            trade_date=trade_date
         )
 
 if __name__ == '__main__':
@@ -102,31 +102,53 @@ if __name__ == '__main__':
 
         # 使用示例1: 按交易日查询（推荐，单日数据量适中）
         # tuShareOptDailyServiceTest.test_by_trade_date(
-        #     trade_date="20260717",
+        #     trade_date="20260702",
         #     exchange=""
         # )
 
         # 使用示例2: 按合约代码 + 日期范围查询（取消注释使用）
         # tuShareOptDailyServiceTest.test_by_ts_code(
-        #     ts_code="10001313.SH",
-        #     start_date="20261201",
-        #     end_date="20261218"
+        #     ts_code="HO2612-C-2500.CFX",
+        #     trade_date="20260701"
         # )
 
 
-        # 使用 calculate_T_minus_n_days_list 循环遍历日期
+        # 使用示例3: 使用 calculate_T_minus_n_days_list 循环遍历日期
+        # calendarService = CalendarService()
+        # start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=30)
+        # end_date = CommonParameters.today
+        #
+        # calendar_service = CalendarService()
+        # trade_date_list = calendar_service.calculate_dates_between_start_end_date(start_date, end_date)
+        # for trade_date_str in trade_date_list:
+        #     tuShareOptDailyServiceTest.test_by_trade_date(
+        #         trade_date=trade_date_str,
+        #         exchange=""
+        #     )
 
+        # 使用示例4: 使用 calculate_T_minus_n_days_list 循环遍历日期, 并循环要求的产品代码
+        ts_code_list = [
+            "HO2612-C-2500.CFX", "HO2612-C-2600.CFX", "HO2612-C-2700.CFX",
+            "HO2612-C-2800.CFX", "HO2612-C-2900.CFX", "HO2612-C-3000.CFX",
+            "HO2612-C-3100.CFX", "HO2612-C-3200.CFX", "HO2612-C-3300.CFX",
+            "HO2612-C-3400.CFX", "HO2612-C-3500.CFX",
+            "HO2612-P-2500.CFX", "HO2612-P-2600.CFX", "HO2612-P-2700.CFX",
+            "HO2612-P-2800.CFX", "HO2612-P-2900.CFX", "HO2612-P-3000.CFX",
+            "HO2612-P-3100.CFX", "HO2612-P-3200.CFX", "HO2612-P-3300.CFX",
+            "HO2612-P-3400.CFX", "HO2612-P-3500.CFX",
+        ]
         calendarService = CalendarService()
-        start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=10)
+        start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=30)
         end_date = CommonParameters.today
 
         calendar_service = CalendarService()
         trade_date_list = calendar_service.calculate_dates_between_start_end_date(start_date, end_date)
         for trade_date_str in trade_date_list:
-            tuShareOptDailyServiceTest.test_by_trade_date(
-                trade_date=trade_date_str,
-                exchange=""
-            )
+            for ts_code in ts_code_list:
+                tuShareOptDailyServiceTest.test_by_ts_code(
+                    ts_code=ts_code,
+                    trade_date=trade_date_str
+                )
 
 
         logger.info("=" * 80)
