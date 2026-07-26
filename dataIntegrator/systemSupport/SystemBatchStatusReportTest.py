@@ -8,4 +8,7 @@ class SystemBatchStatusReportTest:
 
 if __name__ == "__main__":
     report = SystemBatchStatusReport()
-    report.generate_report(target_date="2026-07-18")
+
+    target_list = ['2026-07-18','2026-07-25','2026-07-26']
+    for target_date in target_list:
+        report.generate_report(target_date=target_date)
