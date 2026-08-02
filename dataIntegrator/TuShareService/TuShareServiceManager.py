@@ -922,30 +922,31 @@ class TuShareServiceManager():
             end_month   = self.calendarService.calculate_month(end_date)  # "202607"
 
             param_method_dict = {
-                "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},
-                "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},
-                "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},
-                "callTushareCNMondySupplyService": {"start_date": start_month, "end_date": end_month},  # 保持原方法名
-                "callTushareCNCPIService": {"start_date": start_month, "end_date": end_month},
-                "callTushareCNPPIService": {"start_date": start_month, "end_date": end_month},
-                "callTushareCNPMIService": {"start_date": start_month, "end_date": end_month},
-                "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},
-                "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},
-                "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},
-                "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 保持原方法名
-                "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},
-                "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date}, #5 times daily,
-                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareConvertBondBasicService": {},
-                "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},
-                "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},
-                "callTuShareOptBasicService": {"exchange": ""},
-                "callTuShareOptDailyService": {"exchange": "", "start_date": start_date, "end_date": end_date}
+                "callTuShareCNIndexDailyService": {"ts_code": "000001.SH", "start_date": start_date,"end_date": end_date},  # A股指数日线行情（上证指数000001.SH）
+                "callTuShareChinaStockIndexService": {"ts_code": "603839.SH", "start_date": start_date,"end_date": end_date},  # A股个股日线行情（安正时尚603839.SH）
+                "callTuShareShiborDailyService": {"start_date": start_date, "end_date": end_date},  # Shibor拆借利率日数据
+                "callTushareShiborLPRDailyService": {"start_date": start_date, "end_date": end_date},  # LPR贷款市场报价利率
+                "callTushareCNGDPService": {"start_date": start_quarter, "end_date": end_quarter},  # 中国GDP季度数据
+                "callTushareCNMondySupplyService": {"start_date": start_month, "end_date": end_month},  # 中国货币供应量（M0/M1/M2）月度数据
+                "callTushareCNCPIService": {"start_date": start_month, "end_date": end_month},  # 中国CPI月度数据
+                "callTushareCNPPIService": {"start_date": start_month, "end_date": end_month},  # 中国PPI月度数据
+                "callTushareCNPMIService": {"start_date": start_month, "end_date": end_month},  # 中国PMI月度数据
+                "callTuFutureBasicInformationService": {"exchange": "DCE", "fut_type": '1', "fields": "ts_code,symbol,name,list_date,delist_date,quote_unit"},  # 期货合约基础信息（大商所）
+                "callTuShareFutureDailyService": {"ts_code": "JM2304.DCE", "start_date": start_date, "end_date": end_date},  # 期货日线行情（焦煤JM2304.DCE）
+                "callTushareUSStockBasicService": {"start_date": start_date, "end_date": end_date},  # 美股股票基础信息
+                "callTuShareHKStockDailyService": {"ts_code": "00001.HK", "start_date": start_date, "end_date": end_date},  # 港股日线行情（长和00001.HK）
+                "callTuShareFXOffsoreBasicService": {"exchange": "FXCM", "classify": "INDEX"},  # 外汇基础信息（FXCM指数类）
+                "callTuShareFXDailyService": {"exchange": "US30.FXCM", "start_date": start_date, "end_date": end_date},  # 外汇日线行情（美元指数US30.FXCM）
+                "callTushareSGEDailyService": {"start_date": start_date, "end_date": end_date},  # 新加坡富时A50指数日线行情
+                "callTushareUSTreasuryYieldCurveService": {"start_date": start_date, "end_date": end_date},  # 美国国债收益率曲线
+                "callTuShareUSStockDailyService": {"ts_code": "C", "start_date": start_date, "end_date": end_date},  # 美股日线行情（花旗集团C），每天更新5次
+                "callUSDIndexDailyService": {"start_date": start_date, "end_date": end_date},  # 美元指数日线数据（AKShare来源）
+                "callTuShareConvertBondBasicService": {},  # 可转债基础信息
+                "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},  # 可转债日线行情（ts_code=None拉全量）
+                "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},  # 全球指数日线行情
+                "callTuShareOptBasicService": {"exchange": ""},  # 期权合约基础信息
+                "callTuShareOptDailyService": {"exchange": "", "start_date": start_date, "end_date": end_date}  # 期权日线行情
+                #  TuShareYieldCurveConvertableBondService 需要特殊权限的token，无法使用
             }
 
             # 按顺序调用方法
