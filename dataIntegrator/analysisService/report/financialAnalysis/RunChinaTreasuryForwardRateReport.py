@@ -3,6 +3,7 @@
 
 本文件用于批量生成中国国债远期利率分析报告
 """
+import os
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters

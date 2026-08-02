@@ -367,6 +367,320 @@ class OptDailyIndicatorReport:
         return self._gen_dual_y_chart(df, 'rho', 'Rho', chart_num=8,
                                       title_prefix='图8：spot_price + 各合约 Rho')
 
+    # ===================== 图9：多日隐含波动率微笑演变仪表盘 =====================
+
+    def gen_chart9_ivol_smile_dashboard(self, df, call_put='C'):
+        """多日隐含波动率微笑演变 —— 专业交易员三合一仪表盘
+
+        Panel A (左上): 热力图 — X: moneyness (K/S), Y: trade_date, Color: IV%
+                       交易台最核心的监控图，一眼看出偏斜变化和波动率聚集
+        Panel B (右上): 代表性日期叠加 — 时间渐变着色，观察曲线形态演变
+        Panel C (底部):  关键指标时间序列 — ATM IV, 偏斜度, 微笑曲率
+
+        数据来源: tb_tushare_opt_daily_indicator 真实 ClickHouse 数据
+        """
+        import matplotlib.gridspec as gridspec
+
+        self.writeLogInfo(className=self.__class__.__name__,
+                          functionName="gen_chart9_ivol_smile_dashboard",
+                          event="Generating IV smile evolution dashboard")
+
+        # ---- Step 0: 数据预处理 ----
+        df_sub = df[df['call_put'] == call_put].copy()
+        if df_sub.empty:
+            logger.warning(f"No data for call_put={call_put}, skipping smile dashboard")
+            return None
+
+        # 计算 moneyness
+        df_sub['moneyness'] = df_sub['exercise_price'] / df_sub['spot_price']
+
+        # 过滤 moneyness 在合理范围内
+        df_sub = df_sub[(df_sub['moneyness'] >= 0.80) & (df_sub['moneyness'] <= 1.20)]
+        df_sub = df_sub.dropna(subset=['implied_vol', 'moneyness', 'trade_date_dt'])
+
+        # 获取所有交易日（按时间排序）
+        trade_dates = sorted(df_sub['trade_date_dt'].unique())
+        if len(trade_dates) < 2:
+            logger.warning(f"Insufficient dates ({len(trade_dates)}) for smile dashboard")
+            return None
+        date_labels = [d.strftime('%m-%d') for d in trade_dates]
+        n_days = len(trade_dates)
+
+        # ---- Step 1: 构建规则网格 (moneyness bins × trade_dates) ----
+        moneyness_bins = np.linspace(0.85, 1.15, 31)  # 30 个区间
+        moneyness_centers = 0.5 * (moneyness_bins[:-1] + moneyness_bins[1:])
+
+        iv_grid = np.full((n_days, len(moneyness_centers)), np.nan)
+        for di, dt in enumerate(trade_dates):
+            day_data = df_sub[df_sub['trade_date_dt'] == dt]
+            for bi in range(len(moneyness_centers)):
+                lo, hi = moneyness_bins[bi], moneyness_bins[bi + 1]
+                bucket = day_data[(day_data['moneyness'] >= lo) & (day_data['moneyness'] < hi)]
+                if len(bucket) > 0:
+                    iv_grid[di, bi] = bucket['implied_vol'].median()
+
+        # 对稀疏日期做行内线性插值 + 首尾外推
+        for di in range(n_days):
+            row = iv_grid[di]
+            valid = ~np.isnan(row)
+            if valid.sum() >= 2:
+                iv_grid[di] = np.interp(np.arange(len(row)),
+                                        np.where(valid)[0], row[valid],
+                                        left=row[valid][0], right=row[valid][-1])
+            elif valid.sum() == 1:
+                iv_grid[di, :] = row[valid][0]
+
+        # ---- Step 2: 提取关键指标 ----
+        # ATM IV: moneyness 最接近 1.0 的 bin
+        atm_idx = np.argmin(np.abs(moneyness_centers - 1.0))
+        atm_iv = iv_grid[:, atm_idx]
+
+        # 偏斜度: moneyness 0.90 vs 1.10
+        skew_lo_idx = np.argmin(np.abs(moneyness_centers - 0.90))
+        skew_hi_idx = np.argmin(np.abs(moneyness_centers - 1.10))
+        skew_series = iv_grid[:, skew_lo_idx] - iv_grid[:, skew_hi_idx]
+
+        # 曲率: ATM - avg(0.90, 0.95, 1.05, 1.10)
+        curv_indices = [skew_lo_idx, np.argmin(np.abs(moneyness_centers - 0.95)),
+                        np.argmin(np.abs(moneyness_centers - 1.05)), skew_hi_idx]
+        curvature_series = atm_iv - np.nanmean(iv_grid[:, curv_indices], axis=1)
+
+        # ---- Step 3: 绘图 ----
+        fig = plt.figure(figsize=(26, 17))
+        gs = gridspec.GridSpec(2, 2, height_ratios=[1.1, 1], hspace=0.32, wspace=0.28,
+                               left=0.05, right=0.97, top=0.93, bottom=0.07)
+
+        ax_heatmap = fig.add_subplot(gs[0, 0])
+        ax_overlay = fig.add_subplot(gs[0, 1])
+        ax_metrics = fig.add_subplot(gs[1, :])
+
+        BULL_COLOR = '#1a5276'
+        BEAR_COLOR = '#c0392b'
+        HEAT_CMAP = plt.cm.viridis
+
+        # ---- Panel A: 热力图 ----
+        vmin_val = max(5.0, np.nanmin(iv_grid) * 100 * 0.8)
+        vmax_val = min(80.0, np.nanmax(iv_grid) * 100 * 1.2)
+        im = ax_heatmap.pcolormesh(moneyness_centers, np.arange(n_days),
+                                    iv_grid * 100, cmap=HEAT_CMAP,
+                                    shading='auto', vmin=vmin_val, vmax=vmax_val)
+        cbar = plt.colorbar(im, ax=ax_heatmap, shrink=0.8, pad=0.02)
+        cbar.set_label('隐含波动率 (%)', fontsize=11, fontweight='bold')
+
+        ax_heatmap.axvline(x=1.0, color='white', linestyle='--', linewidth=1.0, alpha=0.6)
+        ax_heatmap.text(1.0, -1.2, 'ATM', color='white', fontsize=8, ha='center', va='bottom')
+
+        ytick_step = max(1, n_days // 25)
+        yticks_pos = np.arange(0, n_days, ytick_step)
+        ax_heatmap.set_yticks(yticks_pos)
+        ax_heatmap.set_yticklabels([date_labels[i] for i in yticks_pos], fontsize=7)
+        ax_heatmap.set_xticks([0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15])
+        ax_heatmap.set_xticklabels(['0.85', '0.90', '0.95', '1.00', '1.05', '1.10', '1.15'], fontsize=8)
+        ax_heatmap.set_xlabel('Moneyness (K/S)', fontsize=12, fontweight='bold')
+        ax_heatmap.set_ylabel('交易日（越晚越靠上）', fontsize=12, fontweight='bold')
+        ax_heatmap.set_title(f'Panel A: IV Smile 热力图 ({call_put}期权)\n颜色越亮 IV越高 | 横看=微笑曲线 | 竖看=IV时序',
+                             fontsize=13, fontweight='bold', pad=10)
+
+        # ---- Panel B: 选取代表性日期叠加 ----
+        n_select = min(7, n_days)
+        selected = np.linspace(0, n_days - 1, n_select, dtype=int)
+        colors_overlay = plt.cm.coolwarm(np.linspace(0.15, 0.85, n_select))
+
+        for idx, (di, c) in enumerate(zip(selected, colors_overlay)):
+            alpha_val = 0.50 + 0.50 * (idx / max(n_select - 1, 1))
+            lw = 1.2 + 2.0 * (idx / max(n_select - 1, 1))
+            ax_overlay.plot(moneyness_centers, iv_grid[di] * 100,
+                            color=c, linewidth=lw, alpha=alpha_val,
+                            label=f'{date_labels[di]} ({atm_iv[di]*100:.1f}%)')
+
+        ax_overlay.axvline(x=1.0, color='gray', linestyle='--', linewidth=0.8, alpha=0.4)
+        ax_overlay.set_xlabel('Moneyness (K/S)', fontsize=12, fontweight='bold')
+        ax_overlay.set_ylabel('隐含波动率 (%)', fontsize=12, fontweight='bold')
+        ax_overlay.set_title(f'Panel B: 代表性日期微笑曲线叠加 ({call_put}期权)',
+                             fontsize=13, fontweight='bold', pad=10)
+        ax_overlay.legend(fontsize=7.5, loc='upper left', ncol=2, framealpha=0.75)
+        ax_overlay.grid(True, linestyle='--', alpha=0.25)
+
+        # ---- Panel C: 关键指标时间序列 ----
+        ax_atm = ax_metrics
+        ax_skew = ax_metrics.twinx()
+
+        ax_atm.fill_between(np.arange(n_days), atm_iv * 100, alpha=0.12, color=BULL_COLOR)
+        ax_atm.plot(np.arange(n_days), atm_iv * 100,
+                    color=BULL_COLOR, linewidth=2.2, marker='o', markersize=3,
+                    label='ATM 隐含波动率 (%)', zorder=5)
+
+        skew_plot = -skew_series * 100  # 转正: 越大=偏斜越严重
+        ax_skew.fill_between(np.arange(n_days), skew_plot, alpha=0.10, color=BEAR_COLOR)
+        ax_skew.plot(np.arange(n_days), skew_plot,
+                     color=BEAR_COLOR, linewidth=2.2, marker='s', markersize=3,
+                     linestyle='--', label='偏斜度 (90%−110% IV差, %pts)', zorder=4)
+
+        ax_skew.plot(np.arange(n_days), curvature_series * 100 * 3,
+                     color='#e67e22', linewidth=1.5, marker='^', markersize=3,
+                     linestyle=':', label='曲率指标 (×3)', zorder=3, alpha=0.7)
+
+        xtick_step_metrics = max(1, n_days // 20)
+        ax_atm.set_xticks(np.arange(0, n_days, xtick_step_metrics))
+        ax_atm.set_xticklabels([date_labels[i] for i in range(0, n_days, xtick_step_metrics)], fontsize=7)
+        ax_atm.set_xlabel('交易日', fontsize=12, fontweight='bold')
+        ax_atm.set_ylabel('ATM 隐含波动率 (%)', fontsize=11, fontweight='bold', color=BULL_COLOR)
+        ax_skew.set_ylabel('偏斜度 / 曲率', fontsize=11, fontweight='bold', color=BEAR_COLOR)
+        ax_atm.tick_params(axis='y', labelcolor=BULL_COLOR)
+        ax_skew.tick_params(axis='y', labelcolor=BEAR_COLOR)
+
+        lines1, labels1 = ax_atm.get_legend_handles_labels()
+        lines2, labels2 = ax_skew.get_legend_handles_labels()
+        ax_atm.legend(lines1 + lines2, labels1 + labels2, loc='upper left',
+                      fontsize=9, framealpha=0.75)
+
+        ax_atm.set_title('Panel C: 微笑关键指标时间序列 — ATM IV / 偏斜度 / 曲率',
+                         fontsize=13, fontweight='bold', pad=10)
+        ax_atm.grid(True, linestyle='--', alpha=0.25)
+
+        # ---- 总标题 ----
+        fig.suptitle(f'隐含波动率微笑曲线多日演变 ({call_put}期权) — 数据来源: tb_tushare_opt_daily_indicator',
+                     fontsize=16, fontweight='bold', y=0.98)
+
+        buf = self._fig_to_bytesio(fig, dpi=180)
+        plt.close(fig)
+        return buf
+
+    # ===================== 图11~18：行权价-指标双Y轴（trade_date为系列） =====================
+
+    def _gen_exercise_price_dual_y_chart(self, df, y1_col, y1_label, y2_col, y2_label,
+                                          chart_num, title_prefix=None, call_put=None):
+        """通用 exercise_price 双Y轴图
+
+        X轴: exercise_price（行权价）
+        Y1轴: 指标列（如 implied_vol, delta, gamma...）
+        Y2轴: 辅助列（如 vol, d2, nd2）
+        系列: 每个 trade_date 一条不同颜色的折线
+        """
+        self.writeLogInfo(className=self.__class__.__name__,
+                          functionName=f"_gen_exercise_price_chart{chart_num}",
+                          event=f"Generating exercise_price dual-Y chart {chart_num}: {y1_label} + {y2_label}")
+
+        df_work = df.copy()
+        if call_put:
+            df_work = df_work[df_work['call_put'] == call_put]
+        if df_work.empty:
+            logger.warning(f"No data for chart {chart_num}, skipping")
+            return None
+
+        # 按 trade_date 分组
+        trade_dates = sorted(df_work['trade_date_dt'].unique())
+        if len(trade_dates) < 1:
+            logger.warning(f"Insufficient trade_dates for chart {chart_num}")
+            return None
+
+        n_dates = len(trade_dates)
+        date_labels = [d.strftime('%m-%d') for d in trade_dates]
+        colors = plt.cm.tab20(np.linspace(0, 1, max(n_dates, 20)))[:n_dates] if n_dates <= 20 else \
+                 plt.cm.viridis(np.linspace(0.1, 0.9, n_dates))
+
+        title = title_prefix if title_prefix else f'图{chart_num}：exercise_price vs {y1_label} + {y2_label}（按trade_date）'
+
+        fig, ax1 = plt.subplots(figsize=(24, 10))
+        fig.suptitle(title, fontsize=14, fontweight='bold', color='#1a1a2e')
+
+        for di, dt in enumerate(trade_dates):
+            day_data = df_work[df_work['trade_date_dt'] == dt].sort_values('exercise_price')
+            if day_data.empty:
+                continue
+            x_vals = day_data['exercise_price'].values
+            y1_vals = day_data[y1_col].values
+
+            color = colors[di]
+            alpha_val = max(0.5, 0.90 - 0.02 * abs(di - n_dates // 2))
+            lw = 1.0 + 1.0 * (di / max(n_dates - 1, 1))
+
+            ax1.plot(x_vals, y1_vals, color=color, linewidth=lw, alpha=alpha_val,
+                     marker='o', markersize=2.5, label=date_labels[di])
+
+        ax1.set_xlabel('行权价 (exercise_price)', fontsize=12, fontweight='bold')
+        ax1.set_ylabel(y1_label, fontsize=12, fontweight='bold')
+        ax1.grid(True, alpha=0.25, linestyle='--')
+
+        # ---- Y2 轴 ----
+        ax2 = ax1.twinx()
+        for di, dt in enumerate(trade_dates):
+            day_data = df_work[df_work['trade_date_dt'] == dt].sort_values('exercise_price')
+            if day_data.empty or y2_col not in day_data.columns:
+                continue
+            x_vals = day_data['exercise_price'].values
+            y2_vals = day_data[y2_col].values
+
+            color = colors[di]
+            ax2.plot(x_vals, y2_vals, color=color, linewidth=0.7, alpha=0.45,
+                     linestyle='--', marker='s', markersize=2)
+
+        ax2.set_ylabel(y2_label, fontsize=12, fontweight='bold')
+
+        # ---- 图例 ----
+        ncol = min(n_dates, 10)
+        ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
+                   fontsize=6, ncol=ncol, frameon=True, borderaxespad=0.5,
+                   handlelength=1.0, columnspacing=0.6)
+
+        # ---- Y1/Y2 零线 ----
+        if y1_col in ('delta', 'gamma', 'theta', 'rho', 'd1', 'd2', 'nd1', 'nd2'):
+            ax1.axhline(y=0, color='gray', linewidth=0.5, linestyle='-', alpha=0.3)
+
+        fig.autofmt_xdate(rotation=45, ha='right')
+        plt.tight_layout()
+        buf = self._fig_to_bytesio(fig, dpi=150)
+        plt.close(fig)
+        return buf
+
+    def gen_chart11_exercise_price_iv_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'implied_vol', '隐含波动率 (implied_vol)', 'vol', '成交量 (vol)',
+            chart_num=11, call_put='C',
+            title_prefix='图11：行权价 vs 隐含波动率(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart12_exercise_price_delta_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'delta', 'Delta', 'vol', '成交量 (vol)',
+            chart_num=12, call_put='C',
+            title_prefix='图12：行权价 vs Delta(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart13_exercise_price_gamma_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'gamma', 'Gamma', 'vol', '成交量 (vol)',
+            chart_num=13, call_put='C',
+            title_prefix='图13：行权价 vs Gamma(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart14_exercise_price_vega_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'vega', 'Vega', 'vol', '成交量 (vol)',
+            chart_num=14, call_put='C',
+            title_prefix='图14：行权价 vs Vega(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart15_exercise_price_theta_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'theta', 'Theta', 'vol', '成交量 (vol)',
+            chart_num=15, call_put='C',
+            title_prefix='图15：行权价 vs Theta(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart16_exercise_price_rho_vol(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'rho', 'Rho', 'vol', '成交量 (vol)',
+            chart_num=16, call_put='C',
+            title_prefix='图16：行权价 vs Rho(Y1) + 成交量(Y2) — 按trade_date (Call)')
+
+    def gen_chart17_exercise_price_d1_d2(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'd1', 'd1', 'd2', 'd2',
+            chart_num=17, call_put='C',
+            title_prefix='图17：行权价 vs d1(Y1) + d2(Y2) — 按trade_date (Call)')
+
+    def gen_chart18_exercise_price_nd1_nd2(self, df):
+        return self._gen_exercise_price_dual_y_chart(
+            df, 'nd1', 'N(d1)', 'nd2', 'N(d2)',
+            chart_num=18, call_put='C',
+            title_prefix='图18：行权价 vs N(d1)(Y1) + N(d2)(Y2) — 按trade_date (Call)')
+
     # ===================== PDF 报告生成 =====================
 
     def _build_pdf_styles(self):
@@ -479,30 +793,41 @@ class OptDailyIndicatorReport:
 
         # ===== 图表 =====
         chart_config = [
-            ('chart1_spot_close', '图1：spot_price + 各合约 收盘价 (close)', '二、'),
-            ('chart2_implied_vol', '图2：spot_price + 各合约 隐含波动率 (implied_vol)', '三、'),
-            ('chart3_bs_price', '图3：spot_price + 各合约 BS理论价', '四、'),
-            ('chart4_delta', '图4：spot_price + 各合约 Delta', '五、'),
-            ('chart5_gamma', '图5：spot_price + 各合约 Gamma', '六、'),
-            ('chart6_vega', '图6：spot_price + 各合约 Vega', '七、'),
-            ('chart7_theta', '图7：spot_price + 各合约 Theta', '八、'),
-            ('chart8_rho', '图8：spot_price + 各合约 Rho', '九、'),
+            ('chart1_spot_close', '图1：spot_price + 各合约 收盘价 (close)', '二、', 0.45),
+            ('chart2_implied_vol', '图2：spot_price + 各合约 隐含波动率 (implied_vol)', '三、', 0.45),
+            ('chart3_bs_price', '图3：spot_price + 各合约 BS理论价', '四、', 0.45),
+            ('chart4_delta', '图4：spot_price + 各合约 Delta', '五、', 0.45),
+            ('chart5_gamma', '图5：spot_price + 各合约 Gamma', '六、', 0.45),
+            ('chart6_vega', '图6：spot_price + 各合约 Vega', '七、', 0.45),
+            ('chart7_theta', '图7：spot_price + 各合约 Theta', '八、', 0.45),
+            ('chart8_rho', '图8：spot_price + 各合约 Rho', '九、', 0.45),
+            ('chart9_smile_call', '图9：IV Smile 多日演变仪表盘 (Call期权)', '十、', 0.65),
+            ('chart10_smile_put', '图10：IV Smile 多日演变仪表盘 (Put期权)', '十、', 0.65),
+            ('chart11_exercise_price_iv_vol', '图11：行权价 vs 隐含波动率 + 成交量 (Call, 按trade_date)', '十一、', 0.45),
+            ('chart12_exercise_price_delta_vol', '图12：行权价 vs Delta + 成交量 (Call, 按trade_date)', '十二、', 0.45),
+            ('chart13_exercise_price_gamma_vol', '图13：行权价 vs Gamma + 成交量 (Call, 按trade_date)', '十三、', 0.45),
+            ('chart14_exercise_price_vega_vol', '图14：行权价 vs Vega + 成交量 (Call, 按trade_date)', '十四、', 0.45),
+            ('chart15_exercise_price_theta_vol', '图15：行权价 vs Theta + 成交量 (Call, 按trade_date)', '十五、', 0.45),
+            ('chart16_exercise_price_rho_vol', '图16：行权价 vs Rho + 成交量 (Call, 按trade_date)', '十六、', 0.45),
+            ('chart17_exercise_price_d1_d2', '图17：行权价 vs d1 + d2 (Call, 按trade_date)', '十七、', 0.45),
+            ('chart18_exercise_price_nd1_nd2', '图18：行权价 vs N(d1) + N(d2) (Call, 按trade_date)', '十八、', 0.45),
         ]
 
-        for buf_key, chart_title, section_label in chart_config:
+        for buf_key, chart_title, section_label, height_frac in chart_config:
             buf = chart_buffers.get(buf_key)
             if buf is None:
                 continue
 
             story.append(Paragraph(f'{section_label} {chart_title}', styles['h1']))
             story.append(Spacer(1, 0.1 * inch))
-            img = RLImage(buf, width=page_width, height=page_width * 0.45)
+            img = RLImage(buf, width=page_width, height=page_width * height_frac)
             story.append(img)
             story.append(Spacer(1, 0.15 * inch))
-            story.append(PageBreak())
+            if buf_key not in ('chart18_exercise_price_nd1_nd2',):  # 最后一张图后不换页，直接接风险提示
+                story.append(PageBreak())
 
         # ===== 风险提示 =====
-        story.append(Paragraph('十、风险提示', styles['h1']))
+        story.append(Paragraph('十九、风险提示', styles['h1']))
         story.append(Spacer(1, 0.15 * inch))
         risk_text = (
             "本报告基于历史期权日线数据进行量化分析，仅供参考，不构成投资建议。<br/>"
@@ -578,8 +903,38 @@ class OptDailyIndicatorReport:
             logger.info("生成图8: rho...")
             chart_buffers['chart8_rho'] = self.gen_chart8_rho(df)
 
+            logger.info("生成图9: IV Smile 多日演变仪表盘 (Call)...")
+            chart_buffers['chart9_smile_call'] = self.gen_chart9_ivol_smile_dashboard(df, call_put='C')
+
+            logger.info("生成图10: IV Smile 多日演变仪表盘 (Put)...")
+            chart_buffers['chart10_smile_put'] = self.gen_chart9_ivol_smile_dashboard(df, call_put='P')
+
+            logger.info("生成图11: 行权价 vs 隐含波动率 + 成交量...")
+            chart_buffers['chart11_exercise_price_iv_vol'] = self.gen_chart11_exercise_price_iv_vol(df)
+
+            logger.info("生成图12: 行权价 vs Delta + 成交量...")
+            chart_buffers['chart12_exercise_price_delta_vol'] = self.gen_chart12_exercise_price_delta_vol(df)
+
+            logger.info("生成图13: 行权价 vs Gamma + 成交量...")
+            chart_buffers['chart13_exercise_price_gamma_vol'] = self.gen_chart13_exercise_price_gamma_vol(df)
+
+            logger.info("生成图14: 行权价 vs Vega + 成交量...")
+            chart_buffers['chart14_exercise_price_vega_vol'] = self.gen_chart14_exercise_price_vega_vol(df)
+
+            logger.info("生成图15: 行权价 vs Theta + 成交量...")
+            chart_buffers['chart15_exercise_price_theta_vol'] = self.gen_chart15_exercise_price_theta_vol(df)
+
+            logger.info("生成图16: 行权价 vs Rho + 成交量...")
+            chart_buffers['chart16_exercise_price_rho_vol'] = self.gen_chart16_exercise_price_rho_vol(df)
+
+            logger.info("生成图17: 行权价 vs d1 + d2...")
+            chart_buffers['chart17_exercise_price_d1_d2'] = self.gen_chart17_exercise_price_d1_d2(df)
+
+            logger.info("生成图18: 行权价 vs N(d1) + N(d2)...")
+            chart_buffers['chart18_exercise_price_nd1_nd2'] = self.gen_chart18_exercise_price_nd1_nd2(df)
+
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
-            logger.info(f"图表生成完成: {chart_count}/8")
+            logger.info(f"图表生成完成: {chart_count}/18")
 
             # Step 4: 生成 PDF
             logger.info("=" * 60)
