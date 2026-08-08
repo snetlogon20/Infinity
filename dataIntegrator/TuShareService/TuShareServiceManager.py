@@ -848,62 +848,37 @@ class TuShareServiceManager():
             logger.error(f"❌ 期权基础信息处理失败：{str(e)}")
             raise e
 
-    @classmethod
-    def callTuShareOptDailyService(self, param_dict):
+    def callTuShareOptDailyService(self, param_dict=None):
         """
-        刷新期权日线行情数据
-        参考 TuShareOptDailyServiceTest.refresh_opt_daily
+        批量刷新期权日线行情数据（精确模式：只拉指定22个HO2612合约）
+        每个交易日只调1次API（vs 原来每个合约1次），效率提升 22 倍
         """
-        job_logger = TuShareJobLogger()
-        job_logger.start_job("callTuShareOptDailyService", param_dict)
+        self.jobLogger.start_job("refresh_opt_daily_by_ts_code", param_dict)
 
         try:
-            logger.info("callTuShareOptDailyService started...")
+            logger.info("refresh_opt_daily_by_ts_code started...")
 
-            start_date = param_dict.get("start_date")
-            end_date = param_dict.get("end_date")
-            exchange = param_dict.get("exchange", "")
+            ts_code_list = CommonDataParameters.CN_OPTION_TS_CODE_LIST
+            start_date = self.calendarService.calculate_T_minus_n_days(CommonParameters.today, days=30)
+            end_date = CommonParameters.today
+            trade_date_list = self.calendarService.calculate_dates_between_start_end_date(start_date, end_date)
 
-            # 使用 CalendarService 获取日期列表并循环遍历
-            calendar_service = CalendarService()
-            trade_date_list = calendar_service.calculate_dates_between_start_end_date(start_date, end_date)
+            # 批量模式: 每个交易日只调1次API（vs 原来每个合约1次），效率提升 22 倍
+            tuShareService = TuShareOptDailyService()
+            total_records = tuShareService.refresh_opt_daily_by_ts_code_list(
+                ts_code_list=ts_code_list,
+                trade_date_list=trade_date_list,
+                exchange=""
+            )
 
-            total_records = 0
-            for trade_date_str in trade_date_list:
-                csvFilePath = os.path.join(CommonParameters.outBoundPath, f"df_tushare_opt_daily_{trade_date_str}.csv")
-
-                tuShareService = TuShareOptDailyService()
-                dataFrame = tuShareService.prepareDataFrame(
-                    trade_date=trade_date_str,
-                    exchange=exchange
-                )
-
-                if dataFrame.empty:
-                    logger.warning(f"{trade_date_str} 期权日线数据为空，跳过")
-                    continue
-
-                logger.info(f"{trade_date_str} 获取到 {len(dataFrame)} 条期权日线记录")
-
-                jsonString = tuShareService.convertDataFrame2JSON()
-                tuShareService.saveDateFrameToDisk(csvFilePath)
-
-                # 先删除旧数据，再插入新数据
-                tuShareService.deleteDateFromClickHouse(
-                    ts_code="",
-                    start_date=trade_date_str,
-                    end_date=trade_date_str
-                )
-                tuShareService.saveDateToClickHouse()
-
-                total_records += len(dataFrame)
-                logger.info(f"✅ {trade_date_str} 期权日线数据处理完成，{len(dataFrame)} 条记录")
-
-            job_logger.end_job_success(records_processed=total_records)
-            logger.info(f"✅ 期权日线数据全部处理完成，共 {total_records} 条记录")
-            logger.info("callTuShareOptDailyService ended...")
+            self.jobLogger.end_job_success(records_processed=total_records)
+            logger.info("=" * 80)
+            logger.info(f"✅ 期权日线数据处理完成，共 {total_records} 条记录")
+            logger.info("=" * 80)
+            logger.info("refresh_opt_daily_by_ts_code ended...")
 
         except Exception as e:
-            job_logger.end_job_failed(str(e), traceback.format_exc())
+            self.jobLogger.end_job_failed(str(e), traceback.format_exc())
             logger.error(f"❌ 期权日线数据处理失败：{str(e)}")
             raise e
 
@@ -945,7 +920,7 @@ class TuShareServiceManager():
                 "callTuShareConvertBondDailyService": {"ts_code": None, "start_date": start_date, "end_date": end_date},  # 可转债日线行情（ts_code=None拉全量）
                 "callTuShareIndexGlobalService": {"start_date": start_date, "end_date": end_date},  # 全球指数日线行情
                 "callTuShareOptBasicService": {"exchange": ""},  # 期权合约基础信息
-                "callTuShareOptDailyService": {"exchange": "", "start_date": start_date, "end_date": end_date}  # 期权日线行情
+                "callTuShareOptDailyService": {"start_date": start_date,"end_date": end_date},  # 期权日线行情（精确模式：只拉指定22个HO2612合约，批量入库）
                 #  TuShareYieldCurveConvertableBondService 需要特殊权限的token，无法使用
             }
 
