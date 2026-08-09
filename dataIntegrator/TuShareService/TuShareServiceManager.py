@@ -1,8 +1,6 @@
 import os
 import time
 import traceback
-from datetime import datetime
-import json
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareCNIndexDailyService import TuShareCNIndexDailyService
@@ -30,6 +28,7 @@ from dataIntegrator.TuShareService.TushareUSTreasuryYieldCurveService import Tus
 from dataIntegrator.TuShareService.TuShareIndexGlobalService import TuShareIndexGlobalService
 from dataIntegrator.TuShareService.TuShareOptBasicService import TuShareOptBasicService
 from dataIntegrator.TuShareService.TuShareOptDailyService import TuShareOptDailyService
+from dataIntegrator.TuShareService.TuShareIndexDailyBasicService import TuShareIndexDailyBasicService
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 from dataIntegrator.TuShareService.TuShareJobLogger import TuShareJobLogger
@@ -59,6 +58,66 @@ class TuShareServiceManager():
 
             self.jobLogger.end_job_success(records_processed=records_count if records_count else len(index_list))
             logger.info("callTuShareCNIndexDailyService ended...")
+            
+        except Exception as e:
+            self.jobLogger.end_job_failed(str(e), traceback.format_exc())
+            raise e
+
+    def callTuShareIndexDailyBasicService(self, param_dict):
+        self.jobLogger.start_job("callTuShareIndexDailyBasicService", param_dict)
+        
+        try:
+            logger.info("callTuShareIndexDailyBasicService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+
+            trade_date_list = self.calendarService.calculate_dates_between_start_end_date(start_date, end_date)
+
+            logger.info(f"开始按交易日批量处理 index_dailybasic 数据，共 {len(trade_date_list)} 个交易日")
+            logger.info(f"日期范围: {start_date} ~ {end_date}")
+
+            total_records = 0
+            success_count = 0
+            failed_count = 0
+
+            for trade_date_str in trade_date_list:
+                try:
+                    tuShareService = TuShareIndexDailyBasicService()
+                    dataFrame = tuShareService.prepareDataFrame(ts_code="", trade_date=trade_date_str)
+
+                    if dataFrame.empty:
+                        logger.info(f"  {trade_date_str}: 无数据，跳过")
+                        continue
+
+                    hit_count = len(dataFrame)
+                    logger.info(f"  {trade_date_str}: {hit_count} 条记录")
+
+                    csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                               f"df_tushare_index_dailybasic_{trade_date_str}.csv")
+
+                    tuShareService.convertDataFrame2JSON()
+                    tuShareService.saveDateFrameToDisk(csvFilePath)
+                    tuShareService.deleteByTradeDate(trade_date_str)
+                    tuShareService.saveDateToClickHouse()
+
+                    total_records += hit_count
+                    success_count += 1
+                    logger.info(f"  {trade_date_str}: 已保存 {hit_count} 条记录")
+
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"  {trade_date_str} 处理失败：{str(e)}")
+                    logger.error(traceback.format_exc())
+                    continue
+
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"批量处理完成！共处理 {len(trade_date_list)} 个交易日")
+            logger.info(f"成功: {success_count}, 失败: {failed_count}, 总记录数: {total_records}")
+            logger.info(f"{'=' * 60}")
+
+            self.jobLogger.end_job_success(records_processed=total_records)
+            logger.info("callTuShareIndexDailyBasicService ended...")
             
         except Exception as e:
             self.jobLogger.end_job_failed(str(e), traceback.format_exc())
@@ -922,6 +981,7 @@ class TuShareServiceManager():
                 "callTuShareOptBasicService": {"exchange": ""},  # 期权合约基础信息
                 "callTuShareOptDailyService": {"start_date": start_date,"end_date": end_date},  # 期权日线行情（精确模式：只拉指定22个HO2612合约，批量入库）
                 #  TuShareYieldCurveConvertableBondService 需要特殊权限的token，无法使用
+                "callTuShareIndexDailyBasicService": {"start_date": start_date,"end_date": end_date},  # 大盘指数每日指标
             }
 
             # 按顺序调用方法

@@ -1,61 +1,66 @@
-from dataIntegrator.TuShareService.TuShareService import TuShareService
-import sys
-from dataIntegrator import CommonLib
 import os
-from dataIntegrator import CommonParameters
+from dataIntegrator.TuShareService.TuShareService import TuShareService
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.TuShareService.TuShareIndexDailyBasicService import TuShareIndexDailyBasicService
-from dataIntegrator.common.CommonDataParameters import CommonDataParameters
+from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 
 logger = CommonLib.logger
 
 class TuShareIndexDailyBasicServiceTest(TuShareService):
 
     @classmethod
-    def refresh_any_index_dailybasic(self):
-        """批量处理多个指数"""
-        index_list = CommonDataParameters.CN_INDEX_LIST
-
-        # 设置日期范围
+    def refresh_index_dailybasic_by_date(self):
+        """
+        按交易日维度处理 index_dailybasic 数据。
+        每个交易日一把拉取全量指数数据，直接入库。
+        """
         start_date = '20250101'
         end_date = CommonParameters.today
 
-        logger.info(f"开始批量处理 {len(index_list)} 个指数...")
+        calendar_service = CalendarService()
+        trade_date_list = calendar_service.calculate_dates_between_start_end_date(start_date, end_date)
 
-        for ts_code in index_list:
+        logger.info("=" * 80)
+        logger.info(f"开始处理 index_dailybasic 数据（按交易日批量模式）")
+        logger.info(f"日期范围: {start_date} ~ {end_date}, 共 {len(trade_date_list)} 个交易日")
+        logger.info("=" * 80)
+
+        total_records = 0
+        for trade_date_str in trade_date_list:
             try:
-                logger.info(f"\n{'=' * 60}")
-                logger.info(f"正在处理：{ts_code}")
-                logger.info(f"{'=' * 60}")
-
-                csvFilePath = os.path.join(CommonParameters.outBoundPath,
-                                           f"df_tushare_index_dailybasic_{ts_code.replace('.', '_')}.csv")
-
                 tuShareService = TuShareIndexDailyBasicService()
-                dataFrame = tuShareService.prepareDataFrame(ts_code, start_date=start_date, end_date=end_date)
+                dataFrame = tuShareService.prepareDataFrame(ts_code="", trade_date=trade_date_str)
 
                 if dataFrame.empty:
-                    logger.warning(f"{ts_code} 没有获取到数据，跳过...")
+                    logger.info(f"  {trade_date_str}: 无数据，跳过")
                     continue
 
-                logger.info(f"转换数据为 JSON...")
-                jsonString = tuShareService.convertDataFrame2JSON()
-                logger.info(f"保存到：{csvFilePath}")
-                tuShareService.saveDateFrameToDisk(csvFilePath)
-                tuShareService.deleteDateFromClickHouse(ts_code, start_date, end_date)
-                tuShareService.saveDateToClickHouse()
+                hit_count = len(dataFrame)
+                logger.info(f"  {trade_date_str}: {hit_count} 条记录")
 
-                logger.info(f" {ts_code} 处理完成！")
+                csvFilePath = os.path.join(CommonParameters.outBoundPath,
+                                           f"df_tushare_index_dailybasic_{trade_date_str}.csv")
+
+                TuShareIndexDailyBasicService.dataFrame = dataFrame
+                TuShareIndexDailyBasicService.convertDataFrame2JSON()
+                TuShareIndexDailyBasicService.saveDateFrameToDisk(csvFilePath)
+                TuShareIndexDailyBasicService.deleteByTradeDate(trade_date_str)
+                TuShareIndexDailyBasicService.saveDateToClickHouse()
+
+                total_records += hit_count
+                logger.info(f"  {trade_date_str}: 已保存 {hit_count} 条记录")
 
             except Exception as e:
-                logger.error(f" {ts_code} 处理失败：{str(e)}")
+                logger.error(f"  {trade_date_str} 处理失败：{str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
                 continue
 
-        logger.info(f"\n{'=' * 60}")
-        logger.info(f"批量处理完成！共处理 {len(index_list)} 个指数")
-        logger.info(f"{'=' * 60}")
+        logger.info("\n" + "=" * 80)
+        logger.info(f"处理完成！共 {total_records} 条记录")
+        logger.info("=" * 80)
+
 
 if __name__ == '__main__':
     tuShareIndexDailyBasicServiceTest = TuShareIndexDailyBasicServiceTest()
-    tuShareIndexDailyBasicServiceTest.refresh_any_index_dailybasic()
+    tuShareIndexDailyBasicServiceTest.refresh_index_dailybasic_by_date()

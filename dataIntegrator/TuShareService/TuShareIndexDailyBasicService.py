@@ -8,17 +8,19 @@ logger = CommonLib.logger
 
 class TuShareIndexDailyBasicService(TuShareService):
     @classmethod
-    def prepareDataFrame(self, ts_code, trade_date=None, start_date=None, end_date=None):
+    def prepareDataFrame(self, ts_code="", trade_date=None, start_date=None, end_date=None):
         logger.info("prepareData started")
         try:
             # index_dailybasic: trade_date 或 ts_code 至少提供一个
             if trade_date:
                 self.dataFrame = self.pro.index_dailybasic(trade_date=trade_date)
+                label = trade_date
             else:
                 self.dataFrame = self.pro.index_dailybasic(ts_code=ts_code, start_date=start_date, end_date=end_date)
+                label = ts_code
 
             row_count = len(self.dataFrame)
-            logger.info(f"成功获取指数 {ts_code} 的指标数据，共 {row_count} 行")
+            logger.info(f"成功获取指数 {label} 的指标数据，共 {row_count} 行")
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e
@@ -53,6 +55,24 @@ class TuShareIndexDailyBasicService(TuShareService):
             raise e
 
         logger.info("deleteDateFromClickHouse completed")
+
+    @classmethod
+    def deleteByTradeDate(self, trade_date, ts_code_list=None):
+        """按交易日删除，可选限定 ts_code 范围"""
+        logger.info(f"deleteByTradeDate started, trade_date={trade_date}")
+
+        try:
+            if ts_code_list:
+                ts_code_in = "','".join(ts_code_list)
+                del_sql = "ALTER TABLE indexsysdb.df_tushare_index_dailybasic DELETE WHERE trade_date = '%s' AND ts_code IN ('%s')" % (trade_date, ts_code_in)
+            else:
+                del_sql = "ALTER TABLE indexsysdb.df_tushare_index_dailybasic DELETE WHERE trade_date = '%s'" % trade_date
+            self.clickhouseClient.execute(del_sql)
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name, event="ALTER TABLE indexsysdb.df_tushare_index_dailybasic Error")
+            raise e
+
+        logger.info("deleteByTradeDate completed")
 
     @classmethod
     def refresh_index_data(self, ts_code, start_date, end_date):
