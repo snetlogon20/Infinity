@@ -24,8 +24,6 @@ import pandas as pd
 from datetime import datetime, date
 from scipy.stats import norm
 from scipy.optimize import brentq
-from py_vollib.black_scholes.implied_volatility import implied_volatility as vollib_iv
-from py_vollib.black_scholes import black_scholes as vollib_bs
 
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator import CommonLib
@@ -41,12 +39,21 @@ class TuShareOptDailyIndicatorAnalyst:
     TABLE_DAILY = 'df_tushare_opt_daily'
     TABLE_BASIC = 'vw_tushare_opt_basic_of_today'  # Tushare仅提供每日最新快照，无历史数据，用 VIEW 取最新
     TABLE_INDEX_DAILY = 'df_tushare_cn_index_daily'
+    TABLE_INDEX_DAILYBASIC = 'df_tushare_index_dailybasic'
     TABLE_TARGET = 'tb_tushare_opt_daily_indicator'
 
     # === 默认参数 ===
     DEFAULT_RISK_FREE_RATE = 0.03          # 3% 默认无风险利率
-    DEFAULT_DIVIDEND_YIELD = 0.0           # 默认股息率
+    DEFAULT_DIVIDEND_YIELD = 0.0           # 默认股息率（fallback，当无股息率数据时使用）
+    DEFAULT_PAYOUT_RATIO = 0.30            # 默认分红比例，用于从 PE_TTM 估算股息率
     TRADING_DAYS_PER_YEAR = 252            # 年化交易天数
+
+    # === 指数分红比例映射: dividend_yield ≈ payout_ratio / pe_ttm ===
+    INDEX_DIVIDEND_PAYOUT_RATIO = {
+        '000016.SH': 0.32,  # 上证50（HO期权标的）
+        '000300.SH': 0.30,  # 沪深300（IO期权标的）
+        '000852.SH': 0.25,  # 中证1000（MO期权标的）
+    }
     CALENDAR_DAYS_PER_YEAR = 365           # 年化日历天数
     ATM_THRESHOLD = 0.01                   # 平值判定阈值 (|S-K|/K < 1%)
 
@@ -69,7 +76,7 @@ class TuShareOptDailyIndicatorAnalyst:
         'turnover_ratio', 'avg_unit_price',
         'days_to_maturity', 'years_to_maturity_calendar', 'years_to_maturity_trading',
         'moneyness_status', 'moneyness_log',
-        'spot_price', 'risk_free_rate',
+        'spot_price', 'risk_free_rate', 'dividend_yield',
         'implied_vol', 'bs_theoretical_price',
         'delta', 'gamma', 'vega', 'theta', 'rho',
         'd1', 'd2', 'nd1', 'nd2',
@@ -550,21 +557,130 @@ class TuShareOptDailyIndicatorAnalyst:
         return rate if pd.notna(rate) else np.nan
 
     @staticmethod
-    def _solve_iv_brentq(price, S, K, T, r, flag):
-        """使用 scipy.brentq 回退求解 IV（比 py_vollib 搜索区间更宽松）
+    def _match_dividend_yield(trade_date_str, index_code, dividend_yield_dict):
+        """根据交易日期和标的指数代码，从股息率查找表中匹配股息率
 
-        适用于时间价值极小、py_vollib 无法收敛的深度实值期权场景。
+        Args:
+            trade_date_str: 交易日字符串 YYYYMMDD
+            index_code: 标的指数代码，如 '000300.SH'
+            dividend_yield_dict: 股息率查找表 {(trade_date, index_code): yield}
+
+        Returns:
+            float or np.nan: 股息率（小数形式），如 0.026；数据缺失返回 np.nan
+        """
+        if dividend_yield_dict is None:
+            return np.nan
+
+        try:
+            trade_date_str = pd.to_datetime(str(trade_date_str)).strftime('%Y%m%d')
+        except Exception:
+            trade_date_str = str(trade_date_str)
+
+        key = (trade_date_str, index_code)
+        return dividend_yield_dict.get(key, np.nan)
+
+    def _fetch_dividend_yield_data(self, start_date, end_date):
+        """从 ClickHouse 拉取指数日频基本指标，用 PE_TTM 估算股息率
+
+        股息率估算公式: dividend_yield = payout_ratio / pe_ttm
+
+        各指数的 payout_ratio 从 INDEX_DIVIDEND_PAYOUT_RATIO 获取，
+        未配置的指数使用 DEFAULT_PAYOUT_RATIO。
+
+        Args:
+            start_date: 起始日期 YYYYMMDD
+            end_date: 截止日期 YYYYMMDD
+
+        Returns:
+            dict or None: {(trade_date_str, index_code_str): dividend_yield_float}
+            所有股息率为小数形式（如 0.026 代表 2.6%），
+            若数据为空返回 None，调用方将 fallback 到 DEFAULT_DIVIDEND_YIELD
+        """
+        logger.info("Fetching index daily basic data for dividend yield estimation...")
+        sql = f"""
+        SELECT trade_date, ts_code, pe_ttm
+        FROM indexsysdb.{self.TABLE_INDEX_DAILYBASIC}
+        WHERE trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date, ts_code
+        """
+        logger.info(f"SQL:\n{sql}")
+
+        try:
+            df_index_basic = ClickhouseService.getDataFrameWithoutColumnsName(sql)
+        except Exception as e:
+            logger.warning(f"Failed to fetch index daily basic data: {e}, "
+                           f"will fallback to DEFAULT_DIVIDEND_YIELD={self.DEFAULT_DIVIDEND_YIELD}")
+            return None
+
+        if len(df_index_basic) == 0:
+            logger.warning("No index daily basic data found, "
+                           f"will fallback to DEFAULT_DIVIDEND_YIELD={self.DEFAULT_DIVIDEND_YIELD}")
+            return None
+
+        df_index_basic.columns = ['trade_date', 'ts_code', 'pe_ttm']
+
+        dividend_yield_dict = {}
+        stat_total = 0
+        stat_skip = 0
+        for _, row in df_index_basic.iterrows():
+            td = str(row['trade_date'])
+            try:
+                td = pd.to_datetime(td).strftime('%Y%m%d')
+            except Exception:
+                pass
+
+            ts_code = str(row['ts_code'])
+            pe_ttm = row['pe_ttm']
+
+            if pd.isna(pe_ttm) or pe_ttm <= 0:
+                stat_skip += 1
+                continue
+
+            # 获取该指数的分红比例
+            payout_ratio = self.INDEX_DIVIDEND_PAYOUT_RATIO.get(
+                ts_code, self.DEFAULT_PAYOUT_RATIO
+            )
+            dividend_yield = payout_ratio / pe_ttm
+
+            key = (td, ts_code)
+            dividend_yield_dict[key] = float(dividend_yield)
+            stat_total += 1
+
+        logger.info(f"Dividend yield data loaded: {stat_total} valid entries, "
+                    f"{stat_skip} skipped (pe_ttm <= 0 or NaN), "
+                    f"range [{min(dividend_yield_dict.keys())} ~ {max(dividend_yield_dict.keys())}]"
+                    if dividend_yield_dict else "Dividend yield data empty")
+        return dividend_yield_dict if dividend_yield_dict else None
+
+    @staticmethod
+    def _solve_iv_brentq(price, S, K, T, r, q, flag):
+        """使用 scipy.brentq 求解隐含波动率（含股息率 q 的 BSM 模型）
+
         搜索区间: sigma ∈ [1e-6, 5.0]
+
+        Args:
+            price: 期权市场价格
+            S: 标的现价
+            K: 行权价
+            T: 剩余到期时间（年）
+            r: 无风险利率
+            q: 股息率
+            flag: 'c' 看涨 / 'p' 看跌
         """
         def _obj_call(sigma):
-            d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+            if sigma <= 0:
+                return 1e10
+            d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
             d2 = d1 - sigma * math.sqrt(T)
-            return S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2) - price
+            return S * math.exp(-q * T) * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2) - price
 
         def _obj_put(sigma):
-            d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+            if sigma <= 0:
+                return 1e10
+            d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
             d2 = d1 - sigma * math.sqrt(T)
-            return K * math.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1) - price
+            return K * math.exp(-r * T) * norm.cdf(-d2) - S * math.exp(-q * T) * norm.cdf(-d1) - price
 
         try:
             obj = _obj_call if flag == 'c' else _obj_put
@@ -573,11 +689,13 @@ class TuShareOptDailyIndicatorAnalyst:
         except Exception:
             return np.nan
 
-    def _calc_implied_vol_and_greeks(self, df_option, shibor_dict=None):
-        """计算隐含波动率和 Greeks
+    def _calc_implied_vol_and_greeks(self, df_option, shibor_dict=None, dividend_yield_dict=None):
+        """计算隐含波动率和 Greeks（含股息率 q 的完整 BSM 模型）
 
-        使用 py_vollib（若可用）或 scipy.fsolve 计算隐含波动率，
-        使用现有 OptionGreeks 计算希腊值。
+        IV 求解: scipy.brentq（已移除 py_vollib，因其不支持股息率 q）
+        Greeks: OptionGreeks（传入真实股息率 y=q）
+        无套利下界: Call: S*e^(-qT)-K*e^(-rT), Put: K*e^(-rT)-S*e^(-qT)
+        d1 公式: (ln(S/K) + (r-q+0.5*sigma^2)*T) / (sigma*sqrt(T))
 
         依赖：spot_price, exercise_price, years_to_maturity_calendar
 
@@ -585,32 +703,37 @@ class TuShareOptDailyIndicatorAnalyst:
             df_option: 期权数据 DataFrame
             shibor_dict: SHIBOR 查找表 {trade_date: {tenor_col: rate}}，
                          若为 None 则 fallback 到 DEFAULT_RISK_FREE_RATE
+            dividend_yield_dict: 股息率查找表 {(trade_date, index_code): yield}，
+                                 若为 None 则 fallback 到 DEFAULT_DIVIDEND_YIELD
         """
         logger.info("TuShareOptDailyIndicatorService._calc_implied_vol_and_greeks: Calculating implied volatility and Greeks")
 
-        # 预填默认无风险利率（逐行将被 SHIBOR 覆盖）
+        # 预填默认值（逐行将被 SHIBOR / 股息率覆盖）
         df_option['risk_free_rate'] = self.DEFAULT_RISK_FREE_RATE
 
         shibor_hit_count = 0
         shibor_miss_count = 0
+        dividend_hit_count = 0
+        dividend_miss_count = 0
 
-        # ---- BS 定价函数 ----
-        def bs_call_price(S, K, T, r, sigma):
+        # ---- BSM 定价函数（含股息率 q） ----
+        def bs_call_price(S, K, T, r, q, sigma):
             if T <= 0 or sigma <= 0:
                 return np.nan
-            d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+            d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
             d2 = d1 - sigma * math.sqrt(T)
-            return S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
+            return S * math.exp(-q * T) * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
 
-        def bs_put_price(S, K, T, r, sigma):
+        def bs_put_price(S, K, T, r, q, sigma):
             if T <= 0 or sigma <= 0:
                 return np.nan
-            d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+            d1 = (math.log(S / K) + (r - q + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
             d2 = d1 - sigma * math.sqrt(T)
-            return K * math.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+            return K * math.exp(-r * T) * norm.cdf(-d2) - S * math.exp(-q * T) * norm.cdf(-d1)
 
         # ---- 对每行计算 ----
         implied_vol_list = []
+        dividend_yield_list = []
         bs_price_list = []
         delta_list = []
         gamma_list = []
@@ -623,9 +746,8 @@ class TuShareOptDailyIndicatorAnalyst:
         nd2_list = []
 
         skip_lower_bound_count = 0  # 因市价 < 欧式期权无套利下界跳过
-        skip_param_count = 0       # 因参数缺失跳过
-        iv_fail_count = 0          # IV 计算异常（py_vollib + brentq 均失败）
-        iv_brentq_count = 0        # py_vollib 失败但 brentq 回退成功
+        skip_param_count = 0        # 因参数缺失跳过
+        iv_brentq_fail_count = 0     # brentq IV 求解失败
 
         for idx, row in df_option.iterrows():
             s = row.get('spot_price')
@@ -634,7 +756,7 @@ class TuShareOptDailyIndicatorAnalyst:
             market_price = row.get('close')
             cp = str(row.get('call_put', '')).upper()
 
-            # 逐行匹配 SHIBOR 无风险利率：按 trade_date + days_to_maturity 匹配最近似期限
+            # ---- 逐行匹配 SHIBOR 无风险利率 r ----
             trade_date_str = str(row.get('trade_date', ''))
             days_mat = row.get('days_to_maturity', 0)
             r = self.DEFAULT_RISK_FREE_RATE  # fallback 默认值
@@ -647,6 +769,24 @@ class TuShareOptDailyIndicatorAnalyst:
                     shibor_miss_count += 1
             df_option.at[idx, 'risk_free_rate'] = r
 
+            # ---- 逐行匹配股息率 q ----
+            ts_code_val = str(row.get('ts_code', ''))
+            # 从合约代码推导标的指数代码
+            index_code_for_div = None
+            for prefix, idx_code in self.CONTRACT_INDEX_MAP.items():
+                if ts_code_val.startswith(prefix):
+                    index_code_for_div = idx_code
+                    break
+
+            q = self.DEFAULT_DIVIDEND_YIELD  # fallback 默认股息率
+            if dividend_yield_dict is not None and index_code_for_div is not None:
+                dy = self._match_dividend_yield(trade_date_str, index_code_for_div, dividend_yield_dict)
+                if pd.notna(dy) and dy > 0:
+                    q = dy
+                    dividend_hit_count += 1
+                else:
+                    dividend_miss_count += 1
+
             # 检查必要参数是否完整
             can_calc = (
                 pd.notna(s) and pd.notna(k) and pd.notna(t) and pd.notna(market_price)
@@ -655,6 +795,7 @@ class TuShareOptDailyIndicatorAnalyst:
 
             if not can_calc:
                 implied_vol_list.append(np.nan)
+                dividend_yield_list.append(np.nan)
                 bs_price_list.append(np.nan)
                 delta_list.append(np.nan)
                 gamma_list.append(np.nan)
@@ -668,56 +809,53 @@ class TuShareOptDailyIndicatorAnalyst:
                 skip_param_count += 1
                 continue
 
-            # ---- 隐含波动率 ----
+            # 记录本行的股息率 q
+            dividend_yield_list.append(q)
+
+            # ---- 隐含波动率（brentq + 含 q） ----
             iv = np.nan
 
-            # 欧式期权无套利下界检查
-            # Call:  max(0, S - K*exp(-rT))  —— 不是简单的 S-K
-            # Put:   max(0, K*exp(-rT) - S)  —— 不是简单的 K-S
+            # 欧式期权无套利下界检查（含股息率 q）
+            # Call:  max(0, S*e^(-qT) - K*e^(-rT))
+            # Put:   max(0, K*e^(-rT) - S*e^(-qT))
             # 深度实值期权因流动性差/收盘时差可能出现市价低于下界，
-            # 此时 BS 公式无解（函数永不为零），保留 NaN
-            discount = math.exp(-r * t)
+            # 此时 BSM 方程无实数解（市场价 < 理论下界），IV 保留 NaN
+            discount_r = math.exp(-r * t)
+            discount_q = math.exp(-q * t)
             if cp == 'C':
-                lower_bound = max(s - k * discount, 0.0)
+                lower_bound = max(s * discount_q - k * discount_r, 0.0)
             else:
-                lower_bound = max(k * discount - s, 0.0)
+                lower_bound = max(k * discount_r - s * discount_q, 0.0)
             if lower_bound > 0 and market_price < lower_bound * 0.9999:
                 iv = np.nan
                 skip_lower_bound_count += 1
             else:
                 flag = 'c' if cp == 'C' else 'p'
-                try:
-                    iv = vollib_iv(market_price, s, k, t, r, flag)
-                    if pd.notna(iv) and (iv <= 0 or iv > 3.0):
-                        iv = np.nan
-                except Exception:
+                iv = self._solve_iv_brentq(market_price, s, k, t, r, q, flag)
+                if pd.notna(iv) and (iv <= 0 or iv > 3.0):
                     iv = np.nan
-
-                # 回退：py_vollib 失败时用 brentq 以更宽松区间再试
                 if pd.isna(iv):
-                    iv = self._solve_iv_brentq(market_price, s, k, t, r, flag)
-                    if pd.isna(iv):
-                        iv_fail_count += 1
-                    else:
-                        iv_brentq_count += 1
+                    iv_brentq_fail_count += 1
 
             implied_vol_list.append(iv)
 
-            # ---- BS 理论价 ----
+            # ---- BS 理论价（含 q） ----
             bs_price = np.nan
             if pd.notna(iv) and iv > 0:
                 try:
-                    flag = 'c' if cp == 'C' else 'p'
-                    bs_price = vollib_bs(flag, s, k, t, r, iv)
+                    if cp == 'C':
+                        bs_price = bs_call_price(s, k, t, r, q, iv)
+                    else:
+                        bs_price = bs_put_price(s, k, t, r, q, iv)
                 except Exception:
                     bs_price = np.nan
             bs_price_list.append(bs_price)
 
-            # ---- d1, d2, N(d1), N(d2) ----
+            # ---- d1, d2, N(d1), N(d2)（含 q: d1 = (ln(S/K) + (r-q+σ²/2)T) / (σ√T)） ----
             if pd.notna(iv) and iv > 0:
                 try:
                     sigma_sqrt_t = iv * math.sqrt(t)
-                    _d1 = (math.log(s / k) + (r + 0.5 * iv ** 2) * t) / sigma_sqrt_t
+                    _d1 = (math.log(s / k) + (r - q + 0.5 * iv ** 2) * t) / sigma_sqrt_t
                     _d2 = _d1 - sigma_sqrt_t
                     d1_list.append(_d1)
                     d2_list.append(_d2)
@@ -734,11 +872,11 @@ class TuShareOptDailyIndicatorAnalyst:
                 nd1_list.append(np.nan)
                 nd2_list.append(np.nan)
 
-            # ---- Greeks ----
+            # ---- Greeks（传入真实股息率 y=q） ----
             if pd.notna(iv) and iv > 0:
                 try:
                     greeks = OptionGreeks.calculate_all_greeks(
-                        S=s, K=k, T=t, r=r, y=self.DEFAULT_DIVIDEND_YIELD,
+                        S=s, K=k, T=t, r=r, y=q,
                         sigma=iv, option_type='call' if cp == 'C' else 'put'
                     )
                     delta_list.append(greeks['delta'])
@@ -761,6 +899,7 @@ class TuShareOptDailyIndicatorAnalyst:
                 rho_list.append(np.nan)
 
         df_option['implied_vol'] = implied_vol_list
+        df_option['dividend_yield'] = dividend_yield_list
         df_option['bs_theoretical_price'] = bs_price_list
         df_option['d1'] = d1_list
         df_option['d2'] = d2_list
@@ -777,11 +916,9 @@ class TuShareOptDailyIndicatorAnalyst:
         logger.info(f"Implied volatility calculated for {iv_count}/{total} rows")
         if skip_lower_bound_count > 0:
             logger.info(f"  Skipped {skip_lower_bound_count}/{total} rows: market_price < no-arbitrage lower bound "
-                        f"(Call: S-K*e^(-rT), Put: K*e^(-rT)-S) — IV has no real solution")
-        if iv_fail_count > 0:
-            logger.info(f"  IV calculation failed for {iv_fail_count}/{total} rows (all solvers exhausted)")
-        if iv_brentq_count > 0:
-            logger.info(f"  Brentq fallback rescued {iv_brentq_count}/{total} rows (py_vollib failed, scipy.brentq succeeded)")
+                        f"(Call: S*e^(-qT)-K*e^(-rT), Put: K*e^(-rT)-S*e^(-qT)) — IV has no real solution")
+        if iv_brentq_fail_count > 0:
+            logger.info(f"  IV calculation failed for {iv_brentq_fail_count}/{total} rows (brentq exhausted)")
         if skip_param_count > 0:
             logger.info(f"  Skipped {skip_param_count}/{total} rows: missing S/K/T/price")
         greeks_count = df_option['delta'].notna().sum()
@@ -789,18 +926,22 @@ class TuShareOptDailyIndicatorAnalyst:
         if shibor_dict is not None:
             logger.info(f"  SHIBOR risk-free rate: hit={shibor_hit_count}/{total}, "
                         f"miss={shibor_miss_count}/{total} (fallback to {self.DEFAULT_RISK_FREE_RATE})")
+        if dividend_yield_dict is not None:
+            logger.info(f"  Dividend yield: hit={dividend_hit_count}/{total}, "
+                        f"miss={dividend_miss_count}/{total} (fallback to {self.DEFAULT_DIVIDEND_YIELD})")
 
         return df_option
 
     # ================================================================
     # 主流程
     # ================================================================
-    def calculate_indicators(self, df_option, shibor_dict=None):
+    def calculate_indicators(self, df_option, shibor_dict=None, dividend_yield_dict=None):
         """依次计算所有指标
 
         Args:
             df_option: 期权数据 DataFrame
             shibor_dict: SHIBOR 查找表，若为 None 则 fallback 到 DEFAULT_RISK_FREE_RATE
+            dividend_yield_dict: 股息率查找表，若为 None 则 fallback 到 DEFAULT_DIVIDEND_YIELD
         """
         logger.info("TuShareOptDailyIndicatorService.calculate_indicators: Calculating all option indicators")
 
@@ -811,7 +952,8 @@ class TuShareOptDailyIndicatorAnalyst:
         df_option = self._calc_trading_metrics(df_option)
         df_option = self._calc_time_metrics(df_option)
         df_option = self._calc_moneyness(df_option)
-        df_option = self._calc_implied_vol_and_greeks(df_option, shibor_dict=shibor_dict)
+        df_option = self._calc_implied_vol_and_greeks(df_option, shibor_dict=shibor_dict,
+                                                      dividend_yield_dict=dividend_yield_dict)
 
         return df_option
 
@@ -838,6 +980,7 @@ class TuShareOptDailyIndicatorAnalyst:
 
         # 处理 NaN：IV/Greeks 保留 NaN（ClickHouse 存 NULL），其余字段填默认值
         greek_and_iv_cols = {'implied_vol', 'bs_theoretical_price',
+                             'dividend_yield',
                              'delta', 'gamma', 'vega', 'theta', 'rho',
                              'd1', 'd2', 'nd1', 'nd2'}
         for col in df_output.columns:
@@ -896,7 +1039,7 @@ class TuShareOptDailyIndicatorAnalyst:
         logger.info("=" * 80)
 
         # Step 1: 拉取数据
-        logger.info("\nStep 1/4: Fetching option daily data from ClickHouse...")
+        logger.info("\nStep 1/5: Fetching option daily data from ClickHouse...")
         df_option = self.fetch_data(
             start_date=start_date, end_date=end_date,
             call_put=call_put, exercise_type=exercise_type, ts_code_filter=ts_code_filter
@@ -906,16 +1049,21 @@ class TuShareOptDailyIndicatorAnalyst:
             logger.warning("No data fetched, aborting")
             return df_option
 
-        # Step 2: 拉取 SHIBOR 数据作为无风险利率
-        logger.info("\nStep 2/4: Fetching SHIBOR data for risk-free rate...")
+        # Step 2: 拉取 SHIBOR 数据作为无风险利率 r
+        logger.info("\nStep 2/5: Fetching SHIBOR data for risk-free rate r...")
         shibor_dict = self._fetch_shibor_data(start_date, end_date)
 
-        # Step 3: 计算指标
-        logger.info("\nStep 3/4: Calculating option indicators...")
-        df_option = self.calculate_indicators(df_option, shibor_dict=shibor_dict)
+        # Step 3: 拉取指数日频基本指标，估算股息率 q (= payout_ratio / pe_ttm)
+        logger.info("\nStep 3/5: Fetching index daily basic data for dividend yield q (estimated from PE_TTM)...")
+        dividend_yield_dict = self._fetch_dividend_yield_data(start_date, end_date)
 
-        # Step 4: 保存
-        logger.info("\nStep 4/4: Saving to ClickHouse...")
+        # Step 4: 计算指标（含 r 和 q）
+        logger.info("\nStep 4/5: Calculating option indicators (BSM with r & q)...")
+        df_option = self.calculate_indicators(df_option, shibor_dict=shibor_dict,
+                                              dividend_yield_dict=dividend_yield_dict)
+
+        # Step 5: 保存
+        logger.info("\nStep 5/5: Saving to ClickHouse...")
         self.save_to_clickhouse(df_option, call_put=call_put, ts_code_filter=ts_code_filter)
 
         # Summary
