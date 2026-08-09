@@ -15,7 +15,7 @@ class OptDailyIndicatorReportTest:
 
         report = OptDailyIndicatorReport()
         pdf_path = report.run(
-            start_date="20260701",
+            start_date="20251222",
             end_date="20260717",
             ts_code_filter="HO2612%",
         )

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     report_configs = [
         {
             "name": "HO2612看涨欧式期权",
-            "start_date": "20260624",
+            "start_date": "20251222",
             "end_date": "20260717",
             "call_put": "C",
             "exercise_type": "欧式",

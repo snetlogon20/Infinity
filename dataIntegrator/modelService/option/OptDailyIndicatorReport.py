@@ -617,6 +617,39 @@ class OptDailyIndicatorReport:
 
         ax2.set_ylabel(y2_label, fontsize=12, fontweight='bold')
 
+        # ---- 右端标签（在 Y1 轴各线上标注 trade_date） ----
+        xlim = ax1.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax1.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.12)
+
+        for di, dt in enumerate(trade_dates):
+            day_data = df_work[df_work['trade_date_dt'] == dt].sort_values('exercise_price')
+            if day_data.empty or y1_col not in day_data.columns:
+                continue
+            y1_series = day_data[y1_col].dropna()
+            x_series = day_data.loc[y1_series.index, 'exercise_price']
+            if len(y1_series) == 0:
+                continue
+            color = colors[di]
+            label_text = date_labels[di]
+            ax1.annotate(
+                label_text,
+                xy=(x_series.iloc[-1], y1_series.iloc[-1]),
+                xytext=(6, 0),
+                textcoords='offset points',
+                color=color,
+                fontsize=7,
+                fontweight='bold',
+                va='center',
+                ha='left',
+                bbox=dict(boxstyle='round,pad=0.18',
+                          facecolor='white',
+                          edgecolor=color,
+                          linewidth=0.5,
+                          alpha=0.85),
+                zorder=10,
+            )
+
         # ---- 图例 ----
         ncol = min(n_dates, 10)
         ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
@@ -680,6 +713,138 @@ class OptDailyIndicatorReport:
             df, 'nd1', 'N(d1)', 'nd2', 'N(d2)',
             chart_num=18, call_put='C',
             title_prefix='图18：行权价 vs N(d1)(Y1) + N(d2)(Y2) — 按trade_date (Call)')
+
+    # ===================== 图19~22：trade_date-X轴 exercise_price为系列 单Y轴 =====================
+
+    def _gen_trade_date_x_single_y_chart(self, df, y_col, y_label,
+                                          chart_num, title_prefix=None, call_put=None):
+        """通用 trade_date 为 X 轴单Y图
+
+        X轴: trade_date（交易日）
+        系列: 每个 exercise_price 一条不同颜色的折线
+        Y轴: 指标列（如 d1, d2, nd1, nd2）
+        每条线最右端标上 exercise_price 标签
+        """
+        self.writeLogInfo(className=self.__class__.__name__,
+                          functionName=f"_gen_trade_date_x_chart{chart_num}",
+                          event=f"Generating trade_date X-axis chart {chart_num}: {y_label}")
+
+        df_work = df.copy()
+        if call_put:
+            df_work = df_work[df_work['call_put'] == call_put]
+        if df_work.empty:
+            logger.warning(f"No data for chart {chart_num}, skipping")
+            return None
+
+        exercise_prices = sorted(df_work['exercise_price'].dropna().unique())
+        if len(exercise_prices) < 1:
+            logger.warning(f"Insufficient exercise_prices for chart {chart_num}")
+            return None
+
+        n_prices = len(exercise_prices)
+        colors = plt.cm.tab20(np.linspace(0, 1, max(n_prices, 20)))[:n_prices] if n_prices <= 20 else \
+                 plt.cm.viridis(np.linspace(0.1, 0.9, n_prices))
+
+        title = title_prefix if title_prefix else f'图{chart_num}：trade_date vs {y_label}（按exercise_price）'
+
+        fig, ax = plt.subplots(figsize=(24, 10))
+        fig.suptitle(title, fontsize=14, fontweight='bold', color='#1a1a2e')
+
+        # 存储每条线的右端点，用于 end label
+        end_points = []  # (x_last, y_last, exercise_price_label, color)
+
+        for pi, ep in enumerate(exercise_prices):
+            ep_data = df_work[df_work['exercise_price'] == ep].sort_values('trade_date_dt')
+            if ep_data.empty:
+                continue
+            x_dates = ep_data['trade_date_dt'].values
+            y_vals = ep_data[y_col].values
+
+            color = colors[pi]
+            alpha_val = max(0.5, 0.90 - 0.02 * abs(pi - n_prices // 2))
+            lw = 1.0 + 1.0 * (pi / max(n_prices - 1, 1))
+
+            label_text = f"{int(ep)}"
+            ax.plot(x_dates, y_vals, color=color, linewidth=lw, alpha=alpha_val,
+                    marker='o', markersize=3, label=label_text)
+
+            # 记录右端点
+            valid_mask = ~np.isnan(y_vals)
+            if valid_mask.sum() > 0:
+                end_points.append((
+                    x_dates[valid_mask][-1],
+                    y_vals[valid_mask][-1],
+                    label_text,
+                    color
+                ))
+
+        ax.set_xlabel('交易日 (trade_date)', fontsize=12, fontweight='bold')
+        ax.set_ylabel(y_label, fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.25, linestyle='--')
+
+        # ---- 零线 ----
+        if y_col in ('delta', 'gamma', 'theta', 'rho', 'd1', 'd2', 'nd1', 'nd2'):
+            ax.axhline(y=0, color='gray', linewidth=0.5, linestyle='-', alpha=0.3)
+
+        # ---- 右端标签（标注 exercise_price） ----
+        xlim = ax.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.12)
+
+        for x_last, y_last, label_text, color in end_points:
+            ax.annotate(
+                label_text,
+                xy=(x_last, y_last),
+                xytext=(6, 0),
+                textcoords='offset points',
+                color=color,
+                fontsize=7,
+                fontweight='bold',
+                va='center',
+                ha='left',
+                bbox=dict(boxstyle='round,pad=0.18',
+                          facecolor='white',
+                          edgecolor=color,
+                          linewidth=0.5,
+                          alpha=0.85),
+                zorder=10,
+            )
+
+        # ---- 图例 ----
+        ncol = min(n_prices, 10)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
+                   fontsize=6, ncol=ncol, frameon=True, borderaxespad=0.5,
+                   handlelength=1.0, columnspacing=0.6)
+
+        fig.autofmt_xdate(rotation=45, ha='right')
+        plt.tight_layout()
+        buf = self._fig_to_bytesio(fig, dpi=150)
+        plt.close(fig)
+        return buf
+
+    def gen_chart19_trade_date_x_d1(self, df):
+        return self._gen_trade_date_x_single_y_chart(
+            df, 'd1', 'd1',
+            chart_num=19, call_put='C',
+            title_prefix='图19：交易日 vs d1 — 按行权价exercise_price为系列 (Call)')
+
+    def gen_chart20_trade_date_x_d2(self, df):
+        return self._gen_trade_date_x_single_y_chart(
+            df, 'd2', 'd2',
+            chart_num=20, call_put='C',
+            title_prefix='图20：交易日 vs d2 — 按行权价exercise_price为系列 (Call)')
+
+    def gen_chart21_trade_date_x_nd1(self, df):
+        return self._gen_trade_date_x_single_y_chart(
+            df, 'nd1', 'N(d1)',
+            chart_num=21, call_put='C',
+            title_prefix='图21：交易日 vs N(d1) — 按行权价exercise_price为系列 (Call)')
+
+    def gen_chart22_trade_date_x_nd2(self, df):
+        return self._gen_trade_date_x_single_y_chart(
+            df, 'nd2', 'N(d2)',
+            chart_num=22, call_put='C',
+            title_prefix='图22：交易日 vs N(d2) — 按行权价exercise_price为系列 (Call)')
 
     # ===================== PDF 报告生成 =====================
 
@@ -811,6 +976,10 @@ class OptDailyIndicatorReport:
             ('chart16_exercise_price_rho_vol', '图16：行权价 vs Rho + 成交量 (Call, 按trade_date)', '十六、', 0.45),
             ('chart17_exercise_price_d1_d2', '图17：行权价 vs d1 + d2 (Call, 按trade_date)', '十七、', 0.45),
             ('chart18_exercise_price_nd1_nd2', '图18：行权价 vs N(d1) + N(d2) (Call, 按trade_date)', '十八、', 0.45),
+            ('chart19_trade_date_x_d1', '图19：交易日 vs d1 (Call, 按exercise_price)', '十九、', 0.45),
+            ('chart20_trade_date_x_d2', '图20：交易日 vs d2 (Call, 按exercise_price)', '二十、', 0.45),
+            ('chart21_trade_date_x_nd1', '图21：交易日 vs N(d1) (Call, 按exercise_price)', '二十一、', 0.45),
+            ('chart22_trade_date_x_nd2', '图22：交易日 vs N(d2) (Call, 按exercise_price)', '二十二、', 0.45),
         ]
 
         for buf_key, chart_title, section_label, height_frac in chart_config:
@@ -823,11 +992,11 @@ class OptDailyIndicatorReport:
             img = RLImage(buf, width=page_width, height=page_width * height_frac)
             story.append(img)
             story.append(Spacer(1, 0.15 * inch))
-            if buf_key not in ('chart18_exercise_price_nd1_nd2',):  # 最后一张图后不换页，直接接风险提示
+            if buf_key not in ('chart22_trade_date_x_nd2',):  # 最后一张图后不换页，直接接风险提示
                 story.append(PageBreak())
 
         # ===== 风险提示 =====
-        story.append(Paragraph('十九、风险提示', styles['h1']))
+        story.append(Paragraph('二十三、风险提示', styles['h1']))
         story.append(Spacer(1, 0.15 * inch))
         risk_text = (
             "本报告基于历史期权日线数据进行量化分析，仅供参考，不构成投资建议。<br/>"
@@ -933,8 +1102,20 @@ class OptDailyIndicatorReport:
             logger.info("生成图18: 行权价 vs N(d1) + N(d2)...")
             chart_buffers['chart18_exercise_price_nd1_nd2'] = self.gen_chart18_exercise_price_nd1_nd2(df)
 
+            logger.info("生成图19: 交易日 vs d1 (按exercise_price为系列)...")
+            chart_buffers['chart19_trade_date_x_d1'] = self.gen_chart19_trade_date_x_d1(df)
+
+            logger.info("生成图20: 交易日 vs d2 (按exercise_price为系列)...")
+            chart_buffers['chart20_trade_date_x_d2'] = self.gen_chart20_trade_date_x_d2(df)
+
+            logger.info("生成图21: 交易日 vs N(d1) (按exercise_price为系列)...")
+            chart_buffers['chart21_trade_date_x_nd1'] = self.gen_chart21_trade_date_x_nd1(df)
+
+            logger.info("生成图22: 交易日 vs N(d2) (按exercise_price为系列)...")
+            chart_buffers['chart22_trade_date_x_nd2'] = self.gen_chart22_trade_date_x_nd2(df)
+
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
-            logger.info(f"图表生成完成: {chart_count}/18")
+            logger.info(f"图表生成完成: {chart_count}/22")
 
             # Step 4: 生成 PDF
             logger.info("=" * 60)
