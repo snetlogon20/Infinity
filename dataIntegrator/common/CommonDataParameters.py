@@ -278,5 +278,16 @@ class CommonDataParameters():
         "DUK", "SO", "D", "EXC", "LIN", "APD", "FCX", "NEM", "SHW"
     ]
 
+    CN_OPTION_TS_CODE_LIST = [
+                "HO2612-C-2500.CFX", "HO2612-C-2600.CFX", "HO2612-C-2700.CFX",
+                "HO2612-C-2800.CFX", "HO2612-C-2900.CFX", "HO2612-C-3000.CFX",
+                "HO2612-C-3100.CFX", "HO2612-C-3200.CFX", "HO2612-C-3300.CFX",
+                "HO2612-C-3400.CFX", "HO2612-C-3500.CFX",
+                "HO2612-P-2500.CFX", "HO2612-P-2600.CFX", "HO2612-P-2700.CFX",
+                "HO2612-P-2800.CFX", "HO2612-P-2900.CFX", "HO2612-P-3000.CFX",
+                "HO2612-P-3100.CFX", "HO2612-P-3200.CFX", "HO2612-P-3300.CFX",
+                "HO2612-P-3400.CFX", "HO2612-P-3500.CFX",
+            ]
+
 
 
