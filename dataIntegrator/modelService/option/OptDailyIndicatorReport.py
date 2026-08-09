@@ -80,13 +80,14 @@ class OptDailyIndicatorReport:
 
     # ===================== 数据获取 =====================
 
-    def fetch_data(self, start_date=None, end_date=None, ts_code_filter=None):
+    def fetch_data(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
         """从 ClickHouse 拉取 tb_tushare_opt_daily_indicator 表数据
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
             ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            call_put: 行权方向 'C'/'P'，None 不过滤
 
         Returns:
             pd.DataFrame
@@ -102,6 +103,8 @@ class OptDailyIndicatorReport:
             where_clauses.append(f"trade_date <= '{end_date}'")
         if ts_code_filter:
             where_clauses.append(f"ts_code LIKE '{ts_code_filter}'")
+        if call_put:
+            where_clauses.append(f"call_put = '{call_put}'")
 
         where_str = " AND ".join(where_clauses) if where_clauses else "1=1"
         sql = f"""
@@ -269,10 +272,12 @@ class OptDailyIndicatorReport:
                                   colors=[spot_color], x_pad_frac=0.02,
                                   label_fontsize=8, single_label='spot_price')
 
-    def _gen_dual_y_chart(self, df, y_col, y_col_cn, chart_num, title_prefix=None):
-        """通用双Y轴折线图模板：
+    def _gen_dual_y_chart(self, df, y_col, y_col_cn, chart_num, title_prefix=None,
+                          extra_y3_col=None, extra_y3_label=None):
+        """通用双Y轴折线图模板（可选第三轴）：
         Y1（左轴）= spot_price（一条粗线）
         Y2（右轴）= 各 ts_code 的指定指标列（多条彩色细线）
+        Y3（可选外轴）= extra_y3_col（如 risk_free_rate）
 
         所有折线在最右端打上标签。
         """
@@ -313,6 +318,31 @@ class OptDailyIndicatorReport:
         ax2.set_ylabel(y_col_cn, fontsize=11)
         ax2.tick_params(axis='y')
 
+        # ---- Y3: extra_y3_col (e.g., risk_free_rate) ----
+        ax3 = None
+        if extra_y3_col and extra_y3_col in df.columns:
+            ax3 = ax1.twinx()
+            ax3.spines['right'].set_position(('outward', 60))
+            ax3.spines['right'].set_color('#e67e22')
+
+            rf_data = df[['trade_date_dt', extra_y3_col]].dropna().drop_duplicates(subset='trade_date_dt')
+            rf_data = rf_data.sort_values('trade_date_dt').set_index('trade_date_dt')[extra_y3_col]
+
+            if not rf_data.empty:
+                y3_label = extra_y3_label or extra_y3_col
+                ax3.plot(rf_data.index.tolist(), rf_data.values,
+                         color='#e67e22', linewidth=2.0, alpha=0.9,
+                         marker='s', markersize=3, linestyle='--',
+                         label=y3_label)
+
+                rf_dict = {y3_label: rf_data.to_frame(name=extra_y3_col)}
+                self._add_end_labels(ax3, [y3_label], rf_dict, extra_y3_col,
+                                     colors=['#e67e22'], x_pad_frac=0.02,
+                                     single_label=y3_label)
+
+            ax3.set_ylabel(y3_label, fontsize=11, color='#e67e22')
+            ax3.tick_params(axis='y', labelcolor='#e67e22')
+
         # ---- 右端标签 ----
         self._add_end_labels(ax2, ts_codes, series_dict, y_col)
 
@@ -324,6 +354,10 @@ class OptDailyIndicatorReport:
         lines2, labels2 = ax2.get_legend_handles_labels()
         all_lines = lines1 + lines2
         all_labels = labels1 + labels2
+        if ax3 is not None:
+            lines3, labels3 = ax3.get_legend_handles_labels()
+            all_lines += lines3
+            all_labels += labels3
         n_items = len(all_lines)
         ncol = min(n_items, 8)
         ax1.legend(all_lines, all_labels, loc='upper center',
@@ -365,7 +399,9 @@ class OptDailyIndicatorReport:
 
     def gen_chart8_rho(self, df):
         return self._gen_dual_y_chart(df, 'rho', 'Rho', chart_num=8,
-                                      title_prefix='图8：spot_price + 各合约 Rho')
+                                      extra_y3_col='risk_free_rate',
+                                      extra_y3_label='risk_free_rate (无风险利率)',
+                                      title_prefix='图8：spot_price + 各合约 Rho + risk_free_rate')
 
     # ===================== 图9：多日隐含波动率微笑演变仪表盘 =====================
 
@@ -885,18 +921,20 @@ class OptDailyIndicatorReport:
         }
 
     def _generate_pdf_report(self, df, chart_buffers,
-                              start_date=None, end_date=None, ts_code_filter=None):
+                              start_date=None, end_date=None, ts_code_filter=None, call_put=None):
         """生成完整 PDF 报告"""
         styles = self._build_pdf_styles()
 
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-        # 文件名基于日期范围
+        # 文件名基于日期范围 + 产品标识
+        filter_tag = ts_code_filter.replace('%', '') if ts_code_filter else 'all'
+        cp_tag = f"_{call_put}" if call_put else ""
         date_tag = f"{start_date}-{end_date}" if start_date and end_date else "custom"
         pdf_path = os.path.join(
             self.OUTPUT_DIR,
-            f"OptDailyIndicator_Report_{date_tag}_{now_ts}.pdf"
+            f"OptDailyIndicator_{filter_tag}{cp_tag}_{date_tag}_{now_ts}.pdf"
         )
 
         doc = SimpleDocTemplate(
@@ -910,8 +948,10 @@ class OptDailyIndicatorReport:
         story = []
 
         # ===== 封面 =====
+        call_put_cn = {'C': '看涨 (Call)', 'P': '看跌 (Put)'}
+        product_desc = f" — {call_put_cn.get(call_put, '')}" if call_put else ""
         story.append(Spacer(1, 1.5 * inch))
-        story.append(Paragraph('期权日线指标分析报告', styles['title']))
+        story.append(Paragraph(f'期权日线指标分析报告{product_desc}', styles['title']))
         story.append(Spacer(1, 0.25 * inch))
         story.append(Paragraph(
             'Option Daily Indicator Analysis Report',
@@ -927,7 +967,7 @@ class OptDailyIndicatorReport:
         cover_text = (
             f"数据区间：{cover_date_range}<br/>"
             f"生成时间：{report_date}<br/>"
-            f"过滤条件：ts_code LIKE '{ts_code_filter or '无'}'<br/>"
+            f"合约过滤：ts_code LIKE '{ts_code_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
             f"数据记录：{len(df)} 条 | 合约数量：{unique_ts}<br/>"
             f"<br/>INFINITY 量化系统 · 期权研究专用"
         )
@@ -957,6 +997,9 @@ class OptDailyIndicatorReport:
         story.append(PageBreak())
 
         # ===== 图表 =====
+        cp_label_full = {'C': 'Call', 'P': 'Put'}
+        cp_display = cp_label_full.get(call_put, 'Call')
+
         chart_config = [
             ('chart1_spot_close', '图1：spot_price + 各合约 收盘价 (close)', '二、', 0.45),
             ('chart2_implied_vol', '图2：spot_price + 各合约 隐含波动率 (implied_vol)', '三、', 0.45),
@@ -965,22 +1008,47 @@ class OptDailyIndicatorReport:
             ('chart5_gamma', '图5：spot_price + 各合约 Gamma', '六、', 0.45),
             ('chart6_vega', '图6：spot_price + 各合约 Vega', '七、', 0.45),
             ('chart7_theta', '图7：spot_price + 各合约 Theta', '八、', 0.45),
-            ('chart8_rho', '图8：spot_price + 各合约 Rho', '九、', 0.45),
-            ('chart9_smile_call', '图9：IV Smile 多日演变仪表盘 (Call期权)', '十、', 0.65),
-            ('chart10_smile_put', '图10：IV Smile 多日演变仪表盘 (Put期权)', '十、', 0.65),
-            ('chart11_exercise_price_iv_vol', '图11：行权价 vs 隐含波动率 + 成交量 (Call, 按trade_date)', '十一、', 0.45),
-            ('chart12_exercise_price_delta_vol', '图12：行权价 vs Delta + 成交量 (Call, 按trade_date)', '十二、', 0.45),
-            ('chart13_exercise_price_gamma_vol', '图13：行权价 vs Gamma + 成交量 (Call, 按trade_date)', '十三、', 0.45),
-            ('chart14_exercise_price_vega_vol', '图14：行权价 vs Vega + 成交量 (Call, 按trade_date)', '十四、', 0.45),
-            ('chart15_exercise_price_theta_vol', '图15：行权价 vs Theta + 成交量 (Call, 按trade_date)', '十五、', 0.45),
-            ('chart16_exercise_price_rho_vol', '图16：行权价 vs Rho + 成交量 (Call, 按trade_date)', '十六、', 0.45),
-            ('chart17_exercise_price_d1_d2', '图17：行权价 vs d1 + d2 (Call, 按trade_date)', '十七、', 0.45),
-            ('chart18_exercise_price_nd1_nd2', '图18：行权价 vs N(d1) + N(d2) (Call, 按trade_date)', '十八、', 0.45),
-            ('chart19_trade_date_x_d1', '图19：交易日 vs d1 (Call, 按exercise_price)', '十九、', 0.45),
-            ('chart20_trade_date_x_d2', '图20：交易日 vs d2 (Call, 按exercise_price)', '二十、', 0.45),
-            ('chart21_trade_date_x_nd1', '图21：交易日 vs N(d1) (Call, 按exercise_price)', '二十一、', 0.45),
-            ('chart22_trade_date_x_nd2', '图22：交易日 vs N(d2) (Call, 按exercise_price)', '二十二、', 0.45),
+            ('chart8_rho', '图8：spot_price + 各合约 Rho + risk_free_rate', '九、', 0.45),
         ]
+
+        # IV Smile 仪表盘：按 call_put 动态插入
+        if call_put is None:
+            chart_config.append(
+                ('chart9_smile_call', '图9：IV Smile 多日演变仪表盘 (Call期权)', '十、', 0.65))
+            chart_config.append(
+                ('chart10_smile_put', '图10：IV Smile 多日演变仪表盘 (Put期权)', '十、', 0.65))
+        else:
+            chart_config.append(
+                ('chart9_smile', '图9：IV Smile 多日演变仪表盘', '十、', 0.65))
+
+        chart_config.extend([
+            ('chart11_exercise_price_iv_vol',
+             f'图11：行权价 vs 隐含波动率 + 成交量 ({cp_display}, 按trade_date)', '十一、', 0.45),
+            ('chart12_exercise_price_delta_vol',
+             f'图12：行权价 vs Delta + 成交量 ({cp_display}, 按trade_date)', '十二、', 0.45),
+            ('chart13_exercise_price_gamma_vol',
+             f'图13：行权价 vs Gamma + 成交量 ({cp_display}, 按trade_date)', '十三、', 0.45),
+            ('chart14_exercise_price_vega_vol',
+             f'图14：行权价 vs Vega + 成交量 ({cp_display}, 按trade_date)', '十四、', 0.45),
+            ('chart15_exercise_price_theta_vol',
+             f'图15：行权价 vs Theta + 成交量 ({cp_display}, 按trade_date)', '十五、', 0.45),
+            ('chart16_exercise_price_rho_vol',
+             f'图16：行权价 vs Rho + 成交量 ({cp_display}, 按trade_date)', '十六、', 0.45),
+            ('chart17_exercise_price_d1_d2',
+             f'图17：行权价 vs d1 + d2 ({cp_display}, 按trade_date)', '十七、', 0.45),
+            ('chart18_exercise_price_nd1_nd2',
+             f'图18：行权价 vs N(d1) + N(d2) ({cp_display}, 按trade_date)', '十八、', 0.45),
+            ('chart19_trade_date_x_d1',
+             f'图19：交易日 vs d1 ({cp_display}, 按exercise_price)', '十九、', 0.45),
+            ('chart20_trade_date_x_d2',
+             f'图20：交易日 vs d2 ({cp_display}, 按exercise_price)', '二十、', 0.45),
+            ('chart21_trade_date_x_nd1',
+             f'图21：交易日 vs N(d1) ({cp_display}, 按exercise_price)', '二十一、', 0.45),
+            ('chart22_trade_date_x_nd2',
+             f'图22：交易日 vs N(d2) ({cp_display}, 按exercise_price)', '二十二、', 0.45),
+        ])
+
+        last_chart_key = chart_config[-1][0] if chart_config else 'chart22_trade_date_x_nd2'
 
         for buf_key, chart_title, section_label, height_frac in chart_config:
             buf = chart_buffers.get(buf_key)
@@ -992,7 +1060,7 @@ class OptDailyIndicatorReport:
             img = RLImage(buf, width=page_width, height=page_width * height_frac)
             story.append(img)
             story.append(Spacer(1, 0.15 * inch))
-            if buf_key not in ('chart22_trade_date_x_nd2',):  # 最后一张图后不换页，直接接风险提示
+            if buf_key != last_chart_key:  # 最后一张图后不换页，直接接风险提示
                 story.append(PageBreak())
 
         # ===== 风险提示 =====
@@ -1012,13 +1080,14 @@ class OptDailyIndicatorReport:
 
     # ===================== 主流程 =====================
 
-    def run(self, start_date=None, end_date=None, ts_code_filter=None):
+    def run(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
         """运行期权日线指标报告生成主流程
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
             ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            call_put: 行权方向 'C'/'P'，None 表示全部
 
         Returns:
             pdf_path or None
@@ -1030,10 +1099,12 @@ class OptDailyIndicatorReport:
         try:
             # Step 1: 拉取数据
             logger.info("=" * 60)
-            logger.info(f"Step 1/3: 从 ClickHouse 拉取数据 (ts_code_filter={ts_code_filter})")
+            logger.info(f"Step 1/3: 从 ClickHouse 拉取数据 "
+                        f"(ts_code_filter={ts_code_filter}, call_put={call_put})")
             logger.info("=" * 60)
             df = self.fetch_data(
-                start_date=start_date, end_date=end_date, ts_code_filter=ts_code_filter
+                start_date=start_date, end_date=end_date,
+                ts_code_filter=ts_code_filter, call_put=call_put
             )
             if df.empty:
                 logger.warning("数据为空，流程终止")
@@ -1072,50 +1143,93 @@ class OptDailyIndicatorReport:
             logger.info("生成图8: rho...")
             chart_buffers['chart8_rho'] = self.gen_chart8_rho(df)
 
-            logger.info("生成图9: IV Smile 多日演变仪表盘 (Call)...")
-            chart_buffers['chart9_smile_call'] = self.gen_chart9_ivol_smile_dashboard(df, call_put='C')
+            # IV Smile 仪表盘：按 call_put 生成对应的
+            if call_put is None or call_put == 'C':
+                logger.info("生成图9: IV Smile 多日演变仪表盘 (Call)...")
+                chart_buffers['chart9_smile_call'] = self.gen_chart9_ivol_smile_dashboard(df, call_put='C')
+            if call_put is None or call_put == 'P':
+                chart_key = 'chart10_smile_put' if call_put is None else 'chart9_smile'
+                log_label = '图10' if call_put is None else '图9'
+                logger.info(f"生成{log_label}: IV Smile 多日演变仪表盘 (Put)...")
+                chart_buffers[chart_key] = self.gen_chart9_ivol_smile_dashboard(df, call_put='P')
 
-            logger.info("生成图10: IV Smile 多日演变仪表盘 (Put)...")
-            chart_buffers['chart10_smile_put'] = self.gen_chart9_ivol_smile_dashboard(df, call_put='P')
+            # 行权价 × trade_date 图表：按 call_put 动态过滤
+            cp_filter = call_put if call_put else 'C'
+            cp_label = call_put if call_put else 'Call'
+            logger.info(f"生成图11: 行权价 vs 隐含波动率 + 成交量 ({cp_label})...")
+            chart_buffers['chart11_exercise_price_iv_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'implied_vol', '隐含波动率 (implied_vol)', 'vol', '成交量 (vol)',
+                chart_num=11, call_put=cp_filter,
+                title_prefix=f'图11：行权价 vs 隐含波动率(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图11: 行权价 vs 隐含波动率 + 成交量...")
-            chart_buffers['chart11_exercise_price_iv_vol'] = self.gen_chart11_exercise_price_iv_vol(df)
+            logger.info(f"生成图12: 行权价 vs Delta + 成交量 ({cp_label})...")
+            chart_buffers['chart12_exercise_price_delta_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'delta', 'Delta', 'vol', '成交量 (vol)',
+                chart_num=12, call_put=cp_filter,
+                title_prefix=f'图12：行权价 vs Delta(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图12: 行权价 vs Delta + 成交量...")
-            chart_buffers['chart12_exercise_price_delta_vol'] = self.gen_chart12_exercise_price_delta_vol(df)
+            logger.info(f"生成图13: 行权价 vs Gamma + 成交量 ({cp_label})...")
+            chart_buffers['chart13_exercise_price_gamma_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'gamma', 'Gamma', 'vol', '成交量 (vol)',
+                chart_num=13, call_put=cp_filter,
+                title_prefix=f'图13：行权价 vs Gamma(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图13: 行权价 vs Gamma + 成交量...")
-            chart_buffers['chart13_exercise_price_gamma_vol'] = self.gen_chart13_exercise_price_gamma_vol(df)
+            logger.info(f"生成图14: 行权价 vs Vega + 成交量 ({cp_label})...")
+            chart_buffers['chart14_exercise_price_vega_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'vega', 'Vega', 'vol', '成交量 (vol)',
+                chart_num=14, call_put=cp_filter,
+                title_prefix=f'图14：行权价 vs Vega(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图14: 行权价 vs Vega + 成交量...")
-            chart_buffers['chart14_exercise_price_vega_vol'] = self.gen_chart14_exercise_price_vega_vol(df)
+            logger.info(f"生成图15: 行权价 vs Theta + 成交量 ({cp_label})...")
+            chart_buffers['chart15_exercise_price_theta_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'theta', 'Theta', 'vol', '成交量 (vol)',
+                chart_num=15, call_put=cp_filter,
+                title_prefix=f'图15：行权价 vs Theta(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图15: 行权价 vs Theta + 成交量...")
-            chart_buffers['chart15_exercise_price_theta_vol'] = self.gen_chart15_exercise_price_theta_vol(df)
+            logger.info(f"生成图16: 行权价 vs Rho + 成交量 ({cp_label})...")
+            chart_buffers['chart16_exercise_price_rho_vol'] = self._gen_exercise_price_dual_y_chart(
+                df, 'rho', 'Rho', 'vol', '成交量 (vol)',
+                chart_num=16, call_put=cp_filter,
+                title_prefix=f'图16：行权价 vs Rho(Y1) + 成交量(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图16: 行权价 vs Rho + 成交量...")
-            chart_buffers['chart16_exercise_price_rho_vol'] = self.gen_chart16_exercise_price_rho_vol(df)
+            logger.info(f"生成图17: 行权价 vs d1 + d2 ({cp_label})...")
+            chart_buffers['chart17_exercise_price_d1_d2'] = self._gen_exercise_price_dual_y_chart(
+                df, 'd1', 'd1', 'd2', 'd2',
+                chart_num=17, call_put=cp_filter,
+                title_prefix=f'图17：行权价 vs d1(Y1) + d2(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图17: 行权价 vs d1 + d2...")
-            chart_buffers['chart17_exercise_price_d1_d2'] = self.gen_chart17_exercise_price_d1_d2(df)
+            logger.info(f"生成图18: 行权价 vs N(d1) + N(d2) ({cp_label})...")
+            chart_buffers['chart18_exercise_price_nd1_nd2'] = self._gen_exercise_price_dual_y_chart(
+                df, 'nd1', 'N(d1)', 'nd2', 'N(d2)',
+                chart_num=18, call_put=cp_filter,
+                title_prefix=f'图18：行权价 vs N(d1)(Y1) + N(d2)(Y2) — 按trade_date ({cp_label})')
 
-            logger.info("生成图18: 行权价 vs N(d1) + N(d2)...")
-            chart_buffers['chart18_exercise_price_nd1_nd2'] = self.gen_chart18_exercise_price_nd1_nd2(df)
+            logger.info(f"生成图19: 交易日 vs d1 按exercise_price ({cp_label})...")
+            chart_buffers['chart19_trade_date_x_d1'] = self._gen_trade_date_x_single_y_chart(
+                df, 'd1', 'd1',
+                chart_num=19, call_put=cp_filter,
+                title_prefix=f'图19：交易日 vs d1 — 按行权价exercise_price为系列 ({cp_label})')
 
-            logger.info("生成图19: 交易日 vs d1 (按exercise_price为系列)...")
-            chart_buffers['chart19_trade_date_x_d1'] = self.gen_chart19_trade_date_x_d1(df)
+            logger.info(f"生成图20: 交易日 vs d2 按exercise_price ({cp_label})...")
+            chart_buffers['chart20_trade_date_x_d2'] = self._gen_trade_date_x_single_y_chart(
+                df, 'd2', 'd2',
+                chart_num=20, call_put=cp_filter,
+                title_prefix=f'图20：交易日 vs d2 — 按行权价exercise_price为系列 ({cp_label})')
 
-            logger.info("生成图20: 交易日 vs d2 (按exercise_price为系列)...")
-            chart_buffers['chart20_trade_date_x_d2'] = self.gen_chart20_trade_date_x_d2(df)
+            logger.info(f"生成图21: 交易日 vs N(d1) 按exercise_price ({cp_label})...")
+            chart_buffers['chart21_trade_date_x_nd1'] = self._gen_trade_date_x_single_y_chart(
+                df, 'nd1', 'N(d1)',
+                chart_num=21, call_put=cp_filter,
+                title_prefix=f'图21：交易日 vs N(d1) — 按行权价exercise_price为系列 ({cp_label})')
 
-            logger.info("生成图21: 交易日 vs N(d1) (按exercise_price为系列)...")
-            chart_buffers['chart21_trade_date_x_nd1'] = self.gen_chart21_trade_date_x_nd1(df)
-
-            logger.info("生成图22: 交易日 vs N(d2) (按exercise_price为系列)...")
-            chart_buffers['chart22_trade_date_x_nd2'] = self.gen_chart22_trade_date_x_nd2(df)
+            logger.info(f"生成图22: 交易日 vs N(d2) 按exercise_price ({cp_label})...")
+            chart_buffers['chart22_trade_date_x_nd2'] = self._gen_trade_date_x_single_y_chart(
+                df, 'nd2', 'N(d2)',
+                chart_num=22, call_put=cp_filter,
+                title_prefix=f'图22：交易日 vs N(d2) — 按行权价exercise_price为系列 ({cp_label})')
 
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
-            logger.info(f"图表生成完成: {chart_count}/22")
+            logger.info(f"图表生成完成: {chart_count} 张")
 
             # Step 4: 生成 PDF
             logger.info("=" * 60)
@@ -1123,7 +1237,8 @@ class OptDailyIndicatorReport:
             logger.info("=" * 60)
             pdf_path = self._generate_pdf_report(
                 df, chart_buffers,
-                start_date=start_date, end_date=end_date, ts_code_filter=ts_code_filter
+                start_date=start_date, end_date=end_date,
+                ts_code_filter=ts_code_filter, call_put=call_put
             )
 
             logger.info("\n" + "=" * 80)
