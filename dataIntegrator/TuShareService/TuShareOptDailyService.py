@@ -1,6 +1,11 @@
+import os
+import time
+
+import pandas as pd
+
 from dataIntegrator.TuShareService.TuShareService import TuShareService
 import sys
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 import pandas
 
 logger = CommonLib.logger
@@ -171,6 +176,33 @@ class TuShareOptDailyService(TuShareService):
         logger.info("saveDateToClickHouse completed")
 
     @classmethod
+    def deleteDateFromClickHouseByTsCodeList(self, ts_code_list, trade_date):
+        """
+        按合约代码列表 + 交易日期精确删除 ClickHouse 数据
+
+        Args:
+            ts_code_list: 合约代码列表，如 ["HO2612-C-2500.CFX", "HO2612-C-2600.CFX"]
+            trade_date: 交易日期 YYYYMMDD
+        """
+        logger.info("deleteDateFromClickHouseByTsCodeList started")
+
+        try:
+            if not ts_code_list or not trade_date:
+                logger.warning("ts_code_list 或 trade_date 为空，跳过删除")
+                return
+
+            ts_code_conditions = "', '".join(ts_code_list)
+            del_sql = "ALTER TABLE indexsysdb.df_tushare_opt_daily DELETE WHERE ts_code IN ('%s') AND trade_date = '%s'" % (ts_code_conditions, trade_date)
+            logger.info(f"执行删除 SQL: {del_sql}")
+            self.clickhouseClient.execute(del_sql)
+
+        except Exception as e:
+            self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
+            raise e
+
+        logger.info("deleteDateFromClickHouseByTsCodeList completed")
+
+    @classmethod
     def deleteDateFromClickHouse(self, ts_code="", trade_date="", start_date="", end_date=""):
         """
         从 ClickHouse 删除指定条件下的期权日线数据
@@ -212,3 +244,146 @@ class TuShareOptDailyService(TuShareService):
             raise e
 
         logger.info("deleteDateFromClickHouse completed")
+
+    @classmethod
+    def refresh_opt_daily(self, ts_code=None, trade_date=None, start_date=None, end_date=None, exchange=None):
+        """
+        刷新期权日线行情数据
+
+        Args:
+            ts_code: TS合约代码（可选）
+            trade_date: 交易日期 (YYYYMMDD)（可选）
+            start_date: 开始日期 (YYYYMMDD)（可选）
+            end_date: 结束日期 (YYYYMMDD)（可选）
+            exchange: 交易所(SSE/SZSE/CFFEX/DCE/SHFE/CZCE)（可选）
+        """
+        try:
+            csvFilePath = os.path.join(CommonParameters.outBoundPath, "df_tushare_opt_daily.csv")
+
+            tuShareService = TuShareOptDailyService()
+
+            logger.info(f"开始获取期权日线数据...")
+            logger.info(f"  - ts_code: {ts_code}")
+            logger.info(f"  - trade_date: {trade_date}")
+            logger.info(f"  - 日期范围: {start_date} ~ {end_date}")
+            logger.info(f"  - exchange: {exchange}")
+
+            # 获取数据
+            dataFrame = tuShareService.prepareDataFrame(
+                ts_code=ts_code,
+                trade_date=trade_date,
+                start_date=start_date,
+                end_date=end_date,
+                exchange=exchange
+            )
+
+            if dataFrame.empty:
+                logger.warning("期权日线数据为空，跳过处理")
+                return
+
+            logger.info(f"获取到 {len(dataFrame)} 条期权日线记录")
+
+            # 保存到 CSV
+            jsonString = tuShareService.convertDataFrame2JSON()
+            tuShareService.saveDateFrameToDisk(csvFilePath)
+            logger.info(f"数据已保存到: {csvFilePath}")
+
+            # 先删除旧数据，再插入新数据
+            logger.info("开始删除 ClickHouse 中的旧数据...")
+            tuShareService.deleteDateFromClickHouse(
+                ts_code=ts_code if ts_code else "",
+                trade_date=trade_date if trade_date else "",
+                start_date=start_date if start_date else "",
+                end_date=end_date if end_date else ""
+            )
+
+            logger.info("开始保存数据到 ClickHouse...")
+            tuShareService.saveDateToClickHouse()
+
+            logger.info(f"✅ 期权日线数据处理完成，共 {len(dataFrame)} 条记录")
+
+        except Exception as e:
+            logger.error(f"❌ 期权日线数据处理失败：{str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    @classmethod
+    def refresh_opt_daily_by_ts_code_list(self, ts_code_list, trade_date_list, exchange=""):
+        """
+        批量获取期权日线数据（推荐方式，效率高）
+
+        每个交易日只调用一次 API（按 trade_date + exchange 拉全量），
+        在内存中过滤目标合约，最后一次性存入 ClickHouse。
+
+        Args:
+            ts_code_list: 目标合约代码列表
+            trade_date_list: 交易日期列表
+            exchange: 交易所，默认空串表示全交易所
+        """
+        logger.info(f"批量查询期权日线数据: {len(ts_code_list)} 个合约 x {len(trade_date_list)} 个交易日")
+
+        all_dfs = []
+        tuShareService = TuShareOptDailyService()
+
+        for i, trade_date_str in enumerate(trade_date_list):
+            try:
+                logger.info(f"  [{i + 1}/{len(trade_date_list)}] 获取 {trade_date_str} 的全量期权日线数据...")
+                df = tuShareService.pro.opt_daily(
+                    trade_date=trade_date_str,
+                    exchange=exchange
+                )
+                if df.empty:
+                    logger.warning(f"  {trade_date_str} 获取数据为空，跳过")
+                    continue
+
+                # 过滤目标合约
+                df_filtered = df[df['ts_code'].isin(ts_code_list)]
+                logger.info(f"  全量 {len(df)} 条 -> 过滤后 {len(df_filtered)} 条")
+
+                if not df_filtered.empty:
+                    all_dfs.append(df_filtered)
+
+                time.sleep(0.3)
+            except Exception as e:
+                logger.warning(f"  {trade_date_str} 获取失败: {e}")
+                time.sleep(0.5)
+
+        if not all_dfs:
+            logger.warning("所有日期均未获取到目标合约数据，跳过")
+            return 0
+
+        # 合并所有数据
+        dataFrame = pd.concat(all_dfs, ignore_index=True)
+        logger.info(f"合并后共 {len(dataFrame)} 条记录")
+
+        # 设置到类级别（因为 saveDateToClickHouse 是 @classmethod，需类属性）
+        cls_ref = type(tuShareService)
+        cls_ref.dataFrame = dataFrame
+
+        # 确保列名一致
+        expected_columns = [
+            'ts_code', 'trade_date', 'exchange',
+            'pre_settle', 'pre_close', 'open', 'high', 'low',
+            'close', 'settle', 'vol', 'amount', 'oi'
+        ]
+        available_columns = [col for col in expected_columns if col in cls_ref.dataFrame.columns]
+        cls_ref.dataFrame = cls_ref.dataFrame[available_columns]
+
+        # 删除旧数据（按每个交易日 + 合约列表精确删除）
+        logger.info("开始删除 ClickHouse 中的旧数据...")
+        for trade_date_str in trade_date_list:
+            try:
+                tuShareService.deleteDateFromClickHouseByTsCodeList(
+                    ts_code_list=ts_code_list,
+                    trade_date=trade_date_str
+                )
+            except Exception as e:
+                logger.warning(f"删除 {trade_date_str} 旧数据失败: {e}")
+
+        # 一次性保存到 ClickHouse
+        logger.info("开始保存数据到 ClickHouse...")
+        cls_ref.saveDateToClickHouse()
+
+        logger.info(f"✅ 批量期权日线数据处理完成，共 {len(dataFrame)} 条记录")
+        return len(dataFrame)
+

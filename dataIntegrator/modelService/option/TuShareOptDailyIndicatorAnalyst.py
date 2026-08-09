@@ -457,6 +457,98 @@ class TuShareOptDailyIndicatorAnalyst:
     # ================================================================
     # Level 4 & 5: 隐含波动率 & Greeks
     # ================================================================
+    def _fetch_shibor_data(self, start_date, end_date):
+        """从 ClickHouse 拉取 SHIBOR 日数据，构建 trade_date -> {tenor_col: rate/100} 查找表
+
+        Args:
+            start_date: 起始日期 YYYYMMDD
+            end_date: 截止日期 YYYYMMDD
+
+        Returns:
+            dict: {trade_date_str: {'tenor_on': rate, 'tenor_1w': rate, ...}}
+            所有利率均除以 100（SHIBOR 原值如 1.8 → 0.018）
+        """
+        logger.info("Fetching SHIBOR daily data for risk-free rate...")
+        sql = f"""
+        SELECT trade_date, tenor_on, tenor_1w, tenor_2w, tenor_1m, tenor_3m, tenor_6m, tenor_9m, tenor_1y
+        FROM indexsysdb.df_tushare_shibor_daily
+        WHERE trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date
+        """
+        logger.info(f"SQL:\n{sql}")
+
+        try:
+            df_shibor = ClickhouseService.getDataFrameWithoutColumnsName(sql)
+        except Exception as e:
+            logger.warning(f"Failed to fetch SHIBOR data: {e}, will fallback to DEFAULT_RISK_FREE_RATE")
+            return None
+
+        if len(df_shibor) == 0:
+            logger.warning("No SHIBOR data found, will fallback to DEFAULT_RISK_FREE_RATE")
+            return None
+
+        df_shibor.columns = ['trade_date', 'tenor_on', 'tenor_1w', 'tenor_2w',
+                             'tenor_1m', 'tenor_3m', 'tenor_6m', 'tenor_9m', 'tenor_1y']
+
+        tenor_cols = ['tenor_on', 'tenor_1w', 'tenor_2w', 'tenor_1m',
+                      'tenor_3m', 'tenor_6m', 'tenor_9m', 'tenor_1y']
+        shibor_dict = {}
+        for _, row in df_shibor.iterrows():
+            td = str(row['trade_date'])
+            # 统一为 YYYYMMDD 格式（兼容 YYYY-MM-DD / Timestamp 等）
+            try:
+                td = pd.to_datetime(td).strftime('%Y%m%d')
+            except Exception:
+                pass
+            shibor_dict[td] = {}
+            for col in tenor_cols:
+                val = row[col]
+                shibor_dict[td][col] = float(val) / 100.0 if pd.notna(val) else np.nan
+
+        logger.info(f"SHIBOR data loaded: {len(shibor_dict)} trade_dates, "
+                    f"range [{min(shibor_dict.keys())} ~ {max(shibor_dict.keys())}]")
+        return shibor_dict
+
+    @staticmethod
+    def _match_shibor_rate(trade_date_str, days_to_maturity, shibor_dict):
+        """根据交易日期和剩余到期天数，从 SHIBOR 查找表中匹配最近似期限利率
+
+        Args:
+            trade_date_str: 交易日字符串 YYYYMMDD
+            days_to_maturity: 剩余到期日历天数
+            shibor_dict: SHIBOR 查找表
+
+        Returns:
+            float or np.nan: 匹配到的年化利率（小数形式），如 0.018；数据缺失返回 np.nan
+        """
+        if shibor_dict is None:
+            return np.nan
+
+        # 统一 trade_date_str 为 YYYYMMDD 格式（兼容 YYYY-MM-DD / Timestamp 等）
+        try:
+            trade_date_str = pd.to_datetime(str(trade_date_str)).strftime('%Y%m%d')
+        except Exception:
+            trade_date_str = str(trade_date_str)
+
+        if trade_date_str not in shibor_dict:
+            return np.nan
+
+        term_columns = {
+            'tenor_on': 1,
+            'tenor_1w': 7,
+            'tenor_2w': 14,
+            'tenor_1m': 30,
+            'tenor_3m': 90,
+            'tenor_6m': 180,
+            'tenor_9m': 270,
+            'tenor_1y': 365
+        }
+
+        best_term = min(term_columns.keys(), key=lambda x: abs(term_columns[x] - days_to_maturity))
+        rate = shibor_dict[trade_date_str].get(best_term, np.nan)
+        return rate if pd.notna(rate) else np.nan
+
     @staticmethod
     def _solve_iv_brentq(price, S, K, T, r, flag):
         """使用 scipy.brentq 回退求解 IV（比 py_vollib 搜索区间更宽松）
@@ -481,18 +573,26 @@ class TuShareOptDailyIndicatorAnalyst:
         except Exception:
             return np.nan
 
-    def _calc_implied_vol_and_greeks(self, df_option):
+    def _calc_implied_vol_and_greeks(self, df_option, shibor_dict=None):
         """计算隐含波动率和 Greeks
 
         使用 py_vollib（若可用）或 scipy.fsolve 计算隐含波动率，
         使用现有 OptionGreeks 计算希腊值。
 
         依赖：spot_price, exercise_price, years_to_maturity_calendar
+
+        Args:
+            df_option: 期权数据 DataFrame
+            shibor_dict: SHIBOR 查找表 {trade_date: {tenor_col: rate}}，
+                         若为 None 则 fallback 到 DEFAULT_RISK_FREE_RATE
         """
         logger.info("TuShareOptDailyIndicatorService._calc_implied_vol_and_greeks: Calculating implied volatility and Greeks")
 
-        # 预填默认无风险利率
+        # 预填默认无风险利率（逐行将被 SHIBOR 覆盖）
         df_option['risk_free_rate'] = self.DEFAULT_RISK_FREE_RATE
+
+        shibor_hit_count = 0
+        shibor_miss_count = 0
 
         # ---- BS 定价函数 ----
         def bs_call_price(S, K, T, r, sigma):
@@ -531,9 +631,21 @@ class TuShareOptDailyIndicatorAnalyst:
             s = row.get('spot_price')
             k = row.get('exercise_price')
             t = row.get('years_to_maturity_calendar')
-            r = self.DEFAULT_RISK_FREE_RATE
             market_price = row.get('close')
             cp = str(row.get('call_put', '')).upper()
+
+            # 逐行匹配 SHIBOR 无风险利率：按 trade_date + days_to_maturity 匹配最近似期限
+            trade_date_str = str(row.get('trade_date', ''))
+            days_mat = row.get('days_to_maturity', 0)
+            r = self.DEFAULT_RISK_FREE_RATE  # fallback 默认值
+            if shibor_dict is not None and pd.notna(days_mat):
+                shibor_rate = self._match_shibor_rate(trade_date_str, days_mat, shibor_dict)
+                if pd.notna(shibor_rate):
+                    r = shibor_rate
+                    shibor_hit_count += 1
+                else:
+                    shibor_miss_count += 1
+            df_option.at[idx, 'risk_free_rate'] = r
 
             # 检查必要参数是否完整
             can_calc = (
@@ -674,14 +786,22 @@ class TuShareOptDailyIndicatorAnalyst:
             logger.info(f"  Skipped {skip_param_count}/{total} rows: missing S/K/T/price")
         greeks_count = df_option['delta'].notna().sum()
         logger.info(f"Greeks calculated for {greeks_count}/{total} rows")
+        if shibor_dict is not None:
+            logger.info(f"  SHIBOR risk-free rate: hit={shibor_hit_count}/{total}, "
+                        f"miss={shibor_miss_count}/{total} (fallback to {self.DEFAULT_RISK_FREE_RATE})")
 
         return df_option
 
     # ================================================================
     # 主流程
     # ================================================================
-    def calculate_indicators(self, df_option):
-        """依次计算所有指标"""
+    def calculate_indicators(self, df_option, shibor_dict=None):
+        """依次计算所有指标
+
+        Args:
+            df_option: 期权数据 DataFrame
+            shibor_dict: SHIBOR 查找表，若为 None 则 fallback 到 DEFAULT_RISK_FREE_RATE
+        """
         logger.info("TuShareOptDailyIndicatorService.calculate_indicators: Calculating all option indicators")
 
         if len(df_option) == 0:
@@ -691,7 +811,7 @@ class TuShareOptDailyIndicatorAnalyst:
         df_option = self._calc_trading_metrics(df_option)
         df_option = self._calc_time_metrics(df_option)
         df_option = self._calc_moneyness(df_option)
-        df_option = self._calc_implied_vol_and_greeks(df_option)
+        df_option = self._calc_implied_vol_and_greeks(df_option, shibor_dict=shibor_dict)
 
         return df_option
 
@@ -776,7 +896,7 @@ class TuShareOptDailyIndicatorAnalyst:
         logger.info("=" * 80)
 
         # Step 1: 拉取数据
-        logger.info("\nStep 1/3: Fetching option daily data from ClickHouse...")
+        logger.info("\nStep 1/4: Fetching option daily data from ClickHouse...")
         df_option = self.fetch_data(
             start_date=start_date, end_date=end_date,
             call_put=call_put, exercise_type=exercise_type, ts_code_filter=ts_code_filter
@@ -786,12 +906,16 @@ class TuShareOptDailyIndicatorAnalyst:
             logger.warning("No data fetched, aborting")
             return df_option
 
-        # Step 2: 计算指标
-        logger.info("\nStep 2/3: Calculating option indicators...")
-        df_option = self.calculate_indicators(df_option)
+        # Step 2: 拉取 SHIBOR 数据作为无风险利率
+        logger.info("\nStep 2/4: Fetching SHIBOR data for risk-free rate...")
+        shibor_dict = self._fetch_shibor_data(start_date, end_date)
 
-        # Step 3: 保存
-        logger.info("\nStep 3/3: Saving to ClickHouse...")
+        # Step 3: 计算指标
+        logger.info("\nStep 3/4: Calculating option indicators...")
+        df_option = self.calculate_indicators(df_option, shibor_dict=shibor_dict)
+
+        # Step 4: 保存
+        logger.info("\nStep 4/4: Saving to ClickHouse...")
         self.save_to_clickhouse(df_option, call_put=call_put, ts_code_filter=ts_code_filter)
 
         # Summary
