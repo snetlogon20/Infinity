@@ -575,9 +575,16 @@ class OptionCallStrategyAnalyzer:
             label = f'{factor:.2f}'.replace('.', '_')
             col_pnl = f'pure_call_pnl_{label}K'
             col_pnl_cny = f'pure_call_pnl_{label}K_cny'
+            col_pnl_pct = f'pure_call_pnl_{label}K_pct'
 
             df[col_pnl] = call_pnl
             df[col_pnl_cny] = call_pnl_cny
+            # 收益率 = 纯期权盈亏 / 权利金 C (投入资金仅为权利金)
+            df[col_pnl_pct] = np.where(
+                C > 0,
+                call_pnl / C * 100,
+                np.nan
+            )
 
         logger.info("Multi-scenario P&L calculated")
 
@@ -593,6 +600,7 @@ class OptionCallStrategyAnalyzer:
         Sheet 2: "LongCall详细分析" — 完整字段明细
         Sheet 3: "多情景盈亏" — 不同 S_T 水平下的 P&L
         Sheet 4: "交易信号汇总" — 按信号分组统计
+        Sheet 5: "当日数据分析" — 最新交易日快照透视表 (字段 × 合约)
         """
         if len(df) == 0:
             logger.warning("Empty DataFrame, nothing to export")
@@ -702,6 +710,7 @@ class OptionCallStrategyAnalyzer:
             scenario_pnl_cols.append(f'scenario_pnl_{label}K_pct')
             scenario_call_cols.append(f'pure_call_pnl_{label}K')
             scenario_call_cols.append(f'pure_call_pnl_{label}K_cny')
+            scenario_call_cols.append(f'pure_call_pnl_{label}K_pct')
 
         scenario_cols = scenario_cols_base + scenario_pnl_cols + scenario_call_cols
 
@@ -744,6 +753,10 @@ class OptionCallStrategyAnalyzer:
                                           ascending=[True, False])
 
         self._write_data_rows(ws4, df_signal, signal_cols, start_row=4)
+
+        # ==================== Sheet 5: 当日数据分析 ====================
+        ws5 = wb.create_sheet("当日数据分析")
+        self._write_daily_pivot_sheet(ws5, df, config_name)
 
         # ==================== 保存 ====================
         wb.save(filepath)
@@ -802,50 +815,46 @@ class OptionCallStrategyAnalyzer:
                 cell.alignment = self.CENTER_ALIGN
 
                 # 数值格式
-                if col_name in ('pct_change', 'spot_to_strike_pct', 'breakeven_S_T_pct',
-                                'pure_call_breakeven_pct', 'theta_cost_pct_of_premium',
-                                'close_vs_theoretical_pct', 'annualized_return_pct',
-                                'strategy_max_loss_pct_of_spot'):
-                    if val is not None:
-                        cell.number_format = '0.00"%"'
-                elif col_name in ('implied_vol', 'risk_free_rate', 'dividend_yield'):
-                    if val is not None:
-                        cell.number_format = '0.00%'
-                elif col_name in ('delta', 'gamma', 'theta', 'vega', 'rho',
-                                  'd1', 'd2', 'nd1', 'nd2'):
-                    if val is not None:
-                        cell.number_format = '0.0000'
-                elif col_name in ('cost_efficiency', 'K_S_ratio'):
-                    if val is not None:
-                        cell.number_format = '0.0000'
-                elif col_name in ('close', 'settle', 'open', 'high', 'low', 'pre_close',
-                                  'exercise_price', 'spot_price',
-                                  'spot_to_strike', 'total_pnl_at_K',
-                                  'breakeven_S_T', 'pure_call_breakeven',
-                                  'delta_weighted_pnl', 'theta_cost_daily',
-                                  'theta_cost_total', 'pnl_after_theta',
-                                  'bs_theoretical_price', 'close_vs_theoretical',
-                                  'spot_gain_at_K', 'strategy_max_loss', 'avg_unit_price'):
-                    if val is not None:
-                        cell.number_format = '#,##0.00'
-                elif col_name in ('mtm_pnl_close', 'mtm_pnl_settle',
-                                  'total_pnl_at_K_cny', 'strategy_max_loss_cny',
-                                  'pure_call_max_loss_cny'):
-                    if val is not None:
-                        cell.number_format = '#,##0'
-                elif 'scenario_pnl' in col_name:
-                    if '_pct' in col_name:
-                        if val is not None:
-                            cell.number_format = '0.00"%"'
-                    elif '_cny' in col_name:
-                        if val is not None:
-                            cell.number_format = '#,##0'
-                    else:
-                        if val is not None:
-                            cell.number_format = '#,##0.00'
-                elif col_name == 'leverage_notional':
-                    if val is not None:
-                        cell.number_format = '0.0"x"'
+                fmt = self._resolve_number_format(col_name)
+                if fmt and val is not None:
+                    cell.number_format = fmt
+
+    def _resolve_number_format(self, col_name):
+        """根据列名解析 Excel 数值格式（多个 Sheet 复用）"""
+        if col_name in ('pct_change', 'spot_to_strike_pct', 'breakeven_S_T_pct',
+                        'pure_call_breakeven_pct', 'theta_cost_pct_of_premium',
+                        'close_vs_theoretical_pct', 'annualized_return_pct',
+                        'strategy_max_loss_pct_of_spot'):
+            return '0.00"%"'
+        if col_name in ('implied_vol', 'risk_free_rate', 'dividend_yield'):
+            return '0.00%'
+        if col_name in ('delta', 'gamma', 'theta', 'vega', 'rho',
+                        'd1', 'd2', 'nd1', 'nd2'):
+            return '0.0000'
+        if col_name in ('cost_efficiency', 'K_S_ratio'):
+            return '0.0000'
+        if col_name in ('close', 'settle', 'open', 'high', 'low', 'pre_close',
+                        'exercise_price', 'spot_price',
+                        'spot_to_strike', 'total_pnl_at_K',
+                        'breakeven_S_T', 'pure_call_breakeven',
+                        'delta_weighted_pnl', 'theta_cost_daily',
+                        'theta_cost_total', 'pnl_after_theta',
+                        'bs_theoretical_price', 'close_vs_theoretical',
+                        'spot_gain_at_K', 'strategy_max_loss', 'avg_unit_price'):
+            return '#,##0.00'
+        if col_name in ('mtm_pnl_close', 'mtm_pnl_settle',
+                        'total_pnl_at_K_cny', 'strategy_max_loss_cny',
+                        'pure_call_max_loss_cny'):
+            return '#,##0'
+        if 'scenario_pnl' in col_name or 'pure_call_pnl' in col_name:
+            if '_pct' in col_name:
+                return '0.00"%"'
+            if '_cny' in col_name:
+                return '#,##0'
+            return '#,##0.00'
+        if col_name == 'leverage_notional':
+            return '0.0"x"'
+        return None
 
     def _apply_conditional_formatting(self, ws, df, columns, start_row=4):
         """对 cost_efficiency、trade_signal 列应用条件格式"""
@@ -941,6 +950,217 @@ class OptionCallStrategyAnalyzer:
                             c.fill = self.GREEN_FILL
                         elif val < 0:
                             c.fill = self.RED_FILL
+
+    def _build_daily_pivot_fields(self):
+        """构建"当日数据分析"透视表的字段行列表（指标 × 合约）
+
+        字段顺序与用户指定的报表一致，重复字段已去重。
+        """
+        fields = [
+            # --- 策略核心指标 (来自 Sheet 1 策略盈亏总览) ---
+            'trade_date', 'ts_code', 'exercise_price', 'close', 'opt_multiplier',
+            'days_to_maturity', 'maturity_date', 'spot_price', 'K_S_ratio',
+            'moneyness_status', 'implied_vol', 'delta', 'gamma', 'vega', 'rho',
+            'theta', 'cost_efficiency', 'total_pnl_at_K', 'total_pnl_at_K_cny',
+            'breakeven_S_T', 'breakeven_S_T_pct', 'delta_weighted_pnl',
+            'theta_cost_total', 'pnl_after_theta',
+            'close_vs_theoretical', 'close_vs_theoretical_pct', 'price_bias',
+            'annualized_return_pct', 'trade_signal', 'signal_reason',
+            # --- 行情与 BS 定价 (来自 Sheet 2 LongCall详细分析) ---
+            'risk_free_rate', 'dividend_yield',
+            'open', 'high', 'low', 'settle', 'pre_close',
+            'vol', 'amount', 'oi', 'pct_change', 'turnover_ratio',
+            'bs_theoretical_price', 'd1', 'd2', 'nd1', 'nd2',
+            'spot_to_strike', 'spot_to_strike_pct',
+        ]
+        # --- 多情景组合盈亏 (来自 Sheet 3 多情景盈亏) ---
+        for factor in self.DEFAULT_SCENARIOS:
+            label = f'{factor:.2f}'.replace('.', '_')
+            fields.append(f'scenario_pnl_{label}K')
+            fields.append(f'scenario_pnl_{label}K_cny')
+            fields.append(f'scenario_pnl_{label}K_pct')
+        # --- 多情景纯期权盈亏 (不买现货) ---
+        for factor in self.DEFAULT_SCENARIOS:
+            label = f'{factor:.2f}'.replace('.', '_')
+            fields.append(f'pure_call_pnl_{label}K')
+            fields.append(f'pure_call_pnl_{label}K_cny')
+            fields.append(f'pure_call_pnl_{label}K_pct')
+        return fields
+
+    def _write_daily_pivot_sheet(self, ws, df, config_name):
+        """写入"当日数据分析"透视表：行 = 指标/字段，列 = 合约
+
+        取最新交易日快照，合约按行权价升序排列，
+        便于横向对比同一日期下不同行权价合约的指标。
+        """
+        if len(df) == 0:
+            logger.warning("Empty DataFrame, skip daily pivot sheet")
+            return
+
+        # 最新交易日
+        latest_date = str(df['trade_date'].max())
+        df_latest = df[df['trade_date'] == latest_date].copy()
+        df_latest = df_latest.sort_values('exercise_price', ascending=True)
+
+        n_contracts = len(df_latest)
+        if n_contracts == 0:
+            logger.warning("No rows for latest trade date, skip daily pivot sheet")
+            return
+        n_cols = n_contracts + 1  # 第 1 列 = 指标名
+
+        fields = self._build_daily_pivot_fields()
+
+        # --- 标题 ---
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
+        title_cell = ws.cell(row=1, column=1, value=f'当日数据分析 — {config_name}')
+        title_cell.font = self.TITLE_FONT
+        title_cell.alignment = Alignment(horizontal='left', vertical='center')
+        ws.row_dimensions[1].height = 30
+
+        # --- 副标题 ---
+        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_cols)
+        sub_cell = ws.cell(
+            row=2, column=1,
+            value=f'最新交易日: {latest_date} | 共 {n_contracts} 个合约 | '
+                  f'按行权价升序排列 | 行 = 指标, 列 = 合约'
+        )
+        sub_cell.font = self.SUBTITLE_FONT
+        sub_cell.alignment = Alignment(horizontal='left', vertical='center')
+        ws.row_dimensions[2].height = 22
+
+        # --- 表头 (row 3): A3 = 指标, B3.. = ts_code ---
+        header_row = 3
+        h0 = ws.cell(row=header_row, column=1, value='指标/字段')
+        h0.font = self.HEADER_FONT
+        h0.fill = self.HEADER_FILL
+        h0.alignment = self.CENTER_ALIGN
+        h0.border = self.THIN_BORDER
+        for col_idx, (_, row) in enumerate(df_latest.iterrows(), 2):
+            cell = ws.cell(row=header_row, column=col_idx, value=str(row['ts_code']))
+            cell.font = self.HEADER_FONT
+            cell.fill = self.HEADER_FILL
+            cell.alignment = self.CENTER_ALIGN
+            cell.border = self.THIN_BORDER
+        ws.row_dimensions[header_row].height = 28
+        ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
+
+        # --- 数据行 ---
+        start_row = header_row + 1
+        for row_idx, field in enumerate(fields, start_row):
+            name_cell = ws.cell(row=row_idx, column=1, value=field)
+            name_cell.font = Font(name='Microsoft YaHei', size=9, bold=True)
+            name_cell.alignment = self.LEFT_ALIGN
+            name_cell.border = self.THIN_BORDER
+
+            fmt = self._resolve_number_format(field)
+            for col_idx, (_, row) in enumerate(df_latest.iterrows(), 2):
+                val = row.get(field)
+                if isinstance(val, float) and (pd.isna(val) or np.isinf(val)):
+                    val = None
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                cell.font = self.BODY_FONT
+                cell.alignment = self.CENTER_ALIGN
+                cell.border = self.THIN_BORDER
+                if fmt and val is not None:
+                    cell.number_format = fmt
+
+            # 关键指标行着色
+            self._paint_pivot_row(ws, row_idx, field, df_latest)
+
+        # --- 列宽 ---
+        ws.column_dimensions['A'].width = 30
+        for col_idx in range(2, n_cols + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 18
+
+        # --- 备注 ---
+        note_row = start_row + len(fields) + 1
+        ws.merge_cells(start_row=note_row, start_column=1,
+                       end_row=note_row, end_column=n_cols)
+        note_cell = ws.cell(row=note_row, column=1, value=self._build_pivot_note())
+        note_cell.font = Font(name='Microsoft YaHei', size=9, color='808080')
+        note_cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+        ws.row_dimensions[note_row].height = 360
+
+    def _paint_pivot_row(self, ws, row_idx, field, df_latest):
+        """对当日透视表的特定指标行着色"""
+        if field == 'cost_efficiency':
+            for col_idx, (_, row) in enumerate(df_latest.iterrows(), 2):
+                val = row.get(field)
+                if isinstance(val, (int, float)) and not pd.isna(val):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if val >= 1.0:
+                        cell.fill = self.GREEN_FILL
+                    elif val >= 0.85:
+                        cell.fill = self.YELLOW_FILL
+                    else:
+                        cell.fill = self.RED_FILL
+        elif field == 'trade_signal':
+            for col_idx, (_, row) in enumerate(df_latest.iterrows(), 2):
+                val = str(row.get(field) or '')
+                if val in self.SIGNAL_MAP:
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if val == 'STRONG_BUY':
+                        cell.fill = self.GREEN_FILL
+                    elif val == 'BUY':
+                        cell.fill = self.YELLOW_FILL
+                    elif val == 'AVOID':
+                        cell.fill = self.RED_FILL
+        elif field.startswith('scenario_pnl_') or field.startswith('pure_call_pnl_'):
+            # 只给盈亏金额列着色 (跳过 _cny / _pct)
+            if field.endswith('_cny') or field.endswith('_pct'):
+                return
+            for col_idx, (_, row) in enumerate(df_latest.iterrows(), 2):
+                val = row.get(field)
+                if isinstance(val, (int, float)) and not pd.isna(val):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if val > 0:
+                        cell.fill = self.GREEN_FILL
+                    elif val < 0:
+                        cell.fill = self.RED_FILL
+
+    def _build_pivot_note(self):
+        """当日数据分析 Sheet 的备注说明（字段作用 + 公式）"""
+        lines = [
+            '【当日数据分析 说明】',
+            '本 Sheet 为最新交易日的快照透视表：行 = 指标/字段, 列 = 合约(按行权价升序)，便于横向对比同一日期不同行权价合约。',
+            '',
+            '【字段说明与公式】',
+            'trade_date: 交易日期（取数据中最新有记录的日期）',
+            'ts_code: 合约代码，如 HO2612-C-2500.CFX = 上证50指数(HO) 2612到期月 行权价2500 看涨(C)',
+            'exercise_price K: 行权价;   close C: 期权收盘价(权利金);   opt_multiplier: 合约乘数',
+            'days_to_maturity: 距到期自然日;   maturity_date: 到期日',
+            'spot_price S0: 标的指数收盘价;   K_S_ratio = K / S0;   moneyness_status: 实值/平值/虚值',
+            'implied_vol: 隐含波动率;   delta / gamma / vega / theta / rho: 期权希腊字母',
+            'cost_efficiency = (K - S0) / C : 收益成本比，> 1 表示到期 S_T=K 时盈利',
+            'total_pnl_at_K = K - S0 - C : 到期 S_T=K 时组合净盈亏;   total_pnl_at_K_cny = total_pnl_at_K × 乘数',
+            'breakeven_S_T: 策略盈亏平衡标的价 (cost_efficiency<=1 时 = (S0+K+C)/2; >1 时 = S0+C);   '
+            'breakeven_S_T_pct = (breakeven_S_T / S0 - 1) × 100%',
+            'delta_weighted_pnl = delta × total_pnl_at_K : 概率加权期望盈亏',
+            'theta_cost_total = |theta| × days_to_maturity : 持有到期总时间衰减成本;   '
+            'pnl_after_theta = total_pnl_at_K - theta_cost_total',
+            'close_vs_theoretical = close - bs_theoretical_price : 市价偏离 BS 理论价;   '
+            'close_vs_theoretical_pct = (close - BS价) / BS价 × 100%',
+            'price_bias: 定价偏离判定 (严重低估/低估/公允/高估/严重高估)',
+            'annualized_return_pct = total_pnl_at_K / C / 剩余年限 × 100% : 年化收益率',
+            'trade_signal: 交易信号 (STRONG_BUY/BUY/CONSIDER/NEUTRAL/AVOID);   signal_reason: 信号依据',
+            'risk_free_rate: 无风险利率;   dividend_yield: 股息率 (BS 输入参数)',
+            'open / high / low / close / settle / pre_close: 当日开盘/最高/最低/收盘/结算/前收',
+            'vol / amount / oi: 成交量 / 成交额 / 持仓量;   pct_change / turnover_ratio: 涨跌幅 / 换手率',
+            'bs_theoretical_price: BS 模型理论价;   d1 / d2 / nd1 / nd2: BS 公式中间量',
+            'spot_to_strike = K - S0;   spot_to_strike_pct = (K / S0 - 1) × 100%',
+            '',
+            '【多情景盈亏公式】(S_T = K × 系数)',
+            'scenario_pnl_1_xxK = S_T + max(0, S_T - K) - S0 - C : 组合盈亏 (Spot + Long Call)',
+            'scenario_pnl_1_xxK_cny = scenario_pnl × 乘数',
+            'scenario_pnl_1_xxK_pct = scenario_pnl / (S0 + C) × 100% : 组合收益率',
+            'pure_call_pnl_1_xxK = max(0, S_T - K) - C : 纯期权盈亏 (不买现货)',
+            'pure_call_pnl_1_xxK_cny = pure_call_pnl × 乘数',
+            'pure_call_pnl_1_xxK_pct = pure_call_pnl / C × 100% : 权利金收益率',
+            '',
+            '【着色规则】cost_efficiency: 绿(≥1) / 黄(0.85~1) / 红(<0.85);  '
+            'trade_signal: 绿=STRONG_BUY / 黄=BUY / 红=AVOID;  盈亏列: 绿=盈利 / 红=亏损',
+        ]
+        return '\n'.join(lines)
 
     def _print_summary(self, df):
         """打印分析摘要到日志"""
