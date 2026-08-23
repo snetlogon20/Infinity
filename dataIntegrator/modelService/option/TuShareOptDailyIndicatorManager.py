@@ -92,12 +92,17 @@ class TuShareOptDailyIndicatorManager:
         logger.info(f"Sample:\n{df_option_data[money_cols].head(10).to_string()}")
         logger.info(f"Status distribution:\n{df_option_data['moneyness_status'].value_counts()}")
 
-        # 2d: 隐含波动率 & Greeks（先拉取 SHIBOR 作为无风险利率）
+        # 2d: 隐含波动率 & Greeks（先拉取 SHIBOR 作为无风险利率，再拉取股息率 q）
         logger.info("\n--- Fetching SHIBOR data for risk-free rate ---")
         shibor_dict = self.service._fetch_shibor_data(start_date, end_date)
 
+        logger.info("\n--- Fetching index daily basic data for dividend yield q ---")
+        dividend_yield_dict = self.service._fetch_dividend_yield_data(start_date, end_date)
+
         logger.info("\n--- Level 4 & 5: Implied Vol & Greeks ---")
-        df_option_data = self.service._calc_implied_vol_and_greeks(df_option_data, shibor_dict=shibor_dict)
+        df_option_data = self.service._calc_implied_vol_and_greeks(
+            df_option_data, shibor_dict=shibor_dict, dividend_yield_dict=dividend_yield_dict
+        )
         greek_cols = ['implied_vol', 'bs_theoretical_price',
                        'd1', 'd2', 'nd1', 'nd2',
                        'delta', 'gamma', 'vega', 'theta', 'rho']
@@ -128,15 +133,26 @@ class TuShareOptDailyIndicatorManager:
             logger.info(f"  d1: {sample_row['d1']:.6f}, d2: {sample_row['d2']:.6f}, N(d1): {sample_row['nd1']:.6f}, N(d2): {sample_row['nd2']:.6f}")
 
         # ---- 保存前检查：打印最后几条记录的关键字段 ----
-        logger.info("\n🔍 保存前最后 5 条记录 (risk_free_rate 相关字段):")
+        logger.info("\n🔍 保存前最后 5 条记录 (risk_free_rate / dividend_yield / spot_price 相关字段):")
         debug_cols = ['trade_date', 'ts_code', 'days_to_maturity',
-                       'risk_free_rate', 'spot_price', 'rho']
+                       'risk_free_rate', 'dividend_yield', 'spot_price', 'rho']
         avail_debug_cols = [c for c in debug_cols if c in df_option_data.columns]
         logger.info(f"\n{df_option_data[avail_debug_cols].tail(5).to_string()}")
 
         rf_unique = df_option_data['risk_free_rate'].dropna().unique()
         logger.info(f"risk_free_rate 唯一值: {sorted(rf_unique)}")
         logger.info(f"risk_free_rate 分布: {df_option_data['risk_free_rate'].value_counts().head(10).to_string()}")
+
+        if 'dividend_yield' in df_option_data.columns:
+            dy_unique = df_option_data['dividend_yield'].dropna().unique()
+            logger.info(f"dividend_yield 唯一值: {sorted(dy_unique)}")
+            logger.info(f"dividend_yield 分布: {df_option_data['dividend_yield'].value_counts().head(10).to_string()}")
+            dy_nonzero = (df_option_data['dividend_yield'] > 0).sum()
+            dy_zero = (df_option_data['dividend_yield'] == 0).sum()
+            dy_nan = df_option_data['dividend_yield'].isna().sum()
+            logger.info(f"dividend_yield 统计: 非零={dy_nonzero}, 零={dy_zero}, NaN={dy_nan}, 总计={len(df_option_data)}")
+        else:
+            logger.warning("dividend_yield 列不存在！")
 
         # ---- Step 3: 保存 ----
         logger.info("\n💾 Step 3: Saving to ClickHouse...")
