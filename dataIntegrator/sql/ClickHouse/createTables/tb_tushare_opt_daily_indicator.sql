@@ -5,6 +5,9 @@
 --ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator DELETE WHERE 1=1;
 --ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator DELETE WHERE trade_date = '20251224';
 
+-- 增量 DDL: 已有表新增 dividend_yield 列
+--ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN dividend_yield Float64 COMMENT '股息率(q): BSM模型使用的年化股息率(小数), 从PE_TTM估算 q=payout_ratio/pe_ttm';
+
 -- 增量 DDL: 已有表新增 d1/d2/N(d1)/N(d2) 列
 --ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN d1 Float64 COMMENT 'BS模型d1参数: (ln(S/K)+(r+0.5*sigma^2)*T)/(sigma*sqrt(T))';
 --ALTER TABLE indexsysdb.tb_tushare_opt_daily_indicator ADD COLUMN d2 Float64 COMMENT 'BS模型d2参数: d1-sigma*sqrt(T)';
@@ -41,6 +44,7 @@ CREATE TABLE indexsysdb.tb_tushare_opt_daily_indicator (
     moneyness_log Float64 COMMENT '对数价态(连续复利): ln(K/S)/sqrt(T)',
     spot_price Float64 COMMENT '标的资产当日收盘价',
     risk_free_rate Float64 COMMENT '无风险利率(用于IV计算)',
+    dividend_yield Float64 COMMENT '股息率(q): BSM模型使用的年化股息率(小数), 从PE_TTM估算 q=payout_ratio/pe_ttm',
     implied_vol Float64 COMMENT '隐含波动率(BS模型,小数)',
     bs_theoretical_price Float64 COMMENT 'BS理论价(使用implied_vol回算)',
     delta Float64 COMMENT 'Delta: 标的价格变动1单位对期权价格影响',
