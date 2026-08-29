@@ -18,12 +18,12 @@ Long Call 策略分析 — 测试入口
 """
 
 from dataIntegrator import CommonLib
-from dataIntegrator.modelService.option.OptionCallStrategyAnalyzer import OptionCallStrategyAnalyzer
+from dataIntegrator.modelService.option.OptionTradingStrategyAnalyzer import OptionTradingStrategyAnalyzer
 
 logger = CommonLib.logger
 
 
-class OptionCallStrategyAnalyzerTest:
+class OptionTradingStrategyAnalyzerTest:
     """Long Call 策略分析测试类"""
 
     def run(self):
@@ -71,7 +71,7 @@ class OptionCallStrategyAnalyzerTest:
             # },
         ]
 
-        analyzer = OptionCallStrategyAnalyzer()
+        analyzer = OptionTradingStrategyAnalyzer()
 
         success_count = 0
         fail_count = 0
@@ -109,5 +109,5 @@ class OptionCallStrategyAnalyzerTest:
 
 
 if __name__ == "__main__":
-    test = OptionCallStrategyAnalyzerTest()
+    test = OptionTradingStrategyAnalyzerTest()
     test.run()

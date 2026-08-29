@@ -32,7 +32,7 @@ from dataIntegrator.modelService.derivatives.options.Greeks.OptionGreeks import 
 logger = CommonLib.logger
 
 
-class TuShareOptDailyIndicatorAnalyst:
+class OptionDailyIndicatorAnalyst:
     """期权日线指标计算服务"""
 
     # === 表名常量 ===
@@ -83,7 +83,7 @@ class TuShareOptDailyIndicatorAnalyst:
     ]
 
     def __init__(self):
-        logger.info("TuShareOptDailyIndicatorService.__init__: initialized")
+        logger.info("OptionDailyIndicatorAnalyst.__init__: initialized")
 
     # ================================================================
     # Level 0: 数据获取 — 子步骤
@@ -309,7 +309,7 @@ class TuShareOptDailyIndicatorAnalyst:
         Returns:
             pd.DataFrame: 合并后的原始数据
         """
-        logger.info("TuShareOptDailyIndicatorService.fetch_data: Fetching option daily data from ClickHouse")
+        logger.info("OptionDailyIndicatorAnalyst.fetch_data: Fetching option daily data from ClickHouse")
 
         # 1. 参数默认值
         if end_date is None:
@@ -360,7 +360,7 @@ class TuShareOptDailyIndicatorAnalyst:
         5. turnover_ratio: 换手率(近似) vol / oi
         6. avg_unit_price: 平均每手成交均价
         """
-        logger.info("TuShareOptDailyIndicatorService._calc_trading_metrics: Calculating trading P&L metrics")
+        logger.info("OptionDailyIndicatorAnalyst._calc_trading_metrics: Calculating trading P&L metrics")
 
         df_option['mtm_pnl_close'] = (df_option['close'] - df_option['pre_close']) * df_option['opt_multiplier']
         df_option['mtm_pnl_settle'] = (df_option['settle'] - df_option['pre_settle']) * df_option['opt_multiplier']
@@ -398,7 +398,7 @@ class TuShareOptDailyIndicatorAnalyst:
         2. years_to_maturity_calendar: 日历/365
         3. years_to_maturity_trading: 交易日/252
         """
-        logger.info("TuShareOptDailyIndicatorService._calc_time_metrics: Calculating time to maturity metrics")
+        logger.info("OptionDailyIndicatorAnalyst._calc_time_metrics: Calculating time to maturity metrics")
 
         # 解析日期
         df_option['_trade_date_dt'] = pd.to_datetime(df_option['trade_date'], format='%Y%m%d', errors='coerce')
@@ -428,7 +428,7 @@ class TuShareOptDailyIndicatorAnalyst:
            - Put:  S<K → ITM, S≈K → ATM, S>K → OTM
         2. moneyness_log: ln(K/S) / sqrt(T) 【按用户指定公式】
         """
-        logger.info("TuShareOptDailyIndicatorService._calc_moneyness: Calculating moneyness")
+        logger.info("OptionDailyIndicatorAnalyst._calc_moneyness: Calculating moneyness")
 
         def _moneyness_status(row):
             s = row.get('spot_price')
@@ -706,7 +706,7 @@ class TuShareOptDailyIndicatorAnalyst:
             dividend_yield_dict: 股息率查找表 {(trade_date, index_code): yield}，
                                  若为 None 则 fallback 到 DEFAULT_DIVIDEND_YIELD
         """
-        logger.info("TuShareOptDailyIndicatorService._calc_implied_vol_and_greeks: Calculating implied volatility and Greeks")
+        logger.info("OptionDailyIndicatorAnalyst._calc_implied_vol_and_greeks: Calculating implied volatility and Greeks")
 
         # 预填默认值（逐行将被 SHIBOR / 股息率覆盖）
         df_option['risk_free_rate'] = self.DEFAULT_RISK_FREE_RATE
@@ -943,7 +943,7 @@ class TuShareOptDailyIndicatorAnalyst:
             shibor_dict: SHIBOR 查找表，若为 None 则 fallback 到 DEFAULT_RISK_FREE_RATE
             dividend_yield_dict: 股息率查找表，若为 None 则 fallback 到 DEFAULT_DIVIDEND_YIELD
         """
-        logger.info("TuShareOptDailyIndicatorService.calculate_indicators: Calculating all option indicators")
+        logger.info("OptionDailyIndicatorAnalyst.calculate_indicators: Calculating all option indicators")
 
         if len(df_option) == 0:
             logger.warning("Empty DataFrame, skipping calculations")
@@ -968,7 +968,7 @@ class TuShareOptDailyIndicatorAnalyst:
             call_put: 行权方向 'C'/'P'，与 fetch 一致，用于缩小 DELETE 范围
             ts_code_filter: 合约代码过滤（LIKE），与 fetch 一致，用于缩小 DELETE 范围
         """
-        logger.info(f"TuShareOptDailyIndicatorService.save_to_clickhouse: Saving {len(df_option)} rows to {self.TABLE_TARGET}")
+        logger.info(f"OptionDailyIndicatorAnalyst.save_to_clickhouse: Saving {len(df_option)} rows to {self.TABLE_TARGET}")
 
         if len(df_option) == 0:
             logger.warning("Empty DataFrame, nothing to save")
@@ -1035,7 +1035,7 @@ class TuShareOptDailyIndicatorAnalyst:
             pd.DataFrame: 计算后的完整数据
         """
         logger.info("\n" + "=" * 80)
-        logger.info("TuShareOptDailyIndicatorService.run: Starting option daily indicator generation")
+        logger.info("OptionDailyIndicatorAnalyst.run: Starting option daily indicator generation")
         logger.info("=" * 80)
 
         # Step 1: 拉取数据
@@ -1095,7 +1095,7 @@ if __name__ == "__main__":
         },
     ]
 
-    service = TuShareOptDailyIndicatorAnalyst()
+    service = OptionDailyIndicatorAnalyst()
 
     for config in report_configs:
         name = config.pop("name")

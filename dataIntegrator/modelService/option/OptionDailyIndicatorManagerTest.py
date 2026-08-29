@@ -1,5 +1,5 @@
-from dataIntegrator import CommonLib
-from dataIntegrator.modelService.option.TuShareOptDailyIndicatorManager import TuShareOptDailyIndicatorManager
+from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.option.OptionDailyIndicatorManager import OptionDailyIndicatorManager
 logger = CommonLib.logger
 
 # ================================================================
@@ -7,7 +7,7 @@ logger = CommonLib.logger
 # ================================================================
 if __name__ == "__main__":
     print("=" * 80)
-    print("TuShareOptDailyIndicatorServiceTest")
+    print("OptionDailyIndicatorManagerTest")
     print("=" * 80)
 
     # 定义测试配置：每个 ts_code_filter + call_put 组合为独立产品
@@ -15,7 +15,8 @@ if __name__ == "__main__":
         {
             "name": "HO2612看涨欧式期权",
             "start_date": "20251222",
-            "end_date": "20260717",
+            #"end_date": "20260717",
+            "end_date": CommonParameters.today,
             "call_put": "C",
             "exercise_type": "欧式",
             "ts_code_filter": "HO2612%",
@@ -23,14 +24,15 @@ if __name__ == "__main__":
         {
             "name": "HO2612看跌欧式期权",
             "start_date": "20251222",
-            "end_date": "20260717",
+            #"end_date": "20260717",
+            "end_date": CommonParameters.today,
             "call_put": "P",
             "exercise_type": "欧式",
             "ts_code_filter": "HO2612%",
         },
     ]
 
-    tuShareOptDailyIndicatorManager = TuShareOptDailyIndicatorManager()
+    optionDailyIndicatorManager = OptionDailyIndicatorManager()
 
     # ---- 计算并保存指标数据 ----
     for idx, config in enumerate(report_configs, 1):
@@ -40,7 +42,7 @@ if __name__ == "__main__":
         logger.info("=" * 80)
 
         try:
-            df_option_result = tuShareOptDailyIndicatorManager.run(
+            df_option_result = optionDailyIndicatorManager.run(
                 start_date=config.get("start_date"),
                 end_date=config.get("end_date"),
                 call_put=config.get("call_put"),

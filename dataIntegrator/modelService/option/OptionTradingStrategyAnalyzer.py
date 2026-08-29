@@ -37,7 +37,7 @@ from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 logger = CommonLib.logger
 
 
-class OptionCallStrategyAnalyzer:
+class OptionTradingStrategyAnalyzer:
     """Long Call 策略分析器
 
     分析：买入标的现货 + 买入看涨期权，到期时标的价格达到行权价 K 时的盈亏情况。

@@ -2,7 +2,7 @@
 期权日线指标计算服务 - 测试入口
 
 运行方式：
-    python -m dataIntegrator.modelService.option.TuShareOptDailyIndicatorServiceTest
+    python -m dataIntegrator.modelService.option.OptionDailyIndicatorManagerTest
 
 测试策略：
     1. 先拉取少量数据进行验证
@@ -12,17 +12,22 @@
 from datetime import datetime, timedelta
 
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.TuShareOptDailyIndicatorAnalyst import TuShareOptDailyIndicatorAnalyst
+from dataIntegrator.modelService.option.OptionDailyIndicatorAnalyst import OptionDailyIndicatorAnalyst
 
 logger = CommonLib.logger
 
 
-class TuShareOptDailyIndicatorManager:
-    """期权日线指标计算服务测试类"""
+class OptionDailyIndicatorManager:
+    """期权日线指标计算服务测试类
+    TuShareOptDailyIndicatorServiceTest  计算Option  各项数据及Greeks指标
+    输入：df_tushare_opt_daily
+    逻辑：OptDailyIndicatorReport - 根据 TuShareOptDailyIndicatorServiceTest 的数据出具最基础的Option分析报表
+    输出：indexsysdb.tb_tushare_opt_daily_indicator
+    """
 
     def __init__(self):
-        self.service = TuShareOptDailyIndicatorAnalyst()
-        logger.info("TuShareOptDailyIndicatorServiceTest.__init__: Test initialized")
+        self.service = OptionDailyIndicatorAnalyst()
+        logger.info("OptionDailyIndicatorManager.__init__: initialized")
 
     def run(self, start_date=None, end_date=None,
                  call_put=None, exercise_type=None, ts_code_filter=None):
@@ -36,7 +41,7 @@ class TuShareOptDailyIndicatorManager:
             ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
         """
         logger.info("=" * 80)
-        logger.info("TuShareOptDailyIndicatorServiceTest.test_run: Starting test")
+        logger.info("OptionDailyIndicatorManager.run: Starting")
         logger.info("=" * 80)
 
         if end_date is None:
