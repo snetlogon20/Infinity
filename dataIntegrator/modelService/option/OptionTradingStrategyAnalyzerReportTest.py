@@ -88,13 +88,18 @@ class OptionTradingStrategyAnalyzerReportTest:
             logger.info("=" * 60)
 
             try:
-                filepath = reporter.run(
+                result = reporter.run(
                     trade_date=config.get("trade_date"),
                     ts_code_filter=config.get("ts_code_filter"),
                     call_put=config.get("call_put"),
                 )
-                if filepath:
-                    logger.info(f"  ✅ Excel 报表已生成: {filepath}")
+                excel_path = result.get('excel') if result else None
+                pdf_path = result.get('pdf') if result else None
+                if excel_path:
+                    logger.info(f"  ✅ Excel 报表已生成: {excel_path}")
+                if pdf_path:
+                    logger.info(f"  ✅ PDF 报告已生成: {pdf_path}")
+                if excel_path or pdf_path:
                     success_count += 1
                 else:
                     logger.warning(f"  ⚠️ 数据为空，报表跳过")

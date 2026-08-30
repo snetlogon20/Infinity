@@ -67,6 +67,16 @@ from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.drawing.image import Image as XLImage
 
+# reportlab PDF 报告生成
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                Image as RLImage, Table, TableStyle, PageBreak)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.modelService.option.OptionTradingStrategyAnalyzer import \
@@ -262,9 +272,33 @@ class OptionTradingStrategyAnalyzerReport:
         # 合并多情景盈亏字段的动态说明到字段说明字典
         self.FIELD_DESCRIPTIONS = {**self.FIELD_DESCRIPTIONS,
                                    **self._build_scenario_descriptions()}
+        # 注册 reportlab 中文字体（PDF 报告用）
+        self.reportlab_font = self._register_reportlab_font()
         logger.info(f"OptionTradingStrategyAnalyzerReport initialized. "
                     f"Report dir: {self.REPORT_DIR}, "
                     f"{len(self.FIELD_DESCRIPTIONS)} field descriptions loaded")
+
+    def _register_reportlab_font(self):
+        """注册 reportlab 中文字体（参照 OptionDailyIndicatorReport）"""
+        reportlab_font = 'Helvetica'
+        font_mapping = [
+            (r'C:\Windows\Fonts\msyh.ttc', 'MicrosoftYaHei'),
+            (r'C:\Windows\Fonts\simhei.ttf', 'SimHei'),
+            (r'C:\Windows\Fonts\simfang.ttf', 'FangSong'),
+            (r'C:\Windows\Fonts\simsun.ttc', 'SimSun'),
+        ]
+        for font_path, font_name in font_mapping:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    reportlab_font = font_name
+                    logger.info(f"✅ ReportLab 加载中文字体: {font_name}")
+                    break
+                except Exception as e:
+                    logger.warning(f"⚠️ 字体加载失败 {font_path}: {e}")
+        if reportlab_font == 'Helvetica':
+            logger.warning("⚠️ ReportLab 未找到中文字体，PDF中文可能无法正常显示")
+        return reportlab_font
 
     @classmethod
     def _build_scenario_descriptions(cls):
@@ -462,7 +496,8 @@ class OptionTradingStrategyAnalyzerReport:
         plt.close(fig)
         return buf
 
-    def export_to_excel(self, df, trade_date, ts_code_filter=None, call_put=None):
+    def export_to_excel(self, df, trade_date, ts_code_filter=None, call_put=None,
+                        gen_ts=None):
         """导出「指标 × 合约」透视矩阵 Excel，并附加图表 Sheet
 
         行 = 字段，列 = 合约（按行权价升序），最右增加说明列。
@@ -474,6 +509,8 @@ class OptionTradingStrategyAnalyzerReport:
             trade_date: 交易日期 YYYYMMDD（用于文件名与标题）
             ts_code_filter: LIKE 过滤，用于文件名前缀
             call_put: 'C'/'P'，用于文件名
+            gen_ts: 生成时间戳 yyyymmdd_hhmmss（由 run 统一生成，
+                    保证 Excel 与 PDF 文件名一致；None 时内部生成）
 
         Returns:
             str or None: Excel 文件路径
@@ -496,7 +533,8 @@ class OptionTradingStrategyAnalyzerReport:
         # 加入生成时间戳，避免同一交易日重复生成时文件被 Excel 占用导致覆盖失败
         prefix = self._extract_prefix(ts_code_filter)
         call_put_str = call_put or 'ALL'
-        gen_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if gen_ts is None:
+            gen_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = (f'OptionTradingStrategyAnalyzerReport_{trade_date}_{gen_ts}'
                     f'_{prefix}_{call_put_str}.xlsx')
         filepath = os.path.join(self.REPORT_DIR, filename)
@@ -749,18 +787,412 @@ class OptionTradingStrategyAnalyzerReport:
         return '\n'.join(lines)
 
     # ================================================================
+    # PDF 报告生成（专业交易员视角）
+    # ================================================================
+    def _build_pdf_styles(self):
+        """构建 PDF 样式（中文字体）"""
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'ReportTitle', parent=styles['Heading1'],
+            fontSize=22, leading=30, alignment=1,
+            fontName=self.reportlab_font, spaceAfter=24,
+        )
+        heading1 = ParagraphStyle(
+            'Heading1Style', parent=styles['Heading1'],
+            fontSize=16, leading=22, fontName=self.reportlab_font,
+            spaceAfter=12, spaceBefore=12,
+        )
+        heading2 = ParagraphStyle(
+            'Heading2Style', parent=styles['Heading2'],
+            fontSize=13, leading=18, fontName=self.reportlab_font,
+            spaceAfter=8, spaceBefore=8,
+        )
+        normal = ParagraphStyle(
+            'NormalStyle', parent=styles['Normal'],
+            fontSize=10, leading=15, fontName=self.reportlab_font,
+        )
+        small = ParagraphStyle(
+            'SmallStyle', parent=styles['Normal'],
+            fontSize=8.5, leading=12, fontName=self.reportlab_font,
+            textColor=colors.HexColor('#555555'),
+        )
+        cover_info = ParagraphStyle(
+            'CoverInfo', parent=styles['Normal'],
+            fontSize=13, leading=20, alignment=1,
+            fontName=self.reportlab_font, textColor=colors.HexColor('#333333'),
+        )
+        return {
+            'title': title_style,
+            'h1': heading1,
+            'h2': heading2,
+            'normal': normal,
+            'small': small,
+            'cover_info': cover_info,
+        }
+
+    @staticmethod
+    def _safe_num(row, field, default=None):
+        """安全取数值，NaN/inf/None 返回 default（兼容 Series 与 namedtuple）"""
+        if hasattr(row, 'get'):
+            val = row.get(field)
+        else:
+            val = getattr(row, field, None)
+        if val is None:
+            return default
+        try:
+            fv = float(val)
+        except (TypeError, ValueError):
+            return default
+        if pd.isna(fv) or np.isinf(fv):
+            return default
+        return fv
+
+    @staticmethod
+    def _fmt(val, nd=2, suffix=''):
+        if val is None:
+            return 'N/A'
+        try:
+            return f"{val:.{nd}f}{suffix}"
+        except (TypeError, ValueError):
+            return 'N/A'
+
+    @staticmethod
+    def _fmt_pct(val, nd=2):
+        if val is None:
+            return 'N/A'
+        try:
+            return f"{val*100:.{nd}f}%"
+        except (TypeError, ValueError):
+            return 'N/A'
+
+    def _build_pdf_key_table(self, df_sorted):
+        """构建关键指标矩阵表（行=合约，列=核心指标）"""
+        headers = ['行权价', '权利金Close', '价态', '成本效率', '盈亏平衡涨幅',
+                   '年化收益率', 'IV', 'Delta', 'Theta占比', '杠杆', '定价', '信号']
+        rows = [headers]
+        for _, row in df_sorted.iterrows():
+            K = self._safe_num(row, 'exercise_price')
+            close = self._safe_num(row, 'close')
+            rows.append([
+                self._fmt(K, 0),
+                self._fmt(close, 2),
+                str(getattr(row, 'moneyness_status', None) or 'N/A'),
+                self._fmt(self._safe_num(row, 'cost_efficiency'), 2),
+                self._fmt_pct(self._safe_num(row, 'breakeven_S_T_pct')),
+                self._fmt_pct(self._safe_num(row, 'annualized_return_pct')),
+                self._fmt_pct(self._safe_num(row, 'implied_vol')),
+                self._fmt(self._safe_num(row, 'delta'), 2),
+                self._fmt_pct(self._safe_num(row, 'theta_cost_pct_of_premium')),
+                self._fmt(self._safe_num(row, 'leverage_notional'), 1),
+                str(getattr(row, 'price_bias', None) or 'N/A'),
+                str(getattr(row, 'trade_signal', None) or 'N/A'),
+            ])
+        return rows
+
+    def _build_pdf_analysis(self, df_sorted, trade_date, call_put_str):
+        """从专业交易员视角生成分析段落
+
+        Returns:
+            list[tuple(heading, [Paragraph文本])]
+        """
+        S0 = self._safe_num(df_sorted.iloc[0], 'spot_price')
+        n = len(df_sorted)
+        ks = [self._safe_num(r, 'exercise_price') for r in df_sorted.itertuples()]
+        valid_ks = [k for k in ks if k is not None]
+        k_min, k_max = (min(valid_ks), max(valid_ks)) if valid_ks else (None, None)
+        dte = self._safe_num(df_sorted.iloc[0], 'days_to_maturity')
+
+        def stat(field, fn, default=None):
+            vals = [self._safe_num(r, field) for r in df_sorted.itertuples()]
+            vals = [v for v in vals if v is not None]
+            if not vals:
+                return default
+            try:
+                return fn(vals)
+            except (TypeError, ValueError):
+                return default
+
+        avg_close = stat('close', lambda vs: sum(vs)/len(vs))
+        med_close = stat('close', lambda vs: sorted(vs)[len(vs)//2])
+        min_close = stat('close', min)
+        max_close = stat('close', max)
+        avg_lev = stat('leverage_notional', lambda vs: sum(vs)/len(vs))
+        max_lev = stat('leverage_notional', max)
+        avg_iv = stat('implied_vol', lambda vs: sum(vs)/len(vs))
+        min_iv = stat('implied_vol', min)
+        max_iv = stat('implied_vol', max)
+
+        # 价态分布
+        moneyness_counts = {}
+        for r in df_sorted.itertuples():
+            m = str(r.moneyness_status) if getattr(r, 'moneyness_status', None) else '未知'
+            moneyness_counts[m] = moneyness_counts.get(m, 0) + 1
+        mn_desc = '、'.join(f'{k} {v}个' for k, v in moneyness_counts.items()) or 'N/A'
+
+        # 成本效率 Top3
+        ce_rows = [(self._safe_num(r, 'cost_efficiency'), int(self._safe_num(r, 'exercise_price') or 0))
+                   for r in df_sorted.itertuples() if self._safe_num(r, 'cost_efficiency') is not None]
+        ce_top = sorted(ce_rows, key=lambda x: x[0], reverse=True)[:3]
+        ce_top_txt = '；'.join(f'K={k} (效率 {self._fmt(v, 2)})' for v, k in ce_top) or 'N/A'
+        ce_ge1 = sum(1 for v, _ in ce_rows if v >= 1.0)
+
+        # 盈亏平衡最低（纯Call口径）
+        be_rows = [(self._safe_num(r, 'pure_call_breakeven_pct'), int(self._safe_num(r, 'exercise_price') or 0))
+                   for r in df_sorted.itertuples() if self._safe_num(r, 'pure_call_breakeven_pct') is not None]
+        be_top = sorted(be_rows, key=lambda x: x[0])[:3]
+        be_top_txt = '；'.join(f'K={k} (需涨 {self._fmt_pct(v)})' for v, k in be_top) or 'N/A'
+
+        # 年化收益率 Top3
+        ar_rows = [(self._safe_num(r, 'annualized_return_pct'), int(self._safe_num(r, 'exercise_price') or 0))
+                   for r in df_sorted.itertuples() if self._safe_num(r, 'annualized_return_pct') is not None]
+        ar_top = sorted(ar_rows, key=lambda x: x[0], reverse=True)[:3]
+        ar_top_txt = '；'.join(f'K={k} (年化 {self._fmt_pct(v)})' for v, k in ar_top) or 'N/A'
+
+        # 概率加权期望 Top3
+        dw_rows = [(self._safe_num(r, 'delta_weighted_pnl'), int(self._safe_num(r, 'exercise_price') or 0))
+                   for r in df_sorted.itertuples() if self._safe_num(r, 'delta_weighted_pnl') is not None]
+        dw_top = sorted(dw_rows, key=lambda x: x[0], reverse=True)[:3]
+        dw_top_txt = '；'.join(f'K={k} (期望 {self._fmt(v, 2)})' for v, k in dw_top) or 'N/A'
+
+        # 定价偏差分布
+        bias_counts = {}
+        for r in df_sorted.itertuples():
+            b = str(r.price_bias) if getattr(r, 'price_bias', None) else 'N/A'
+            bias_counts[b] = bias_counts.get(b, 0) + 1
+        bias_desc = '、'.join(f'{k} {v}个' for k, v in bias_counts.items()) or 'N/A'
+
+        # 最被低估 / 最高估
+        bias_rows = [(self._safe_num(r, 'close_vs_theoretical_pct'), int(self._safe_num(r, 'exercise_price') or 0))
+                     for r in df_sorted.itertuples() if self._safe_num(r, 'close_vs_theoretical_pct') is not None]
+        if bias_rows:
+            most_und = min(bias_rows, key=lambda x: x[0])
+            most_ov = max(bias_rows, key=lambda x: x[0])
+            most_und_txt = f'K={most_und[1]} (偏离 {self._fmt_pct(most_und[0])})'
+            most_ov_txt = f'K={most_ov[1]} (偏离 {self._fmt_pct(most_ov[0])})'
+        else:
+            most_und_txt = most_ov_txt = 'N/A'
+
+        # 时间衰减最高 / 杠杆最高
+        theta_rows = [(self._safe_num(r, 'theta_cost_pct_of_premium'), int(self._safe_num(r, 'exercise_price') or 0))
+                      for r in df_sorted.itertuples() if self._safe_num(r, 'theta_cost_pct_of_premium') is not None]
+        theta_top = max(theta_rows, key=lambda x: x[0]) if theta_rows else (None, None)
+        theta_top_txt = f'K={theta_top[1]} (衰减占权利金 {self._fmt_pct(theta_top[0])})' if theta_top[0] is not None else 'N/A'
+
+        # 信号统计
+        sig_counts = {}
+        for r in df_sorted.itertuples():
+            s = str(r.trade_signal) if getattr(r, 'trade_signal', None) else 'N/A'
+            sig_counts[s] = sig_counts.get(s, 0) + 1
+        buy_list = [int(self._safe_num(r, 'exercise_price') or 0) for r in df_sorted.itertuples()
+                    if str(getattr(r, 'trade_signal', '')) in ('STRONG_BUY', 'BUY')]
+        avoid_list = [int(self._safe_num(r, 'exercise_price') or 0) for r in df_sorted.itertuples()
+                      if str(getattr(r, 'trade_signal', '')) == 'AVOID']
+
+        cp_cn = {'C': '看涨(Call)', 'P': '看跌(Put)'}.get(call_put_str, call_put_str)
+        secs = []
+
+        # ===== 一、市场概览 =====
+        secs.append(('一、市场概览与交易环境', [
+            f"标的现货 {self._fmt(S0, 2)}，共 {n} 个{cp_cn}合约，行权价区间 {self._fmt(k_min, 0)} ~ {self._fmt(k_max, 0)}，"
+            f"距到期约 {self._fmt(dte, 0)} 天。",
+            f"权利金成本：均值 {self._fmt(avg_close, 2)}、中位数 {self._fmt(med_close, 2)}、"
+            f"区间 {self._fmt(min_close, 2)} ~ {self._fmt(max_close, 2)}。价态分布：{mn_desc}。",
+            f"杠杆水平：平均 {self._fmt(avg_lev, 1)} 倍，最高 {self._fmt(max_lev, 1)} 倍。"
+            f"杠杆越高，权利金对标的涨跌的敏感度越大，盈亏波动也越大。",
+        ]))
+
+        # ===== 二、成本效率 =====
+        secs.append(('二、成本效率（性价比）分析', [
+            f"成本效率 = (K-S0)/C，衡量到期 S_T=K 时现货涨幅能否覆盖权利金。"
+            f"当前 {ce_ge1}/{n} 个合约效率 ≥ 1，即标的只需涨到行权价即可回本。",
+            f"最优效率合约：{ce_top_txt}。",
+            "交易提示：成本效率是中性情景（标的不涨不跌到行权价）下的回本能力，"
+            "效率越高代表权利金越'便宜'、容错空间越大；但需结合到期时间与波动率综合判断。",
+        ]))
+
+        # ===== 三、盈亏平衡与收益 =====
+        secs.append(('三、盈亏平衡与收益潜力', [
+            f"纯Call口径盈亏平衡（需涨幅度）最低：{be_top_txt}。"
+            f"这些合约只需要标的较小幅上涨即可覆盖权利金成本，适合温和看多的交易者。",
+            f"到期 S_T=K 情景下年化收益率最高：{ar_top_txt}。年化收益率已按剩余期限折算，"
+            f"可用于不同期限合约间的横向比较，但高年化往往伴随高波动与高衰减。",
+            f"按 Delta 概率加权的期望盈亏（delta_weighted_pnl）最高：{dw_top_txt}。"
+            "该指标融合了'涨到行权价的概率'，比单纯看盈亏更有决策参考意义。",
+        ]))
+
+        # ===== 四、波动率与定价 =====
+        secs.append(('四、波动率环境与定价偏差', [
+            f"隐含波动率 IV：均值 {self._fmt_pct(avg_iv)}，区间 {self._fmt_pct(min_iv)} ~ {self._fmt_pct(max_iv)}。"
+            f"{'IV 处于偏低水平，权利金整体偏“便宜”，买方有利。' if (avg_iv is not None and avg_iv < 0.2) else 'IV 处于中性偏高水平，需注意买方支付的时间与波动溢价。'}",
+            f"定价偏差分布：{bias_desc}。最被低估合约：{most_und_txt}；最高估合约：{most_ov_txt}。",
+            "交易提示：市价低于 BS 理论价的合约（负偏离）存在相对价值机会，可优先关注；"
+            "明显高估的合约应避免追买，或考虑作为卖方获取溢价。",
+        ]))
+
+        # ===== 五、风险与时间衰减 =====
+        secs.append(('五、风险控制与时间衰减', [
+            f"持有到期时间衰减最重的合约：{theta_top_txt}。时间价值随到期临近加速损耗，"
+            "权利金越贵、剩余期限越短，Theta 侵蚀越明显。",
+            f"最大风险敞口：全部权利金（最多亏损 close × 乘数）。"
+            f"组合最大亏损占现货比例平均约 {self._fmt_pct(stat('strategy_max_loss_pct_of_spot', lambda vs: sum(vs)/len(vs)))}。",
+            "风控建议：控制单一合约权利金占总资金比例；虚值合约虽杠杆高但行权概率低（N(d2) 小），"
+            "深度虚值仓位应严设止损；临近到期避免重仓高 Theta 合约。",
+        ]))
+
+        # ===== 六、交易信号 =====
+        sig_desc = '、'.join(f'{k} {v}个' for k, v in sig_counts.items()) or 'N/A'
+        buy_txt = '、'.join(f'K={k}' for k in buy_list) or '无'
+        avoid_txt = '、'.join(f'K={k}' for k in avoid_list) or '无'
+        secs.append(('六、交易信号汇总与操作建议', [
+            f"信号分布：{sig_desc}。",
+            f"买入/强烈买入（STRONG_BUY/BUY）：{buy_txt}。"
+            f"回避（AVOID）：{avoid_txt}。",
+            "综合建议：优先在成本效率高、定价低估、Delta 概率加权期望为正的合约中选择；"
+            "若看好标的上涨，可结合纯Call盈亏平衡涨幅小的合约控制回本门槛；"
+            "若认为波动率将上升，可增配 Vega 敞口（平值附近合约）。",
+        ]))
+        return secs
+
+    def export_to_pdf(self, df, trade_date, ts_code_filter=None, call_put=None,
+                      gen_ts=None):
+        """生成专业交易员视角 PDF 报告（含图表与文字分析）
+
+        PDF 文件名与 Excel 完全一致，仅后缀不同。
+
+        Returns:
+            str or None: PDF 文件路径
+        """
+        if len(df) == 0:
+            logger.warning("Empty DataFrame, nothing to export to PDF")
+            return None
+
+        df_sorted = df.sort_values('exercise_price', ascending=True).reset_index(drop=True)
+        prefix = self._extract_prefix(ts_code_filter)
+        call_put_str = call_put or 'ALL'
+        if gen_ts is None:
+            gen_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = (f'OptionTradingStrategyAnalyzerReport_{trade_date}_{gen_ts}'
+                    f'_{prefix}_{call_put_str}.pdf')
+        pdf_path = os.path.join(self.REPORT_DIR, filename)
+
+        styles = self._build_pdf_styles()
+        report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        spot_price = self._safe_num(df_sorted.iloc[0], 'spot_price')
+
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=landscape(A4),
+            rightMargin=50, leftMargin=50,
+            topMargin=40, bottomMargin=30,
+        )
+        page_width = landscape(A4)[0] - 100
+        story = []
+
+        # ===== 封面 =====
+        cp_cn = {'C': '看涨 (Call)', 'P': '看跌 (Put)', 'ALL': '全部'}
+        story.append(Spacer(1, 1.5 * inch))
+        story.append(Paragraph(f'期权策略指标分析报告', styles['title']))
+        story.append(Spacer(1, 0.25 * inch))
+        story.append(Paragraph(
+            'Option Trading Strategy Analysis Report',
+            ParagraphStyle('Sub', parent=styles['normal'], alignment=1,
+                           fontSize=11, textColor=colors.HexColor('#888888'),
+                           fontName=self.reportlab_font),
+        ))
+        story.append(Spacer(1, 0.35 * inch))
+        story.append(Paragraph(
+            f"交易日：{trade_date} | {cp_cn.get(call_put_str, call_put_str)}<br/>"
+            f"标的现货：{self._fmt(spot_price, 2)} | 合约数量：{len(df_sorted)} 个<br/>"
+            f"生成时间：{report_date}<br/>"
+            f"<br/>策略：买入现货 + 买入 Call（Spot + Long Call）<br/>"
+            f"INFINITY 量化系统 · 期权研究专用",
+            styles['cover_info'],
+        ))
+        story.append(PageBreak())
+
+        # ===== 一、市场概览（文字） =====
+        story.append(Paragraph('第一部分 · 交易员分析', styles['h1']))
+        for heading, paras in self._build_pdf_analysis(df_sorted, trade_date, call_put_str):
+            story.append(Paragraph(heading, styles['h2']))
+            story.append(Spacer(1, 0.05 * inch))
+            for p in paras:
+                story.append(Paragraph(p, styles['normal']))
+                story.append(Spacer(1, 0.06 * inch))
+        story.append(PageBreak())
+
+        # ===== 二、关键指标矩阵表 =====
+        story.append(Paragraph('第二部分 · 关键指标矩阵', styles['h1']))
+        story.append(Spacer(1, 0.1 * inch))
+        rows = self._build_pdf_key_table(df_sorted)
+        col_widths = [page_width / len(rows[0])] * len(rows[0])
+        table = Table(rows, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), self.reportlab_font),
+            ('FONTSIZE', (0, 0), (-1, -1), 6.5),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#AAAAAA')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EEF3FA')]),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 0.1 * inch))
+        story.append(Paragraph(
+            '注：成本效率=(K-S0)/C；盈亏平衡涨幅为纯Call口径 (K+C)/S0-1；'
+            '年化收益率按剩余期限折算；Theta占比=持有到期总衰减/权利金；杠杆=现货/权利金。',
+            styles['small'],
+        ))
+        story.append(PageBreak())
+
+        # ===== 三、图表 =====
+        story.append(Paragraph('第三部分 · 到期盈亏与收益率曲线', styles['h1']))
+        story.append(Spacer(1, 0.1 * inch))
+        chart_buf = self._plot_payoff_curves(df_sorted, trade_date, call_put_str)
+        if chart_buf:
+            img = RLImage(chart_buf, width=page_width, height=page_width * 0.45)
+            story.append(img)
+        story.append(Spacer(1, 0.15 * inch))
+        story.append(Paragraph(
+            '左图为各合约（纯 Call 买方）到期盈亏曲线：横轴为到期标的价格 S_T，纵轴为盈亏金额（元/张，×乘数），'
+            '红色虚线为当前现货价。右图为到期收益率曲线（盈亏/权利金），直观展示各合约在不同到期价位的收益率与杠杆效应：'
+            '平值附近合约收益曲线平滑、容错高；虚值合约盈亏比高但需标的大幅波动才获利。',
+            styles['normal'],
+        ))
+        story.append(PageBreak())
+
+        # ===== 四、风险提示 =====
+        story.append(Paragraph('第四部分 · 风险提示', styles['h1']))
+        story.append(Spacer(1, 0.15 * inch))
+        story.append(Paragraph(
+            "本报告基于历史期权数据进行量化分析，仅供参考，不构成投资建议。<br/>"
+            "期权为高杠杆衍生品，最大亏损为全部权利金，但部分策略（含现货）可能放大亏损敞口。<br/>"
+            "隐含波动率为 BS 模型反向求解，深度实值期权市价低于理论下界时 IV 可能缺失。<br/>"
+            "Greeks 为 BS 框架下的理论值，实际交易受流动性、波动率微笑、跳空等因素影响可能存在偏差。<br/>"
+            "建议投资者结合自身风险承受能力，进行独立判断和决策。",
+            styles['normal'],
+        ))
+
+        doc.build(story)
+        logger.info(f"PDF report saved: {pdf_path}")
+        return pdf_path
+
+    # ================================================================
     # 主流程
     # ================================================================
-    def run(self, trade_date, ts_code_filter=None, call_put=None):
-        """主流程：拉取 → 构建字段 → 导出 Excel
+    def run(self, trade_date, ts_code_filter=None, call_put=None, gen_pdf=True):
+        """主流程：拉取 → 构建字段 → 导出 Excel + PDF
 
         Args:
             trade_date: 交易日期 YYYYMMDD
             ts_code_filter: LIKE 过滤，如 'HO2612%'
             call_put: 'C'/'P'/None
+            gen_pdf: 是否同时生成 PDF 报告（默认 True）
 
         Returns:
-            str or None: Excel 文件路径
+            dict: {'excel': 路径 or None, 'pdf': 路径 or None}
         """
         logger.info("\n" + "=" * 80)
         logger.info(f"OptionTradingStrategyAnalyzerReport.run: "
@@ -773,21 +1205,35 @@ class OptionTradingStrategyAnalyzerReport:
                              call_put=call_put)
         if len(df) == 0:
             logger.warning("No data found, skipping report generation")
-            return None
+            return {'excel': None, 'pdf': None}
 
         # Step 2: 构建字段顺序（去重，交易员视角）
         fields = self.build_field_order(df)
         logger.info(f"Field order: {fields}")
 
-        # Step 3: 导出 Excel
-        filepath = self.export_to_excel(df, trade_date=trade_date,
-                                        ts_code_filter=ts_code_filter,
-                                        call_put=call_put)
+        # Step 3: 统一生成时间戳，保证 Excel/PDF 文件名一致
+        gen_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Step 4: 导出 Excel
+        excel_path = self.export_to_excel(df, trade_date=trade_date,
+                                          ts_code_filter=ts_code_filter,
+                                          call_put=call_put, gen_ts=gen_ts)
+
+        # Step 5: 导出 PDF（与 Excel 同名，仅后缀不同）
+        pdf_path = None
+        if gen_pdf:
+            try:
+                pdf_path = self.export_to_pdf(df, trade_date=trade_date,
+                                              ts_code_filter=ts_code_filter,
+                                              call_put=call_put, gen_ts=gen_ts)
+            except Exception as e:
+                logger.error(f"PDF generation failed: {e}", exc_info=True)
 
         logger.info(f"\n{'=' * 80}")
-        logger.info(f"Report generated: {filepath}")
+        logger.info(f"Excel report: {excel_path}")
+        logger.info(f"PDF report:   {pdf_path}")
         logger.info(f"{'=' * 80}")
-        return filepath
+        return {'excel': excel_path, 'pdf': pdf_path}
 
 
 # ================================================================
@@ -817,14 +1263,16 @@ if __name__ == "__main__":
         logger.info(f"# Running config: {name}")
         logger.info(f"{'#' * 80}")
         try:
-            filepath = reporter.run(
+            result = reporter.run(
                 trade_date=config.get("trade_date"),
                 ts_code_filter=config.get("ts_code_filter"),
                 call_put=config.get("call_put"),
             )
-            if filepath:
-                logger.info(f"✅ [{name}] Excel: {filepath}")
-            else:
+            if result.get('excel'):
+                logger.info(f"✅ [{name}] Excel: {result['excel']}")
+            if result.get('pdf'):
+                logger.info(f"✅ [{name}] PDF: {result['pdf']}")
+            if not result.get('excel') and not result.get('pdf'):
                 logger.warning(f"⚠️ [{name}] No data, report skipped")
         except Exception as e:
             logger.error(f"❌ [{name}] Failed: {e}", exc_info=True)
