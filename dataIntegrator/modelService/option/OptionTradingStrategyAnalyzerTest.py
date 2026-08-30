@@ -17,7 +17,7 @@ Long Call 策略分析 — 测试入口
     - ts_code_filter:  LIKE 模式过滤合约代码，如 'HO2612%', 'IO2606%'
 """
 
-from dataIntegrator import CommonLib
+from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.modelService.option.OptionTradingStrategyAnalyzer import OptionTradingStrategyAnalyzer
 
 logger = CommonLib.logger
@@ -39,7 +39,8 @@ class OptionTradingStrategyAnalyzerTest:
             {
                 "name": "HO2612看涨欧式期权",
                 "start_date": "20251222",
-                "end_date": "20260717",
+                #"end_date": "20260717",
+                "end_date": CommonParameters.today,
                 "call_put": "C",
                 "exercise_type": "欧式",
                 "ts_code_filter": "HO2612%",
@@ -47,7 +48,8 @@ class OptionTradingStrategyAnalyzerTest:
             {
                 "name": "HO2612看跌欧式期权",
                 "start_date": "20251222",
-                "end_date": "20260717",
+                #"end_date": "20260717",
+                "end_date": CommonParameters.today,
                 "call_put": "P",
                 "exercise_type": "欧式",
                 "ts_code_filter": "HO2612%",
