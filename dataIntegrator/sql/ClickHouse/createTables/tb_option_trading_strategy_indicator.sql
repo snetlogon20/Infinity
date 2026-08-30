@@ -1,0 +1,131 @@
+-- 期权交易策略指标分析表（Spot + Long Call 策略）
+-- 数据来源：OptionTradingStrategyAnalyzer.py 计算后的策略指标（与 Excel 报表各 Sheet 内容一致）
+-- 字段 = Excel 报表写入内容并集：策略盈亏总览 + LongCall详细分析 + 多情景盈亏 + 交易信号
+-- 支持多日增量写入：按 trade_date + call_put + ts_code 过滤条件增量删除后插入
+--drop table indexsysdb.tb_option_trading_strategy_indicator
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_indicator DELETE WHERE 1=1;
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_indicator DELETE WHERE trade_date = '20260809';
+
+CREATE TABLE indexsysdb.tb_option_trading_strategy_indicator (
+    -- ===== 标识字段 =====
+    trade_date String COMMENT '交易日期(YYYYMMDD)',
+    ts_code String COMMENT 'TS合约代码',
+    opt_name String COMMENT '合约名称',
+    opt_exchange String COMMENT '合约交易所',
+    call_put String COMMENT '期权类型(C=认购/P=认沽)',
+    -- ===== 合约要素 =====
+    exercise_price Float64 COMMENT '行权价 K',
+    opt_multiplier Float64 COMMENT '合约单位(乘数)',
+    s_month String COMMENT '结算月(YYYYMM)',
+    maturity_date String COMMENT '到期日(YYYYMMDD)',
+    days_to_maturity Int32 COMMENT '距离到期日历天数',
+    years_to_maturity_calendar Float64 COMMENT '距离到期年数(日历日/365)',
+    -- ===== 标的市场 =====
+    spot_price Float64 COMMENT '标的资产当日收盘价 S₀',
+    moneyness_status String COMMENT '价态标志: ITM(实值)/ATM(平值)/OTM(虚值)',
+    moneyness_log Float64 COMMENT '对数价态(连续复利): ln(K/S)/sqrt(T)',
+    risk_free_rate Float64 COMMENT '无风险利率 r',
+    dividend_yield Float64 COMMENT '股息率(q): q=payout_ratio/pe_ttm',
+    -- ===== 期权行情 =====
+    open Float64 COMMENT '开盘价',
+    high Float64 COMMENT '最高价',
+    low Float64 COMMENT '最低价',
+    close Float64 COMMENT '收盘价(期权权利金 C)',
+    settle Float64 COMMENT '结算价',
+    pre_close Float64 COMMENT '前收盘价',
+    vol Float64 COMMENT '成交量(手)',
+    amount Float64 COMMENT '成交金额(万元)',
+    oi Float64 COMMENT '持仓量(手)',
+    pct_change Float64 COMMENT '日内涨跌幅(%): (close/pre_close-1)*100',
+    turnover_ratio Float64 COMMENT '换手率(近似): vol/oi',
+    -- ===== BS 定价 =====
+    implied_vol Float64 COMMENT '隐含波动率(BS模型,小数)',
+    bs_theoretical_price Float64 COMMENT 'BS理论价(使用implied_vol回算)',
+    close_vs_theoretical Float64 COMMENT '收盘价-理论价偏差: close-bs_theoretical_price',
+    close_vs_theoretical_pct Float64 COMMENT '收盘价相对理论价偏差(%): (close/bs_theoretical_price-1)*100',
+    price_bias String COMMENT '定价偏差标签: 偏贵/偏便宜/合理',
+    -- ===== Greeks =====
+    delta Float64 COMMENT 'Delta: 标的价格变动1单位对期权价格影响',
+    gamma Float64 COMMENT 'Gamma: Delta对S的敏感度',
+    theta Float64 COMMENT 'Theta: 每日时间衰减(元/天)',
+    vega Float64 COMMENT 'Vega: IV变动1%的权利金变化',
+    rho Float64 COMMENT 'Rho: 利率敏感度',
+    d1 Float64 COMMENT 'BS模型d1参数: (ln(S/K)+(r+0.5*sigma^2)*T)/(sigma*sqrt(T))',
+    d2 Float64 COMMENT 'BS模型d2参数: d1-sigma*sqrt(T)',
+    nd1 Float64 COMMENT 'BS模型N(d1): 标准正态累积分布值',
+    nd2 Float64 COMMENT 'BS模型N(d2): 标准正态累积分布值',
+    -- ===== 策略盈亏指标 =====
+    spot_to_strike Float64 COMMENT '现货到行权价距离: K-S₀',
+    spot_to_strike_pct Float64 COMMENT '现货到行权价距离(%): (K-S₀)/S₀*100',
+    K_S_ratio Float64 COMMENT '行权价比值: K/S₀',
+    cost_efficiency Float64 COMMENT '收益成本比: (K-S₀)/C, >1 才赚钱',
+    total_pnl_at_K Float64 COMMENT '到期策略总盈亏(假设S_T=K): K-S₀-C',
+    total_pnl_at_K_cny Float64 COMMENT '策略总盈亏(元): (K-S₀-C)*opt_multiplier',
+    breakeven_S_T Float64 COMMENT '盈亏平衡到期价: S₀+C',
+    breakeven_S_T_pct Float64 COMMENT '盈亏平衡涨幅(%): C/S₀*100',
+    breakeven_type String COMMENT '盈亏平衡类型: 高于现价/低于现价',
+    pure_call_breakeven Float64 COMMENT '纯Call盈亏平衡到期价: K+C',
+    pure_call_breakeven_pct Float64 COMMENT '纯Call盈亏平衡涨幅(%): (K+C-S₀)/S₀*100',
+    delta_weighted_pnl Float64 COMMENT '概率加权盈亏(期望收益): delta*(K-S₀)-C',
+    theta_cost_daily Float64 COMMENT '每日时间衰减成本(元): -theta',
+    theta_cost_total Float64 COMMENT '到期前总时间衰减成本(元): -theta*days_to_maturity',
+    theta_cost_pct_of_premium Float64 COMMENT '时间衰减占权利金比例(%): theta_cost_total/C*100',
+    pnl_after_theta Float64 COMMENT '扣除时间衰减后的净盈亏: total_pnl_at_K-theta_cost_total',
+    annualized_return_pct Float64 COMMENT '年化收益率(%): (total_pnl_at_K/(S₀+C))/years*100',
+    strategy_max_loss Float64 COMMENT '策略最大亏损: -C(仅权利金)',
+    strategy_max_loss_cny Float64 COMMENT '策略最大亏损(元): -C*opt_multiplier',
+    strategy_max_loss_pct_of_spot Float64 COMMENT '最大亏损占标的价值比例(%): C/S₀*100',
+    leverage_notional Float64 COMMENT '杠杆名义敞口(元): K*opt_multiplier',
+    -- ===== 交易信号 =====
+    trade_signal String COMMENT '交易信号: STRONG_BUY/BUY/CONSIDER/NEUTRAL/AVOID',
+    signal_reason String COMMENT '信号理由说明',
+    -- ===== 多情景盈亏 (S_T = K × factor) =====
+    scenario_pnl_1_00K Float64 COMMENT '情景S_T=1.00K策略总盈亏(点)',
+    scenario_pnl_1_00K_cny Float64 COMMENT '情景S_T=1.00K策略总盈亏(元)',
+    scenario_pnl_1_00K_pct Float64 COMMENT '情景S_T=1.00K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_03K Float64 COMMENT '情景S_T=1.03K策略总盈亏(点)',
+    scenario_pnl_1_03K_cny Float64 COMMENT '情景S_T=1.03K策略总盈亏(元)',
+    scenario_pnl_1_03K_pct Float64 COMMENT '情景S_T=1.03K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_05K Float64 COMMENT '情景S_T=1.05K策略总盈亏(点)',
+    scenario_pnl_1_05K_cny Float64 COMMENT '情景S_T=1.05K策略总盈亏(元)',
+    scenario_pnl_1_05K_pct Float64 COMMENT '情景S_T=1.05K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_08K Float64 COMMENT '情景S_T=1.08K策略总盈亏(点)',
+    scenario_pnl_1_08K_cny Float64 COMMENT '情景S_T=1.08K策略总盈亏(元)',
+    scenario_pnl_1_08K_pct Float64 COMMENT '情景S_T=1.08K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_10K Float64 COMMENT '情景S_T=1.10K策略总盈亏(点)',
+    scenario_pnl_1_10K_cny Float64 COMMENT '情景S_T=1.10K策略总盈亏(元)',
+    scenario_pnl_1_10K_pct Float64 COMMENT '情景S_T=1.10K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_15K Float64 COMMENT '情景S_T=1.15K策略总盈亏(点)',
+    scenario_pnl_1_15K_cny Float64 COMMENT '情景S_T=1.15K策略总盈亏(元)',
+    scenario_pnl_1_15K_pct Float64 COMMENT '情景S_T=1.15K收益率(%): pnl/(S₀+C)*100',
+    scenario_pnl_1_20K Float64 COMMENT '情景S_T=1.20K策略总盈亏(点)',
+    scenario_pnl_1_20K_cny Float64 COMMENT '情景S_T=1.20K策略总盈亏(元)',
+    scenario_pnl_1_20K_pct Float64 COMMENT '情景S_T=1.20K收益率(%): pnl/(S₀+C)*100',
+    -- ===== 纯期权多情景盈亏 (仅 Long Call) =====
+    pure_call_pnl_1_00K Float64 COMMENT '纯Call情景S_T=1.00K盈亏(点): max(S_T-K,0)-C',
+    pure_call_pnl_1_00K_cny Float64 COMMENT '纯Call情景S_T=1.00K盈亏(元)',
+    pure_call_pnl_1_00K_pct Float64 COMMENT '纯Call情景S_T=1.00K收益率(%): pnl/C*100',
+    pure_call_pnl_1_03K Float64 COMMENT '纯Call情景S_T=1.03K盈亏(点)',
+    pure_call_pnl_1_03K_cny Float64 COMMENT '纯Call情景S_T=1.03K盈亏(元)',
+    pure_call_pnl_1_03K_pct Float64 COMMENT '纯Call情景S_T=1.03K收益率(%): pnl/C*100',
+    pure_call_pnl_1_05K Float64 COMMENT '纯Call情景S_T=1.05K盈亏(点)',
+    pure_call_pnl_1_05K_cny Float64 COMMENT '纯Call情景S_T=1.05K盈亏(元)',
+    pure_call_pnl_1_05K_pct Float64 COMMENT '纯Call情景S_T=1.05K收益率(%): pnl/C*100',
+    pure_call_pnl_1_08K Float64 COMMENT '纯Call情景S_T=1.08K盈亏(点)',
+    pure_call_pnl_1_08K_cny Float64 COMMENT '纯Call情景S_T=1.08K盈亏(元)',
+    pure_call_pnl_1_08K_pct Float64 COMMENT '纯Call情景S_T=1.08K收益率(%): pnl/C*100',
+    pure_call_pnl_1_10K Float64 COMMENT '纯Call情景S_T=1.10K盈亏(点)',
+    pure_call_pnl_1_10K_cny Float64 COMMENT '纯Call情景S_T=1.10K盈亏(元)',
+    pure_call_pnl_1_10K_pct Float64 COMMENT '纯Call情景S_T=1.10K收益率(%): pnl/C*100',
+    pure_call_pnl_1_15K Float64 COMMENT '纯Call情景S_T=1.15K盈亏(点)',
+    pure_call_pnl_1_15K_cny Float64 COMMENT '纯Call情景S_T=1.15K盈亏(元)',
+    pure_call_pnl_1_15K_pct Float64 COMMENT '纯Call情景S_T=1.15K收益率(%): pnl/C*100',
+    pure_call_pnl_1_20K Float64 COMMENT '纯Call情景S_T=1.20K盈亏(点)',
+    pure_call_pnl_1_20K_cny Float64 COMMENT '纯Call情景S_T=1.20K盈亏(元)',
+    pure_call_pnl_1_20K_pct Float64 COMMENT '纯Call情景S_T=1.20K收益率(%): pnl/C*100',
+    -- ===== 记录时间 =====
+    insert_time DateTime DEFAULT now() COMMENT '写入时间'
+)
+ENGINE = MergeTree()
+ORDER BY (trade_date, ts_code)
+SETTINGS index_granularity = 8192;

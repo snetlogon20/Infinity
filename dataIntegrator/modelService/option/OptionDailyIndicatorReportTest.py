@@ -1,16 +1,16 @@
-from dataIntegrator import CommonLib
-from dataIntegrator.modelService.option.OptDailyIndicatorReport import \
-    OptDailyIndicatorReport
+from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.modelService.option.OptionDailyIndicatorReport import \
+    OptionDailyIndicatorReport
 
 logger = CommonLib.logger
 
 
-class OptDailyIndicatorReportTest:
+class OptionDailyIndicatorReportTest:
 
     def run(self):
         """按产品配置生成期权日线指标 PDF 报告"""
         logger.info("=" * 80)
-        logger.info("Starting OptDailyIndicatorReportTest")
+        logger.info("Starting OptionDailyIndicatorReportTest")
         logger.info("=" * 80)
 
         # 定义报告配置：每个 ts_code_filter + call_put 组合为独立产品
@@ -18,20 +18,22 @@ class OptDailyIndicatorReportTest:
             {
                 "name": "HO2612看涨欧式期权",
                 "start_date": "20251222",
-                "end_date": "20260717",
+                #"end_date": "20260717",
+                "end_date": CommonParameters.today,
                 "call_put": "C",
                 "ts_code_filter": "HO2612%",
             },
             {
                 "name": "HO2612看跌欧式期权",
                 "start_date": "20251222",
-                "end_date": "20260717",
+                #"end_date": "20260717",
+                "end_date": CommonParameters.today,
                 "call_put": "P",
                 "ts_code_filter": "HO2612%",
             },
         ]
 
-        opt_report = OptDailyIndicatorReport()
+        dailyIndicatorReport = OptionDailyIndicatorReport()
 
         for idx, config in enumerate(report_configs, 1):
             logger.info("\n" + "=" * 60)
@@ -39,7 +41,7 @@ class OptDailyIndicatorReportTest:
             logger.info("=" * 60)
 
             try:
-                pdf_path = opt_report.run(
+                pdf_path = dailyIndicatorReport.run(
                     start_date=config.get("start_date"),
                     end_date=config.get("end_date"),
                     ts_code_filter=config.get("ts_code_filter"),
@@ -63,5 +65,5 @@ class OptDailyIndicatorReportTest:
 
 
 if __name__ == "__main__":
-    test = OptDailyIndicatorReportTest()
+    test = OptionDailyIndicatorReportTest()
     test.run()

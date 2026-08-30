@@ -37,7 +37,7 @@ from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 logger = CommonLib.logger
 
 
-class OptionCallStrategyAnalyzer:
+class OptionTradingStrategyAnalyzer:
     """Long Call 策略分析器
 
     分析：买入标的现货 + 买入看涨期权，到期时标的价格达到行权价 K 时的盈亏情况。
@@ -46,6 +46,57 @@ class OptionCallStrategyAnalyzer:
     # === 表名常量 ===
     TABLE_INDICATOR = 'tb_tushare_opt_daily_indicator'
     TABLE_DAILY_VIEW = 'vw_tushare_opt_daily'
+    TABLE_TARGET = 'tb_option_trading_strategy_indicator'
+
+    # === 目标表字段顺序（与建表 SQL 一致，= Excel 报表各 Sheet 写入列并集） ===
+    TARGET_COLUMNS = [
+        # 标识字段
+        'trade_date', 'ts_code', 'opt_name', 'opt_exchange', 'call_put',
+        # 合约要素
+        'exercise_price', 'opt_multiplier', 's_month', 'maturity_date',
+        'days_to_maturity', 'years_to_maturity_calendar',
+        # 标的市场
+        'spot_price', 'moneyness_status', 'moneyness_log',
+        'risk_free_rate', 'dividend_yield',
+        # 期权行情
+        'open', 'high', 'low', 'close', 'settle', 'pre_close',
+        'vol', 'amount', 'oi', 'pct_change', 'turnover_ratio',
+        # BS 定价
+        'implied_vol', 'bs_theoretical_price',
+        'close_vs_theoretical', 'close_vs_theoretical_pct', 'price_bias',
+        # Greeks
+        'delta', 'gamma', 'theta', 'vega', 'rho',
+        'd1', 'd2', 'nd1', 'nd2',
+        # 策略盈亏
+        'spot_to_strike', 'spot_to_strike_pct', 'K_S_ratio',
+        'cost_efficiency',
+        'total_pnl_at_K', 'total_pnl_at_K_cny',
+        'breakeven_S_T', 'breakeven_S_T_pct', 'breakeven_type',
+        'pure_call_breakeven', 'pure_call_breakeven_pct',
+        'delta_weighted_pnl',
+        'theta_cost_daily', 'theta_cost_total', 'theta_cost_pct_of_premium',
+        'pnl_after_theta', 'annualized_return_pct',
+        'strategy_max_loss', 'strategy_max_loss_cny', 'strategy_max_loss_pct_of_spot',
+        'leverage_notional',
+        # 交易信号
+        'trade_signal', 'signal_reason',
+        # 多情景盈亏（S_T = K × factor，与 calc_scenario_pnl 生成的列名一致）
+        'scenario_pnl_1_00K', 'scenario_pnl_1_00K_cny', 'scenario_pnl_1_00K_pct',
+        'scenario_pnl_1_03K', 'scenario_pnl_1_03K_cny', 'scenario_pnl_1_03K_pct',
+        'scenario_pnl_1_05K', 'scenario_pnl_1_05K_cny', 'scenario_pnl_1_05K_pct',
+        'scenario_pnl_1_08K', 'scenario_pnl_1_08K_cny', 'scenario_pnl_1_08K_pct',
+        'scenario_pnl_1_10K', 'scenario_pnl_1_10K_cny', 'scenario_pnl_1_10K_pct',
+        'scenario_pnl_1_15K', 'scenario_pnl_1_15K_cny', 'scenario_pnl_1_15K_pct',
+        'scenario_pnl_1_20K', 'scenario_pnl_1_20K_cny', 'scenario_pnl_1_20K_pct',
+        # 纯期权多情景盈亏（仅 Long Call）
+        'pure_call_pnl_1_00K', 'pure_call_pnl_1_00K_cny', 'pure_call_pnl_1_00K_pct',
+        'pure_call_pnl_1_03K', 'pure_call_pnl_1_03K_cny', 'pure_call_pnl_1_03K_pct',
+        'pure_call_pnl_1_05K', 'pure_call_pnl_1_05K_cny', 'pure_call_pnl_1_05K_pct',
+        'pure_call_pnl_1_08K', 'pure_call_pnl_1_08K_cny', 'pure_call_pnl_1_08K_pct',
+        'pure_call_pnl_1_10K', 'pure_call_pnl_1_10K_cny', 'pure_call_pnl_1_10K_pct',
+        'pure_call_pnl_1_15K', 'pure_call_pnl_1_15K_cny', 'pure_call_pnl_1_15K_pct',
+        'pure_call_pnl_1_20K', 'pure_call_pnl_1_20K_cny', 'pure_call_pnl_1_20K_pct',
+    ]
 
     # === 合约前缀 → 标的指数代码映射 ===
     CONTRACT_INDEX_MAP = {
@@ -55,7 +106,8 @@ class OptionCallStrategyAnalyzer:
     }
 
     # === 输出路径 ===
-    REPORT_DIR = os.path.join(CommonParameters.reportPath, 'OptDailyIndicator')
+    #REPORT_DIR = os.path.join(CommonParameters.reportPath, 'OptDailyIndicator')
+    REPORT_DIR = CommonParameters.optionAnalysisReportPath
 
     # === 多情景系数 ===
     DEFAULT_SCENARIOS = [1.00, 1.03, 1.05, 1.08, 1.10, 1.15, 1.20]
@@ -609,7 +661,7 @@ class OptionCallStrategyAnalyzer:
         # 文件名
         safe_name = config_name.replace(' ', '_').replace('/', '_')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'{safe_name}_{start_date}_{end_date}_{timestamp}.xlsx'
+        filename = f'OptionTradingStrategyAnalysis_{safe_name}_{start_date}_{end_date}_{timestamp}.xlsx'
         filepath = os.path.join(self.REPORT_DIR, filename)
 
         logger.info(f"Exporting Excel to: {filepath}")
@@ -1203,10 +1255,74 @@ class OptionCallStrategyAnalyzer:
         logger.info("=" * 60)
 
     # ================================================================
+    # Step 5: 写入 ClickHouse
+    # ================================================================
+    def save_to_clickhouse(self, df, call_put=None, ts_code_filter=None):
+        """写入 ClickHouse 目标表（与 Excel 报表内容一致）
+
+        策略：按 trade_date + 可选过滤条件 增量删除后插入（保留历史数据）。
+              传入 call_put / ts_code_filter 确保只删除同批数据，不会误删其他配置的历史记录。
+
+        Args:
+            df: 待写入的 DataFrame（run 计算后的完整数据）
+            call_put: 行权方向 'C'/'P'，与 fetch 一致，用于缩小 DELETE 范围
+            ts_code_filter: 合约代码过滤（LIKE），与 fetch 一致，用于缩小 DELETE 范围
+        """
+        logger.info(f"OptionTradingStrategyAnalyzer.save_to_clickhouse: "
+                    f"Saving {len(df)} rows to {self.TABLE_TARGET}")
+
+        if len(df) == 0:
+            logger.warning("Empty DataFrame, nothing to save")
+            return
+
+        # 确保只保存目标表字段（Excel 各 Sheet 写入列的并集）
+        available_cols = [c for c in self.TARGET_COLUMNS if c in df.columns]
+        df_output = df[available_cols].copy()
+
+        # 类型处理：字符串列填空串，整数列取整，数值列保留 NaN 存 NULL
+        str_cols = {'trade_date', 'ts_code', 'opt_name', 'opt_exchange',
+                    'call_put', 's_month', 'maturity_date',
+                    'moneyness_status', 'price_bias', 'breakeven_type',
+                    'trade_signal', 'signal_reason'}
+        for col in df_output.columns:
+            if col in str_cols:
+                df_output[col] = df_output[col].fillna('').astype(str)
+            elif col in ('days_to_maturity',):
+                df_output[col] = pd.to_numeric(df_output[col], errors='coerce').fillna(0).astype(int)
+            else:
+                df_output[col] = pd.to_numeric(df_output[col], errors='coerce')
+                df_output[col] = df_output[col].where(pd.notna(df_output[col]), None)
+
+        # 增量删除：仅删除本次涉及的 trade_date + 过滤条件匹配的数据
+        trade_dates = df_output['trade_date'].unique().tolist()
+        dates_str = "','".join(trade_dates)
+        delete_conditions = [f"trade_date IN ('{dates_str}')"]
+
+        if call_put:
+            delete_conditions.append(f"call_put = '{call_put}'")
+        if ts_code_filter:
+            delete_conditions.append(f"ts_code LIKE '{ts_code_filter}'")
+
+        del_sql = f"ALTER TABLE indexsysdb.{self.TABLE_TARGET} DELETE WHERE {' AND '.join(delete_conditions)}"
+        logger.info(f"SQL:\n{del_sql}")
+        ClickhouseService.execute_sql(del_sql)
+        logger.info(f"Deleted data for trade_dates: {trade_dates}"
+                    f"{', call_put=' + call_put if call_put else ''}"
+                    f"{', ts_code like ' + ts_code_filter if ts_code_filter else ''}")
+
+        # 写入
+        ClickhouseService.save_dataframe_to_clickhouse(
+            dataframe=df_output,
+            table_name=self.TABLE_TARGET,
+            database='indexsysdb'
+        )
+        logger.info(f"Saved {len(df_output)} rows to {self.TABLE_TARGET}")
+
+    # ================================================================
     # 主流程
     # ================================================================
     def run(self, config):
-        """主流程：拉取 → 清洗 → 计算 → 导出
+        """主流程：拉取 → 清洗 → 计算 → 导出 → 落库(ClickHouse)
 
         Args:
             config: dict with keys:
@@ -1218,7 +1334,7 @@ class OptionCallStrategyAnalyzer:
                 - ts_code_filter: str LIKE pattern
 
         Returns:
-            str or None: Excel 文件路径
+            str or None: Excel 文件路径（同时已写入 tb_option_trading_strategy_indicator）
         """
         name = config.get('name', 'Unknown')
         start_date = config.get('start_date')
@@ -1254,16 +1370,22 @@ class OptionCallStrategyAnalyzer:
             return None
 
         # Step 3: 计算策略盈亏
-        logger.info("\nStep 3/4: Calculating strategy P&L...")
+        logger.info("\nStep 3/5: Calculating strategy P&L...")
         df = self.calc_strategy_pnl(df)
         df = self.calc_scenario_pnl(df)
 
         # Step 4: 导出 Excel
-        logger.info("\nStep 4/4: Exporting Excel report...")
+        logger.info("\nStep 4/5: Exporting Excel report...")
         filepath = self.export_to_excel(df, name, start_date, end_date)
+
+        # Step 5: 写入 ClickHouse（内容与 Excel 报表一致）
+        logger.info("\nStep 5/5: Saving to ClickHouse...")
+        self.save_to_clickhouse(df, call_put=call_put, ts_code_filter=ts_code_filter)
 
         logger.info(f"\n{'='*80}")
         logger.info(f"[{name}] Report generated: {filepath}")
+        logger.info(f"  Excel: {filepath}")
+        logger.info(f"  ClickHouse: {self.TABLE_TARGET} ({len(df)} rows)")
         logger.info(f"{'='*80}")
 
         return filepath
@@ -1292,7 +1414,7 @@ if __name__ == "__main__":
         },
     ]
 
-    analyzer = OptionCallStrategyAnalyzer()
+    analyzer = OptionTradingStrategyAnalyzer()
 
     for config in report_configs:
         name = config.get("name")

@@ -33,12 +33,12 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 
-class OptDailyIndicatorReport:
+class OptionDailyIndicatorReport:
     """期权日线指标 报告生成器"""
 
-    REPORT_DIR = os.path.join(CommonParameters.reportPath, 'OptDailyIndicator')
+    REPORT_DIR = CommonParameters.optionAnalysisReportPath
     # 用户指定输出目录
-    OUTPUT_DIR = r"E:\tmp"
+    #OUTPUT_DIR = r"E:\tmp"
 
     CHART_COLORS = [
         '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12',
@@ -49,7 +49,7 @@ class OptDailyIndicatorReport:
 
     def __init__(self):
         os.makedirs(self.REPORT_DIR, exist_ok=True)
-        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
+        # os.makedirs(self.OUTPUT_DIR, exist_ok=True)
         self.reportlab_font = self._register_chinese_font()
 
     def _register_chinese_font(self):
@@ -933,8 +933,8 @@ class OptDailyIndicatorReport:
         cp_tag = f"_{call_put}" if call_put else ""
         date_tag = f"{start_date}-{end_date}" if start_date and end_date else "custom"
         pdf_path = os.path.join(
-            self.OUTPUT_DIR,
-            f"OptDailyIndicator_{filter_tag}{cp_tag}_{date_tag}_{now_ts}.pdf"
+            self.REPORT_DIR,
+            f"OptionDailyIndicator_{filter_tag}{cp_tag}_{date_tag}_{now_ts}.pdf"
         )
 
         doc = SimpleDocTemplate(
@@ -1094,7 +1094,7 @@ class OptDailyIndicatorReport:
         """
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName="run",
-                          event="Starting OptDailyIndicatorReport generation")
+                          event="Starting OptionDailyIndicatorReport generation")
 
         try:
             # Step 1: 拉取数据
@@ -1258,5 +1258,5 @@ class OptDailyIndicatorReport:
 
 
 if __name__ == "__main__":
-    report = OptDailyIndicatorReport()
+    report = OptionDailyIndicatorReport()
     report.run(start_date="20260701", end_date="20260717", ts_code_filter="HO2612%")

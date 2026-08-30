@@ -22,6 +22,7 @@ class CommonParameters():
     reportPath = os.path.join(outBoundPath, 'report')
     portfolioAnalysisReportPath = os.path.join(reportPath, 'PortfolioAnalysis')
     SystemBatchStatusReportPath = os.path.join(reportPath, 'SystemBatchStatus')
+    optionAnalysisReportPath = os.path.join(reportPath, 'OptionAnalysis')
 
 
     tuShareToken = MyTokens.tuShareToken
