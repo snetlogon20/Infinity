@@ -26,6 +26,7 @@ OptionTradingStrategyAnalyzerReport — 期权策略分析报告生成器（读 
 
 import os
 import io
+import math
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -117,6 +118,10 @@ class OptionTradingStrategyAnalyzerReport:
         'pure_call_breakeven', 'pure_call_breakeven_pct',
         # --- 概率加权 / 年化收益 ---
         'delta_weighted_pnl', 'annualized_return_pct',
+        # --- 胜率与赔率（量化盈亏概率） ---
+        'win_rate_pct', 'loss_rate_pct', 'prob_itm_pct',
+        'avg_win_cny', 'avg_loss_cny', 'payoff_ratio', 'risk_reward_ratio',
+        'profit_factor', 'expected_value_cny', 'edge_pct',
         # --- 最大风险 / 杠杆 ---
         'strategy_max_loss', 'strategy_max_loss_cny', 'strategy_max_loss_pct_of_spot',
         'leverage_notional',
@@ -149,6 +154,10 @@ class OptionTradingStrategyAnalyzerReport:
         'breakeven_S_T', 'breakeven_S_T_pct',
         'pure_call_breakeven', 'pure_call_breakeven_pct',
         'delta_weighted_pnl', 'annualized_return_pct',
+        # --- 胜率与赔率 ---
+        'win_rate_pct', 'loss_rate_pct', 'prob_itm_pct',
+        'avg_win_cny', 'avg_loss_cny', 'payoff_ratio', 'risk_reward_ratio',
+        'profit_factor', 'expected_value_cny', 'edge_pct',
         # --- 最大风险 / 杠杆 ---
         'strategy_max_loss', 'strategy_max_loss_cny', 'strategy_max_loss_pct_of_spot',
         'leverage_notional',
@@ -183,6 +192,17 @@ class OptionTradingStrategyAnalyzerReport:
         'pure_call_breakeven_pct': '纯Call盈亏平衡涨幅 = (K+C)/S0-1 的百分比',
         'delta_weighted_pnl': '概率加权期望盈亏 = delta × total_pnl_at_K（按Delta概率折算的期望收益）',
         'annualized_return_pct': '年化收益率 = total_pnl_at_K / C / years × 100%（权利金投入的年化回报）',
+        # ---------- 胜率与赔率（量化盈亏概率） ----------
+        'win_rate_pct': '到期盈利概率 = N(d2_BE)×100%：以盈亏平衡价 BE 代入 BS d2 公式所得 P(S_T>BE)',
+        'loss_rate_pct': '到期亏损概率 = 100% - win_rate_pct',
+        'prob_itm_pct': '到期行权概率 = P(S_T>K)×100%（Call）/ P(S_T<K)×100%（Put）：到期实值概率',
+        'avg_win_cny': '平均盈利金额 = 盈利情景 scenario_pnl_1_xxK_cny 的均值（元/张）',
+        'avg_loss_cny': '平均亏损金额 = |亏损情景均值|（元/张）',
+        'payoff_ratio': '盈亏比（情景法）= avg_win_cny / avg_loss_cny：平均盈利/平均亏损',
+        'risk_reward_ratio': '盈亏比（基准法）= total_pnl_at_K_cny / |strategy_max_loss_cny|：基准情景收益/最大风险',
+        'profit_factor': '利润因子 = 盈利情景总和 / |亏损情景总和|：>1 表示系统期望为正',
+        'expected_value_cny': '期望盈亏 = win_rate×avg_win_cny - loss_rate×avg_loss_cny（元/张）',
+        'edge_pct': '边际收益率 = expected_value_cny / (close×乘数)×100%：期望收益占权利金投入比例',
         'strategy_max_loss': '策略最大亏损 = -C（最多亏掉全部权利金，现货不跌则无额外损失）',
         'strategy_max_loss_cny': '最大亏损金额 = -C × opt_multiplier（元）',
         'strategy_max_loss_pct_of_spot': '最大亏损占现货比例 = -C/S0×100%',
@@ -362,6 +382,147 @@ class OptionTradingStrategyAnalyzerReport:
         return df
 
     # ================================================================
+    # Step 1.5: 现算胜率与赔率量化指标（报表层，幂等）
+    # ================================================================
+    @staticmethod
+    def _norm_cdf(x):
+        """标准正态累积分布函数（用 math.erf 实现，避免 scipy 依赖）"""
+        if x is None:
+            return None
+        try:
+            return 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    def _enrich_win_loss_metrics(self, df):
+        """在 DataFrame 上现算胜率与赔率量化指标（幂等，列已存在则跳过）
+
+        胜率:
+            - win_rate_pct : BE 口径 = N(d2_BE)×100%, d2_BE 以盈亏平衡价 BE 代入 BS d2 公式
+            - prob_itm_pct : K 口径 = N(d2)×100%, 到期行权(实值)概率 P(S_T>K)
+            - loss_rate_pct = 100% - win_rate_pct
+        赔率:
+            - payoff_ratio(情景法) = avg_win_cny / avg_loss_cny (7 档到期情景均值)
+            - risk_reward_ratio(基准法) = total_pnl_at_K_cny / |strategy_max_loss_cny|
+        期望:
+            - expected_value_cny = win_rate×avg_win_cny - loss_rate×avg_loss_cny
+            - edge_pct = expected_value_cny / (close×乘数)×100%
+
+        Returns:
+            pd.DataFrame: 追加新列后的副本（无数据或已含新列时原样返回）
+        """
+        if len(df) == 0 or 'win_rate_pct' in df.columns:
+            return df
+        df = df.copy()
+
+        def _safe(row, field, default=None):
+            if field not in row.index:
+                return default
+            val = row[field]
+            if val is None:
+                return default
+            try:
+                fv = float(val)
+            except (TypeError, ValueError):
+                return default
+            return fv if not (pd.isna(fv) or np.isinf(fv)) else default
+
+        # 7 档到期情景 S_T = K×系数, 字段形如 scenario_pnl_1_03K_cny
+        labels = [f'{f:.2f}'.replace('.', '_') for f in self.SCENARIO_FACTORS]
+
+        # IV 缺失兜底: 同一序列(已按行权价升序)线性插值, 仅用于概率计算, 不落库
+        iv_map = {}
+        if 'implied_vol' in df.columns:
+            iv_series = pd.to_numeric(df['implied_vol'], errors='coerce')
+            if iv_series.notna().sum() >= 2 and iv_series.isna().any():
+                iv_series = iv_series.interpolate(method='linear', limit_direction='both')
+            iv_map = dict(zip(df.index, iv_series))
+
+        for idx, row in df.iterrows():
+            S0 = _safe(row, 'spot_price')
+            K = _safe(row, 'exercise_price')
+            C = _safe(row, 'close')
+            sigma = iv_map.get(idx, _safe(row, 'implied_vol'))
+            T = _safe(row, 'years_to_maturity_calendar')
+            r = _safe(row, 'risk_free_rate', 0.0) or 0.0
+            q = _safe(row, 'dividend_yield', 0.0) or 0.0
+            multiplier = _safe(row, 'opt_multiplier')
+            BE = _safe(row, 'breakeven_S_T')
+            cp = str(row.get('call_put', '')).upper()
+            ce = _safe(row, 'cost_efficiency')
+
+            # ---- 胜率（BE 口径） ----
+            # "现货+期权"组合盈亏随 S_T 单调不减，盈亏平衡点 BE 处 P(S_T>BE) 即盈利概率
+            # 特例: 现货+Put 且 K-S0>C (cost_efficiency>1) 时任意到期价格均盈利
+            def _d2(X):
+                if not (S0 and sigma and T and X and sigma > 0 and T > 0 and X > 0):
+                    return None
+                return (math.log(S0 / X) + (r - q - 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
+
+            if cp == 'P' and ce is not None and ce > 1.0:
+                win_rate = 100.0
+            elif BE:
+                d2BE = _d2(BE)
+                win_rate = (self._norm_cdf(d2BE) * 100.0) if d2BE is not None else None
+            else:
+                win_rate = None
+
+            # ---- 行权概率（K 口径） ----
+            # Call 到期行权 = P(S_T>K)=N(d2)；Put 到期行权 = P(S_T<K)=1-N(d2)
+            d2K = _d2(K) if K else None
+            if cp == 'P' and d2K is not None:
+                nd2cdf = self._norm_cdf(d2K)
+                prob_itm = (1.0 - nd2cdf) * 100.0 if nd2cdf is not None else None
+            else:
+                prob_itm = (self._norm_cdf(d2K) * 100.0) if d2K is not None else None
+            if prob_itm is None:
+                nd2 = _safe(row, 'nd2')
+                if nd2 is not None:
+                    prob_itm = (1.0 - nd2) * 100.0 if cp == 'P' else nd2 * 100.0
+            # 兜底: BE 口径因数据缺失无法计算时，退化为 K 口径（同为到期概率），保证报表不空缺
+            if win_rate is None and prob_itm is not None:
+                win_rate = prob_itm
+
+            # ---- 情景法：平均盈利/亏损 与 盈亏比 ----
+            scen_vals = [_safe(row, f'scenario_pnl_{lab}K_cny') for lab in labels]
+            scen_vals = [v for v in scen_vals if v is not None]
+            wins = [v for v in scen_vals if v > 0]
+            losses = [v for v in scen_vals if v < 0]
+            avg_win = sum(wins) / len(wins) if wins else None
+            avg_loss = abs(sum(losses) / len(losses)) if losses else None
+            payoff_ratio = (avg_win / avg_loss) if (avg_win is not None and avg_loss and avg_loss > 0) else None
+            profit_factor = ((sum(wins) / abs(sum(losses))) if (wins and losses and abs(sum(losses)) > 0) else None)
+
+            # ---- 基准法：基准情景收益 / 最大风险 ----
+            pnl_at_K = _safe(row, 'total_pnl_at_K_cny')
+            max_loss = _safe(row, 'strategy_max_loss_cny')
+            risk_reward = (pnl_at_K / abs(max_loss)) if (pnl_at_K is not None and max_loss is not None and max_loss < 0) else None
+
+            # ---- 期望盈亏 & 边际收益率 ----
+            ev = None
+            if win_rate is not None and avg_win is not None and avg_loss is not None:
+                w = win_rate / 100.0
+                ev = w * avg_win - (1.0 - w) * avg_loss
+            edge_pct = None
+            if ev is not None and C and multiplier and C * multiplier > 0:
+                edge_pct = ev / (C * multiplier) * 100.0
+
+            df.at[idx, 'win_rate_pct'] = win_rate
+            df.at[idx, 'loss_rate_pct'] = (100.0 - win_rate) if win_rate is not None else None
+            df.at[idx, 'prob_itm_pct'] = prob_itm
+            df.at[idx, 'avg_win_cny'] = avg_win
+            df.at[idx, 'avg_loss_cny'] = avg_loss
+            df.at[idx, 'payoff_ratio'] = payoff_ratio
+            df.at[idx, 'risk_reward_ratio'] = risk_reward
+            df.at[idx, 'profit_factor'] = profit_factor
+            df.at[idx, 'expected_value_cny'] = ev
+            df.at[idx, 'edge_pct'] = edge_pct
+
+        logger.info("Win/Loss metrics enriched: "
+                    f"win_rate_pct/prob_itm_pct/payoff_ratio/risk_reward_ratio/expected_value_cny added")
+        return df
+
+    # ================================================================
     # Step 2: 构建字段行列表（去重 + 交易员视角排序）
     # ================================================================
     def build_field_order(self, df):
@@ -521,6 +682,8 @@ class OptionTradingStrategyAnalyzerReport:
 
         # 按行权价升序排列合约
         df_sorted = df.sort_values('exercise_price', ascending=True).reset_index(drop=True)
+        # 现算胜率与赔率量化指标（幂等，底层表未含时补充）
+        df_sorted = self._enrich_win_loss_metrics(df_sorted)
         n_contracts = len(df_sorted)
         data_end_col = 1 + n_contracts        # A列指标 + 合约列
         desc_col = data_end_col + 1           # 说明列（K列在9合约时）
@@ -675,8 +838,13 @@ class OptionTradingStrategyAnalyzerReport:
         if field in ('pct_change', 'spot_to_strike_pct', 'breakeven_S_T_pct',
                      'pure_call_breakeven_pct', 'theta_cost_pct_of_premium',
                      'close_vs_theoretical_pct', 'annualized_return_pct',
-                     'strategy_max_loss_pct_of_spot'):
+                     'strategy_max_loss_pct_of_spot',
+                     'win_rate_pct', 'loss_rate_pct', 'prob_itm_pct', 'edge_pct'):
             return '0.00"%"'
+        if field in ('payoff_ratio', 'risk_reward_ratio', 'profit_factor'):
+            return '0.00'
+        if field in ('avg_win_cny', 'avg_loss_cny', 'expected_value_cny'):
+            return '#,##0'
         if field in ('implied_vol', 'risk_free_rate', 'dividend_yield'):
             return '0.00%'
         if field in ('delta', 'gamma', 'theta', 'vega', 'rho',
@@ -765,6 +933,17 @@ class OptionTradingStrategyAnalyzerReport:
             'strategy_max_loss = -C : 最大亏损(权利金);  leverage_notional = S0 / C : 杠杆倍数',
             'annualized_return_pct = total_pnl_at_K / C / 剩余年限 × 100% : 年化收益率',
             '',
+            '【胜率与赔率】(量化盈亏概率, 基于 BS 模型与多情景盈亏)',
+            'win_rate_pct = N(d2_BE)×100% : d2_BE=[ln(S0/BE)+(r-q-σ²/2)T]/(σ√T), 即 P(S_T>BE) 到期盈利概率',
+            'loss_rate_pct = 100% - win_rate_pct : 到期亏损概率',
+            'prob_itm_pct = 到期行权概率 : Call 为 P(S_T>K)=N(d2), Put 为 P(S_T<K)=1-N(d2)',
+            'avg_win_cny / avg_loss_cny = 盈利/亏损情景 scenario_pnl_1_xxK_cny 的均值(元/张)',
+            'payoff_ratio(情景法) = avg_win_cny / avg_loss_cny : 平均盈利/平均亏损(盈亏比)',
+            'risk_reward_ratio(基准法) = total_pnl_at_K_cny / |strategy_max_loss_cny| : 基准情景收益/最大风险',
+            'profit_factor = 盈利情景总和 / |亏损情景总和| : >1 表示期望为正',
+            'expected_value_cny = win_rate×avg_win_cny - loss_rate×avg_loss_cny : 概率加权期望盈亏',
+            'edge_pct = expected_value_cny / (close×乘数) ×100% : 期望收益占权利金投入比例',
+            '',
             '【多情景盈亏】(S_T = K × 系数, 系数 1.00/1.03/1.05/1.08/1.10/1.15/1.20)',
             'scenario_pnl_1_xxK = S_T + max(0, S_T - K) - S0 - C : 组合盈亏 (Spot + Long Call)',
             'scenario_pnl_1_xxK_cny = scenario_pnl × 乘数',
@@ -780,7 +959,9 @@ class OptionTradingStrategyAnalyzerReport:
             'delta_weighted_pnl/annualized_return_pct/strategy_max_loss/strategy_max_loss_cny/ '
             'strategy_max_loss_pct_of_spot/leverage_notional/theta_cost_daily/theta_cost_total/ '
             'theta_cost_pct_of_premium/pnl_after_theta/close_vs_theoretical/close_vs_theoretical_pct/ '
-            'price_bias/implied_vol/bs_theoretical_price/delta/gamma/theta/vega/rho 等行',
+            'price_bias/implied_vol/bs_theoretical_price/delta/gamma/theta/vega/rho/ '
+            'win_rate_pct/loss_rate_pct/prob_itm_pct/avg_win_cny/avg_loss_cny/payoff_ratio/ '
+            'risk_reward_ratio/profit_factor/expected_value_cny/edge_pct 等行',
             '2) 静态着色: cost_efficiency: 绿(≥1) / 黄(0.85~1) / 红(<0.85);  '
             'trade_signal: 绿=STRONG_BUY / 黄=BUY / 红=AVOID;  盈亏列: 绿=盈利 / 红=亏损',
         ]
@@ -868,7 +1049,8 @@ class OptionTradingStrategyAnalyzerReport:
     def _build_pdf_key_table(self, df_sorted):
         """构建关键指标矩阵表（行=合约，列=核心指标）"""
         headers = ['行权价', '权利金Close', '价态', '成本效率', '盈亏平衡涨幅',
-                   '年化收益率', 'IV', 'Delta', 'Theta占比', '杠杆', '定价', '信号']
+                   '年化收益率', '胜率', '行权概率', '盈亏比', '期望盈亏',
+                   'IV', 'Delta', 'Theta占比', '杠杆', '定价', '信号']
         rows = [headers]
         for _, row in df_sorted.iterrows():
             K = self._safe_num(row, 'exercise_price')
@@ -880,6 +1062,11 @@ class OptionTradingStrategyAnalyzerReport:
                 self._fmt(self._safe_num(row, 'cost_efficiency'), 2),
                 self._fmt_pct(self._safe_num(row, 'breakeven_S_T_pct')),
                 self._fmt_pct(self._safe_num(row, 'annualized_return_pct')),
+                # 胜率与赔率（win_rate_pct 等已为 ×100 的百分比数值）
+                self._fmt(self._safe_num(row, 'win_rate_pct'), 2, '%'),
+                self._fmt(self._safe_num(row, 'prob_itm_pct'), 2, '%'),
+                self._fmt(self._safe_num(row, 'payoff_ratio'), 2),
+                self._fmt(self._safe_num(row, 'expected_value_cny'), 0),
                 self._fmt_pct(self._safe_num(row, 'implied_vol')),
                 self._fmt(self._safe_num(row, 'delta'), 2),
                 self._fmt_pct(self._safe_num(row, 'theta_cost_pct_of_premium')),
@@ -1051,6 +1238,51 @@ class OptionTradingStrategyAnalyzerReport:
             "若看好标的上涨，可结合纯Call盈亏平衡涨幅小的合约控制回本门槛；"
             "若认为波动率将上升，可增配 Vega 敞口（平值附近合约）。",
         ]))
+
+        # ===== 七、胜率与赔率（量化盈亏概率） =====
+        def _wl_stat(field, fn):
+            vals = [self._safe_num(r, field) for r in df_sorted.itertuples()]
+            vals = [v for v in vals if v is not None]
+            return fn(vals) if vals else None
+
+        def _pairs(field):
+            return [(self._safe_num(r, field), self._safe_num(r, 'exercise_price'))
+                    for r in df_sorted.itertuples()
+                    if self._safe_num(r, field) is not None]
+
+        def _top3(pairs, nd=2):
+            if not pairs:
+                return 'N/A'
+            tops = sorted(pairs, key=lambda x: x[0], reverse=True)[:3]
+            return '、'.join(f'K={int(p[1])} ({self._fmt(p[0], nd)})' for p in tops)
+
+        wr_pairs = _pairs('win_rate_pct')
+        itm_pairs = _pairs('prob_itm_pct')
+        pr_pairs = _pairs('payoff_ratio')
+        ev_pairs = _pairs('expected_value_cny')
+        avg_wr = _wl_stat('win_rate_pct', lambda vs: sum(vs) / len(vs))
+        avg_itm = _wl_stat('prob_itm_pct', lambda vs: sum(vs) / len(vs))
+        n_pos_ev = sum(1 for v, _ in ev_pairs if v > 0)
+        n_neg_ev = sum(1 for v, _ in ev_pairs if v < 0)
+        n_pr_gt1 = sum(1 for v, _ in pr_pairs if v > 1.0)
+        if call_put_str == 'C':
+            itm_trend = '离行权价越远的合约行权概率越低（虚值程度上升）'
+        elif call_put_str == 'P':
+            itm_trend = '离行权价越远的合约行权概率越高（实值程度上升）'
+        else:
+            itm_trend = '行权概率随行权价偏移而分布变化'
+        secs.append(('七、胜率与赔率（量化盈亏概率）', [
+            f"到期盈利概率（BE口径，P(S_T&gt;盈亏平衡价)）：平均 {self._fmt(avg_wr, 2)}%，"
+            f"最高 {_top3(wr_pairs)}。到期行权概率（K口径，Call 为 P(S_T&gt;K)、Put 为 P(S_T&lt;K)）："
+            f"平均 {self._fmt(avg_itm, 2)}%，{itm_trend}。",
+            f"盈亏比（情景法=平均盈利/平均亏损）：{n_pr_gt1}/{len(pr_pairs)} 个合约盈亏比&gt;1，"
+            f"最高 {_top3(pr_pairs)}。盈亏比高意味着亏损情景均值小、盈利情景均值大。",
+            f"概率加权期望盈亏（元/张）：正期望 {n_pos_ev} 个、负期望 {n_neg_ev} 个；"
+            f"期望最高 {_top3(ev_pairs)}。",
+            "交易提示：胜率与赔率通常此消彼长——低行权价合约胜率高但盈亏比低，虚值合约胜率低但盈亏比高；"
+            "应综合胜率×盈亏比判断期望值（EV），正 EV 且风险可控才是优质标的，"
+            "避免陷入高胜率低赔率或高赔率低胜率的单边陷阱。",
+        ]))
         return secs
 
     def export_to_pdf(self, df, trade_date, ts_code_filter=None, call_put=None,
@@ -1067,6 +1299,8 @@ class OptionTradingStrategyAnalyzerReport:
             return None
 
         df_sorted = df.sort_values('exercise_price', ascending=True).reset_index(drop=True)
+        # 现算胜率与赔率量化指标（幂等，底层表未含时补充）
+        df_sorted = self._enrich_win_loss_metrics(df_sorted)
         prefix = self._extract_prefix(ts_code_filter)
         call_put_str = call_put or 'ALL'
         if gen_ts is None:
@@ -1128,7 +1362,7 @@ class OptionTradingStrategyAnalyzerReport:
         table = Table(rows, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), self.reportlab_font),
-            ('FONTSIZE', (0, 0), (-1, -1), 6.5),
+            ('FONTSIZE', (0, 0), (-1, -1), 5.5),
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -1142,7 +1376,9 @@ class OptionTradingStrategyAnalyzerReport:
         story.append(Spacer(1, 0.1 * inch))
         story.append(Paragraph(
             '注：成本效率=(K-S0)/C；盈亏平衡涨幅为纯Call口径 (K+C)/S0-1；'
-            '年化收益率按剩余期限折算；Theta占比=持有到期总衰减/权利金；杠杆=现货/权利金。',
+            '年化收益率按剩余期限折算；Theta占比=持有到期总衰减/权利金；杠杆=现货/权利金；'
+            '胜率=到期盈利概率 N(d2_BE)；行权概率=到期行权概率 N(d2)；'
+            '盈亏比=平均盈利/平均亏损(情景法)；期望盈亏=胜率×平均盈利-亏损率×平均亏损。',
             styles['small'],
         ))
         story.append(PageBreak())
