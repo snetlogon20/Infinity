@@ -1,0 +1,31 @@
+# ============================================================================
+# py312 conda 环境定义
+# 用法：conda env create -f environment.yml
+#
+# 设计原则：
+#   本文件只放「requirements.txt 里装不了 / 不适合用 pip 装」的包。
+#   其余依赖（pandas / torch / sentence-transformers / ...）仍由
+#   requirements.txt 用 pip 锁死版本，避免 conda 与 pip 互相覆盖。
+# ============================================================================
+name: py312
+
+channels:
+  - conda-forge
+
+dependencies:
+  # ---------- 基础 ----------
+  - python=3.12
+  - pip
+
+  # ---------- 原来靠 pip 特判安装的包 ----------
+  # pip 侧包名是 arch，conda-forge 上叫 arch-py，直接给预编译二进制，
+  # 不再需要 --config-settings="--global-option=--no-cython" 绕开本地编译
+  - "arch-py>=5.5"
+
+  # conda-forge 有 chromadb 的 py312 预编译包（含 C++ 扩展），
+  # 因此不再需要 --no-deps + https://whls.blob.core.windows.net/unstable/ 这套 hack。
+  # 注意：conda 不支持 extras 语法，原来那条 `chromadb[all]` 在这里无法照搬。
+  - "chromadb>=0.4.20"
+
+  - overrides
+  - posthog
