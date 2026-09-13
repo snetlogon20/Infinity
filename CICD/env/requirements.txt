@@ -75,6 +75,7 @@ PyYAML==6.0.2
 referencing==0.36.2
 regex==2024.11.6
 repath==0.9.0
+reportlab==5.0.1
 requests==2.32.3
 rpds-py==0.24.0
 safetensors==0.5.3
