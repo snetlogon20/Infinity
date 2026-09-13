@@ -1,0 +1,1 @@
+jupyter lab --notebook-dir D:\workspace_jnote\FRM

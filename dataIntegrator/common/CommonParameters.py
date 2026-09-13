@@ -1,6 +1,15 @@
 import os
 import datetime
 from dataIntegrator.common.MyTokens import MyTokens
+import sys
+import logging
+
+#发现日志输出是红色的，只是在这里加个临时的解决方案
+logging.basicConfig(
+    stream=sys.stdout,          # ← 关键：指定 stdout
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
 
 class CommonParameters():
 
@@ -27,7 +36,7 @@ class CommonParameters():
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.23.10'
+    clickhouseHostName='192.168.23.128'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
