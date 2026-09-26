@@ -6,7 +6,7 @@ REM Financial Analysis Reports batch file (with logging)
 
 REM Set paths (portable: %~dp0 resolves to this script's directory)
 set SCRIPT_DIR=%~dp0
-set PYTHON_PATH=C:\Users\ASUS\Anaconda3\envs\py312\python.exe
+set PYTHON_PATH=C:\Users\Samuel\anaconda3\envs\py312\python.exe
 set PROJECT_PATH=%SCRIPT_DIR%..\..\..
 set LOG_PATH=%PROJECT_PATH%_data\log
 set INFINITY_LOG_FILE=%LOG_PATH%\reports.log
