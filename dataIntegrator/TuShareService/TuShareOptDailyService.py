@@ -12,6 +12,37 @@ logger = CommonLib.logger
 
 class TuShareOptDailyService(TuShareService):
 
+    # opt_daily 单次调用有行数上限（超出会被静默截断），按交易日全市场拉取时必须分页
+    OPT_DAILY_PAGE_SIZE = 5000
+
+    @classmethod
+    def _fetch_opt_daily_by_date(self, trade_date_str, exchange=None):
+        """
+        按交易日分页拉取期权日线数据（全市场或单交易所），避免超过单次行数上限被截断
+
+        Args:
+            trade_date_str: 交易日期 YYYYMMDD
+            exchange: 交易所（SSE/SZSE/CFFEX/DCE/SHFE/CZCE），None=全市场
+
+        Returns:
+            DataFrame: 该交易日全部行情数据，无数据时返回空 DataFrame
+        """
+        all_dfs = []
+        offset = 0
+        while True:
+            df = self.pro.opt_daily(trade_date=trade_date_str, exchange=exchange,
+                                    offset=offset, limit=self.OPT_DAILY_PAGE_SIZE)
+            if df is None or df.empty:
+                break
+            all_dfs.append(df)
+            if len(df) < self.OPT_DAILY_PAGE_SIZE:
+                break
+            offset += self.OPT_DAILY_PAGE_SIZE
+
+        if not all_dfs:
+            return pandas.DataFrame()
+        return pandas.concat(all_dfs, ignore_index=True)
+
     @classmethod
     def prepareDataFrame(self, ts_code=None, trade_date=None, start_date=None, end_date=None, exchange=None):
         """
@@ -103,7 +134,7 @@ class TuShareOptDailyService(TuShareService):
             batch_no += 1
             date_str = current.strftime("%Y%m%d")
             try:
-                df = self.pro.opt_daily(trade_date=date_str, exchange=exchange)
+                df = self._fetch_opt_daily_by_date(date_str, exchange=exchange)
                 if not df.empty:
                     all_dfs.append(df)
                     logger.info(f"  第 {batch_no} 批: {date_str}，获取 {len(df)} 条记录")
@@ -328,10 +359,7 @@ class TuShareOptDailyService(TuShareService):
         for i, trade_date_str in enumerate(trade_date_list):
             try:
                 logger.info(f"  [{i + 1}/{len(trade_date_list)}] 获取 {trade_date_str} 的全量期权日线数据...")
-                df = tuShareService.pro.opt_daily(
-                    trade_date=trade_date_str,
-                    exchange=exchange
-                )
+                df = tuShareService._fetch_opt_daily_by_date(trade_date_str, exchange=exchange)
                 if df.empty:
                     logger.warning(f"  {trade_date_str} 获取数据为空，跳过")
                     continue
