@@ -186,13 +186,19 @@ class OptionDailyIndicatorAnalyst:
         """从 ts_code 回退解析 call_put 和 exercise_price
 
         当 LEFT JOIN basic 表未匹配到时，从合约代码正则提取。
-        格式: PREFIXYYMM-C/P-STRIKE.EXCHANGE, 如 A2609-C-3400.DCE 或 HO2612-C-2500.CFX
+        支持两种合约代码格式:
+          带横线: PREFIXYYMM-C/P-STRIKE.EXCHANGE, 如 A2609-C-3400.DCE 或 HO2612-C-2500.CFX
+          无横线: PREFIXYYMMC/PSTRIKE.EXCHANGE, 如 HO2612C84000.SHF 或 CU2612P128000.SHF
         """
-        parsed = df_opt_daily['ts_code'].astype(str).str.extract(
-            r'^[A-Za-z]+\d{4}-([CP])-(\d+)\..*$', expand=True
-        )
-        parsed.columns = ['_parsed_cp', '_parsed_strike']
-        parsed['_parsed_strike'] = pd.to_numeric(parsed['_parsed_strike'], errors='coerce')
+        ts_codes = df_opt_daily['ts_code'].astype(str)
+
+        parsed_dash = ts_codes.str.extract(r'^[A-Za-z]+\d{4}-([CP])-(\d+)\..*$', expand=True)
+        parsed_flat = ts_codes.str.extract(r'^[A-Za-z]+\d{4}([CP])(\d+)\..*$', expand=True)
+
+        parsed = pd.DataFrame({
+            '_parsed_cp': parsed_dash[0].fillna(parsed_flat[0]),
+            '_parsed_strike': pd.to_numeric(parsed_dash[1].fillna(parsed_flat[1]), errors='coerce')
+        })
 
         mask_cp = df_opt_daily['call_put'].isna() | (df_opt_daily['call_put'] == '')
         df_opt_daily.loc[mask_cp, 'call_put'] = parsed.loc[mask_cp, '_parsed_cp']
