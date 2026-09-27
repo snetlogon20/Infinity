@@ -1,0 +1,1 @@
+python -m pip install -r D:\workspace_python\infinity\CICD\env\requirements.txt

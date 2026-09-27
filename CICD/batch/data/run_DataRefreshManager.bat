@@ -5,7 +5,7 @@ echo.
 REM Data refresh scheduler batch file (with logging)
 
 REM Set paths
-set PYTHON_PATH=C:\Users\ASUS\Anaconda3\envs\py312\python.exe
+set PYTHON_PATH=C:\Users\Samuel\anaconda3\envs\py312\python.exe
 set PROJECT_PATH=D:\workspace_python\infinity
 set LOG_PATH=D:\workspace_python\infinity_data\log
 set INFINITY_LOG_FILE=%LOG_PATH%\dataIntegrater.log

@@ -6,7 +6,7 @@ Long Call 策略分析 — 测试入口
 
 功能：
     调用 OptionCallStrategyAnalyzer 按配置循环生成 Excel 报表
-    输出路径: D:\workspace_python\infinity_data\outbound\report\OptDailyIndicator\
+    输出路径: D:\workspace_python\infinity_data\outbound\report\OptionAnalysis
 
 配置说明：
     - name:            报表名称（用于文件名和标题）
