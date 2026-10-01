@@ -115,11 +115,21 @@ class OptionDailyIndicatorReport:
             where_clauses.append(f"call_put = '{call_put}'")
 
         where_str = " AND ".join(where_clauses) if where_clauses else "1=1"
+        # 目标表无 symbol/name 列，JOIN df_tushare_opt_basic 取合约名称用于图表标签
         sql = f"""
-        SELECT *
-        FROM indexsysdb.tb_tushare_opt_daily_indicator
+        SELECT
+            ind.*,
+            b.symbol                                          AS symbol,
+            b.name                                            AS name
+        FROM indexsysdb.tb_tushare_opt_daily_indicator ind
+        LEFT JOIN (
+            SELECT ts_code, any(symbol) AS symbol, any(name) AS name
+            FROM indexsysdb.df_tushare_opt_basic
+            GROUP BY ts_code
+        ) b
+            ON ind.ts_code = b.ts_code
         WHERE {where_str}
-        ORDER BY trade_date, ts_code
+        ORDER BY ind.trade_date, ind.ts_code
         """
         logger.info(f"SQL:\n{sql}")
         df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
@@ -160,6 +170,27 @@ class OptionDailyIndicatorReport:
 
     # ===================== 图表通用工具 =====================
 
+    def _build_label_map(self, df):
+        """构建 ts_code → 显示名 映射（优先合约名称 name，回退 symbol，再回退 ts_code）
+
+        图表内部仍以 ts_code 作为分组/系列 key（保证数据结构与计算逻辑不变），
+        仅在图例、右端标签、封面等处用本映射把 ts_code 替换为可读名称。
+        """
+        label_map = {}
+        if 'ts_code' not in df.columns:
+            return label_map
+
+        cols = [c for c in ('ts_code', 'name', 'symbol') if c in df.columns]
+        subset = df[cols].astype(str).drop_duplicates(subset='ts_code')
+        for _, row in subset.iterrows():
+            label = str(row.get('name', '')).strip()
+            if label in ('', 'nan', 'None', 'NaT'):
+                label = str(row.get('symbol', '')).strip()
+            if label in ('', 'nan', 'None', 'NaT'):
+                label = str(row['ts_code'])
+            label_map[str(row['ts_code'])] = label
+        return label_map
+
     def _fig_to_bytesio(self, fig, dpi=180):
         """matplotlib figure → BytesIO"""
         buf = io.BytesIO()
@@ -176,8 +207,9 @@ class OptionDailyIndicatorReport:
                   handlelength=1.2)
 
     def _add_end_labels(self, ax, ts_codes, series_dict, y_col, colors=None,
-                         x_pad_frac=0.10, label_fontsize=7, single_label=None):
-        """在每条折线最右端打上 ts_code 标签（颜色与线一致），并扩展右侧空间
+                         x_pad_frac=0.10, label_fontsize=7, single_label=None,
+                         label_map=None):
+        """在每条折线最右端打上合约名称标签（颜色与线一致），并扩展右侧空间
 
         Args:
             ax: matplotlib axes（数据坐标系，用于定位标签位置）
@@ -188,6 +220,7 @@ class OptionDailyIndicatorReport:
             x_pad_frac: 右侧扩展比例，给标签留出空间
             label_fontsize: 标签字号
             single_label: 若提供，则所有线共用此单一标签（用于 spot_price 等）
+            label_map: {ts_code: 合约名称}，缺省则直接显示 ts_code
         """
         if colors is None:
             colors = self.CHART_COLORS
@@ -206,7 +239,12 @@ class OptionDailyIndicatorReport:
             color = colors[idx % len(colors)]
             x_last = sub.index[-1]
             y_last = sub.iloc[-1]
-            label_text = single_label if single_label else ts_code
+            if single_label:
+                label_text = single_label
+            elif label_map and ts_code in label_map:
+                label_text = label_map[ts_code]
+            else:
+                label_text = ts_code
             ax.annotate(
                 label_text,
                 xy=(x_last, y_last),
@@ -297,6 +335,8 @@ class OptionDailyIndicatorReport:
         all_dates, ts_codes, series_dict = self._prep_ts_code_data(df, ['spot_price', y_col])
         y2_ts_codes = [t for t in ts_codes if y_col in series_dict[t].columns
                         and series_dict[t][y_col].notna().sum() > 0]
+        # ts_code → 合约名称（图表标签用名称，更易读）
+        label_map = self._build_label_map(df)
 
         if len(ts_codes) == 0:
             logger.warning(f"No valid ts_code for chart {chart_num}, skipping")
@@ -320,7 +360,8 @@ class OptionDailyIndicatorReport:
                 color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
                 ax2.plot(series.index.tolist(), series.values,
                          color=color, linewidth=0.8, alpha=0.78,
-                         marker='o', markersize=3, label=ts_code)
+                         marker='o', markersize=3,
+                         label=label_map.get(ts_code, ts_code))
 
         ax2.axhline(y=0, color='gray', linewidth=0.5, linestyle='-')
         ax2.set_ylabel(y_col_cn, fontsize=11)
@@ -351,8 +392,8 @@ class OptionDailyIndicatorReport:
             ax3.set_ylabel(y3_label, fontsize=11, color='#e67e22')
             ax3.tick_params(axis='y', labelcolor='#e67e22')
 
-        # ---- 右端标签 ----
-        self._add_end_labels(ax2, ts_codes, series_dict, y_col)
+        # ---- 右端标签（显示合约名称） ----
+        self._add_end_labels(ax2, ts_codes, series_dict, y_col, label_map=label_map)
 
         # ---- X 轴格式 ----
         fig.autofmt_xdate(rotation=45, ha='right')
@@ -972,11 +1013,20 @@ class OptionDailyIndicatorReport:
         trade_dates = sorted(df['trade_date'].unique()) if 'trade_date' in df.columns else []
         cover_date_range = f"{trade_dates[0]} — {trade_dates[-1]}" if len(trade_dates) > 0 else "N/A"
         unique_ts = df['ts_code'].nunique() if 'ts_code' in df.columns else 0
+
+        # 合约名称清单（替代 ts_code，便于阅读；最多展示 40 个）
+        label_map = self._build_label_map(df)
+        contract_names = sorted(set(label_map.values()))
+        names_display = '、'.join(contract_names[:40])
+        if len(contract_names) > 40:
+            names_display += f" 等 {len(contract_names)} 个合约"
+
         cover_text = (
             f"数据区间：{cover_date_range}<br/>"
             f"生成时间：{report_date}<br/>"
             f"合约过滤：symbol LIKE '{symbol_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
             f"数据记录：{len(df)} 条 | 合约数量：{unique_ts}<br/>"
+            f"合约名称：{names_display or '无'}<br/>"
             f"<br/>INFINITY 量化系统 · 期权研究专用"
         )
         story.append(Paragraph(cover_text, styles['cover_info']))
