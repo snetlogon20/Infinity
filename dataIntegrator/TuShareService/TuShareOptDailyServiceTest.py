@@ -28,95 +28,103 @@ class TuShareOptDailyServiceTest(TuShareService):
 
 
     @classmethod
-    def load_ts_code_list_from_basic(self, symbol_prefixes='510050', exchange=None):
+    def load_ts_code_list_from_basic(self, underlying_groups=None, symbol_prefixes=None):
         """
         从 ClickHouse opt_basic 最新快照动态加载目标标的的合约清单
 
         SSE ETF 期权的 ts_code 是 8 位数字（如 10000201.SH），无语义规律且每月有新合约上市，
         硬编码不可行，必须从 opt_basic 快照（含 symbol 字段）按标的前缀过滤。
-        CFFEX 股指期权的 symbol 以合约前缀开头（如 'HO2612C2500'），可用 'HO2612' 前缀匹配。
+
+        支持跨交易所混合标的（如上交所 50ETF 小合约 + 中金所 HO 指数大合约）：
+        每组 (symbol_prefix, exchange) 独立取该组最新快照 trade_date，互不干扰，
+        exchange 条件可消除 'HO' 等前缀的跨所歧义。
 
         Args:
-            symbol_prefixes: 标的/合约代码前缀，str 或 list[str]。
-                             如 '510050' 或 ['510050', 'HO2612']
-            exchange: 交易所过滤（'SSE'/'CFFEX'/...），None=不过滤
+            underlying_groups: 标的分组配置 list[dict]，每项含:
+                - symbol_prefix: 标的/合约前缀（如 '510050', 'HO'）
+                - exchange: 交易所代码（如 'SSE', 'CFFEX'），空串表示不过滤
+            symbol_prefixes: 兼容旧入参，str 或 list[str]（不区分交易所）。
+                             与 underlying_groups 同时传入时以 underlying_groups 为准。
 
         Returns:
             list[str]: 合约代码列表（已去重）
         """
-        # 兼容单个 str 入参
-        if isinstance(symbol_prefixes, str):
-            symbol_prefixes = [symbol_prefixes]
-        if not symbol_prefixes:
-            raise ValueError("symbol_prefixes 不能为空")
+        # 兼容旧入参: symbol_prefixes → 无交易所条件的分组
+        if not underlying_groups and symbol_prefixes:
+            if isinstance(symbol_prefixes, str):
+                symbol_prefixes = [symbol_prefixes]
+            underlying_groups = [{'symbol_prefix': p, 'exchange': ''} for p in symbol_prefixes]
+        if isinstance(underlying_groups, dict):
+            underlying_groups = [underlying_groups]
+        if not underlying_groups:
+            raise ValueError("underlying_groups / symbol_prefixes 不能为空")
 
-        # 每个 prefix 一对 (symbol LIKE 'x%', trade_date 对齐) 条件
-        symbol_conds = " OR ".join(
-            f"symbol LIKE '{p}%'" for p in symbol_prefixes
-        )
-        exchange_cond = f" AND exchange = '{exchange}'" if exchange else ""
-        sql = f"""
-        SELECT DISTINCT ts_code
-        FROM indexsysdb.df_tushare_opt_basic
-        WHERE ({symbol_conds}){exchange_cond}
-          AND trade_date = (
-              SELECT max(trade_date) FROM indexsysdb.df_tushare_opt_basic
-              WHERE ({symbol_conds}){exchange_cond}
-          )
-        ORDER BY ts_code
-        """
-        df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
+        ts_code_set = set()
+        for group in underlying_groups:
+            prefix = str(group.get('symbol_prefix', '')).strip()
+            exchange = str(group.get('exchange', '') or '').strip()
+            if not prefix:
+                continue
 
-        if df is None or df.empty or 'ts_code' not in df.columns:
-            logger.error(f"opt_basic 快照中未找到 symbol LIKE {symbol_prefixes} (exchange={exchange}) 的合约，"
-                         f"请先运行 TuShareOptBasicServiceTest.refresh_opt_basic 刷新基础信息")
-            raise ValueError(f"No contracts found for symbol prefixes {symbol_prefixes} (exchange={exchange}) in opt_basic snapshot")
+            # CFFEX 指数期权（如 HO）symbol 与 ts_code 前缀一致，两者 OR 兜底
+            # ETF 期权 ts_code 为8位数字，只会命中 symbol
+            like_conds = f"symbol LIKE '{prefix}%' OR ts_code LIKE '{prefix}%'"
+            if exchange:
+                exchange_cond = f"AND exchange = '{exchange}'"
+            else:
+                exchange_cond = ""
 
-        ts_code_list = df['ts_code'].astype(str).tolist()
-        logger.info(f"从 opt_basic 最新快照加载到 {len(ts_code_list)} 个 {symbol_prefixes} (exchange={exchange}) 期权合约")
+            sql = f"""
+            SELECT DISTINCT ts_code
+            FROM indexsysdb.df_tushare_opt_basic
+            WHERE ({like_conds})
+              {exchange_cond}
+              AND trade_date = (
+                  SELECT max(trade_date) FROM indexsysdb.df_tushare_opt_basic
+                  WHERE ({like_conds})
+                    {exchange_cond}
+              )
+            ORDER BY ts_code
+            """
+            df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
+
+            if df is None or df.empty or 'ts_code' not in df.columns:
+                logger.warning(f"opt_basic 快照中未找到 symbol/ts_code LIKE '{prefix}%'"
+                               f"{f' (exchange={exchange})' if exchange else ''} 的合约，跳过该组")
+                continue
+
+            group_codes = df['ts_code'].astype(str).tolist()
+            ts_code_set.update(group_codes)
+            logger.info(f"从 opt_basic 最新快照加载到 {len(group_codes)} 个 "
+                        f"'{prefix}'{f' ({exchange})' if exchange else ''} 期权合约")
+
+        if not ts_code_set:
+            logger.error("opt_basic 快照中未找到任何目标合约，"
+                         "请先运行 TuShareOptBasicServiceTest.refresh_opt_basic 刷新基础信息")
+            raise ValueError(f"No contracts found for groups {underlying_groups} in opt_basic snapshot")
+
+        ts_code_list = sorted(ts_code_set)
+        logger.info(f"合计加载 {len(ts_code_list)} 个期权合约（跨 {len(underlying_groups)} 组）")
         return ts_code_list
 
     @classmethod
-    def refresh_opt_daily_by_ts_code(self):
+    def refresh_opt_daily_by_ts_code(self, underlying_groups):
 
         tuShareService = TuShareOptDailyService()
 
-        # 目标标的期权合约清单，从 opt_basic 最新快照动态加载（支持多标的）
-        ts_code_list = self.load_ts_code_list_from_basic(symbol_prefixes=['510050', 'HO2612'])
+        ts_code_list = self.load_ts_code_list_from_basic(underlying_groups=underlying_groups)
 
         calendarService = CalendarService()
-        #start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=300)
-        start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=30)
+        start_date = calendarService.calculate_T_minus_n_days(CommonParameters.today, days=300)
         end_date = CommonParameters.today
         calendar_service = CalendarService()
         trade_date_list = calendar_service.calculate_dates_between_start_end_date(start_date, end_date)
-
-        # 按交易所后缀分组，分交易所拉取：
-        # TuShare opt_daily 的 exchange 参数一次只能传一个交易所，
-        # 传 'SSE' 只会返回上交所行情（100xxx.SH），CFFEX 的 HO2612-*.CFX 必须单独按 'CFFEX' 拉
-        suffix_exchange_map = {
-            '.SH': 'SSE',
-            '.CFX': 'CFFEX',
-        }
-        for suffix, exchange in suffix_exchange_map.items():
-            group_list = [c for c in ts_code_list if c.endswith(suffix)]
-            if not group_list:
-                logger.info(f"跳过交易所 {exchange}：无 {suffix} 后缀的目标合约")
-                continue
-            logger.info(f"开始拉取 {exchange} 行情：{len(group_list)} 个合约")
-            # 批量模式: 每个交易日只调1次API（vs 原来每个合约1次）
-            tuShareService.refresh_opt_daily_by_ts_code_list(
-                ts_code_list=group_list,
-                trade_date_list=trade_date_list,
-                exchange=exchange
-            )
-
-        # 提示未覆盖的后缀（如上期所 .SHF），避免静默漏数据
-        handled = tuple(suffix_exchange_map.keys())
-        unmatched = [c for c in ts_code_list if not c.endswith(handled)]
-        if unmatched:
-            logger.warning(f"以下 {len(unmatched)} 个合约的后缀未配置交易所映射，未拉取: {unmatched[:10]}{'...' if len(unmatched) > 10 else ''}")
-
+        # 批量模式: 每个交易日按交易所各调1次API（.SH→SSE, .CFX→CFFEX 自动分组，内存过滤）
+        tuShareService.refresh_opt_daily_by_ts_code_list(
+            ts_code_list=ts_code_list,
+            trade_date_list=trade_date_list,
+            exchange=""
+        )
         logger.info("=" * 80)
         logger.info("期权日线数据处理完成")
         logger.info("=" * 80)
@@ -137,7 +145,16 @@ if __name__ == '__main__':
         # )
 
         # 使用示例2: 批量获取期权日线数据（一次 API 调用获取全天全量，内存过滤，最后一次性存入 ClickHouse）
-        tuShareOptDailyServiceTest.refresh_opt_daily_by_ts_code()
+
+        # 目标标的分组配置（跨交易所混合）：
+        # - 上交所 华夏上证50ETF 小合约: symbol like '510050%'
+        # - 中金所 上证50指数 大合约:   HO 前缀指数期权
+        # 每组独立取 opt_basic 最新快照；合约清单自动按 ts_code 后缀分组交易所拉取
+        underlying_groups = [
+            {'symbol_prefix': '510050', 'exchange': 'SSE'},   # 华夏上证50ETF 小合约
+            {'symbol_prefix': 'HO',     'exchange': 'CFFEX'}, # 中金所上证50指数 大合约
+        ]
+        tuShareOptDailyServiceTest.refresh_opt_daily_by_ts_code(underlying_groups)
 
     except Exception as e:
         logger.error(f"处理失败: {e}")
