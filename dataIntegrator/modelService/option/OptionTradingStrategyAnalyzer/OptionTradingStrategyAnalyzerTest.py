@@ -39,7 +39,6 @@ class OptionTradingStrategyAnalyzerTest:
             {
                 "name": "HO2612看涨欧式期权",
                 "start_date": "20251222",
-                #"end_date": "20260717",
                 "end_date": CommonParameters.today,
                 "call_put": "C",
                 "exercise_type": "欧式",
@@ -48,29 +47,11 @@ class OptionTradingStrategyAnalyzerTest:
             {
                 "name": "HO2612看跌欧式期权",
                 "start_date": "20251222",
-                #"end_date": "20260717",
                 "end_date": CommonParameters.today,
                 "call_put": "P",
                 "exercise_type": "欧式",
                 "ts_code_filter": "HO2612%",
             },
-            # 追加配置示例:
-            # {
-            #     "name": "IO2606看涨欧式期权",
-            #     "start_date": "20251222",
-            #     "end_date": "20260717",
-            #     "call_put": "C",
-            #     "exercise_type": "欧式",
-            #     "ts_code_filter": "IO2606%",
-            # },
-            # {
-            #     "name": "MO2606看涨欧式期权",
-            #     "start_date": "20251222",
-            #     "end_date": "20260717",
-            #     "call_put": "C",
-            #     "exercise_type": "欧式",
-            #     "ts_code_filter": "MO2606%",
-            # },
         ]
 
         analyzer = OptionTradingStrategyAnalyzer()
