@@ -80,13 +80,15 @@ class OptionDailyIndicatorReport:
 
     # ===================== 数据获取 =====================
 
-    def fetch_data(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+    def fetch_data(self, start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """从 ClickHouse 拉取 tb_tushare_opt_daily_indicator 表数据
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'（华夏上证50ETF），指数期权如 'HO2612%'
+                           目标表无 symbol 列，通过 df_tushare_opt_basic 的 symbol
+                           反查合约清单（ts_code IN 子查询），兼容 CFFEX symbol/ts_code 两种格式
             call_put: 行权方向 'C'/'P'，None 不过滤
 
         Returns:
@@ -101,8 +103,14 @@ class OptionDailyIndicatorReport:
             where_clauses.append(f"trade_date >= '{start_date}'")
         if end_date:
             where_clauses.append(f"trade_date <= '{end_date}'")
-        if ts_code_filter:
-            where_clauses.append(f"ts_code LIKE '{ts_code_filter}'")
+        if symbol_filter:
+            # ETF期权 ts_code 为8位数字（如 10000201.SH），必须按 basic.symbol 反查合约清单
+            where_clauses.append(
+                f"ts_code IN ("
+                f"SELECT DISTINCT ts_code FROM indexsysdb.df_tushare_opt_basic "
+                f"WHERE symbol LIKE '{symbol_filter}' OR ts_code LIKE '{symbol_filter}'"
+                f")"
+            )
         if call_put:
             where_clauses.append(f"call_put = '{call_put}'")
 
@@ -921,7 +929,7 @@ class OptionDailyIndicatorReport:
         }
 
     def _generate_pdf_report(self, df, chart_buffers,
-                              start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+                              start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """生成完整 PDF 报告"""
         styles = self._build_pdf_styles()
 
@@ -929,7 +937,7 @@ class OptionDailyIndicatorReport:
         now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         # 文件名基于日期范围 + 产品标识
-        filter_tag = ts_code_filter.replace('%', '') if ts_code_filter else 'all'
+        filter_tag = symbol_filter.replace('%', '') if symbol_filter else 'all'
         cp_tag = f"_{call_put}" if call_put else ""
         date_tag = f"{start_date}-{end_date}" if start_date and end_date else "custom"
         pdf_path = os.path.join(
@@ -967,7 +975,7 @@ class OptionDailyIndicatorReport:
         cover_text = (
             f"数据区间：{cover_date_range}<br/>"
             f"生成时间：{report_date}<br/>"
-            f"合约过滤：ts_code LIKE '{ts_code_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
+            f"合约过滤：symbol LIKE '{symbol_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
             f"数据记录：{len(df)} 条 | 合约数量：{unique_ts}<br/>"
             f"<br/>INFINITY 量化系统 · 期权研究专用"
         )
@@ -1080,13 +1088,13 @@ class OptionDailyIndicatorReport:
 
     # ===================== 主流程 =====================
 
-    def run(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+    def run(self, start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """运行期权日线指标报告生成主流程
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'（华夏上证50ETF），指数期权如 'HO2612%'
             call_put: 行权方向 'C'/'P'，None 表示全部
 
         Returns:
@@ -1100,11 +1108,11 @@ class OptionDailyIndicatorReport:
             # Step 1: 拉取数据
             logger.info("=" * 60)
             logger.info(f"Step 1/3: 从 ClickHouse 拉取数据 "
-                        f"(ts_code_filter={ts_code_filter}, call_put={call_put})")
+                        f"(symbol_filter={symbol_filter}, call_put={call_put})")
             logger.info("=" * 60)
             df = self.fetch_data(
                 start_date=start_date, end_date=end_date,
-                ts_code_filter=ts_code_filter, call_put=call_put
+                symbol_filter=symbol_filter, call_put=call_put
             )
             if df.empty:
                 logger.warning("数据为空，流程终止")
@@ -1238,7 +1246,7 @@ class OptionDailyIndicatorReport:
             pdf_path = self._generate_pdf_report(
                 df, chart_buffers,
                 start_date=start_date, end_date=end_date,
-                ts_code_filter=ts_code_filter, call_put=call_put
+                symbol_filter=symbol_filter, call_put=call_put
             )
 
             logger.info("\n" + "=" * 80)
@@ -1259,4 +1267,4 @@ class OptionDailyIndicatorReport:
 
 if __name__ == "__main__":
     report = OptionDailyIndicatorReport()
-    report.run(start_date="20260701", end_date="20260717", ts_code_filter="HO2612%")
+    report.run(start_date="20251222", end_date=CommonParameters.today, symbol_filter="510050%")
