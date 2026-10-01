@@ -1,5 +1,5 @@
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionDailyIndicatorReport import \
+from dataIntegrator.modelService.option.OptionDailyIndicator.OptionDailyIndicatorReport import \
     OptionDailyIndicatorReport
 
 logger = CommonLib.logger

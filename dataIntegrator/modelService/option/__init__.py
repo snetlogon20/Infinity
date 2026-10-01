@@ -21,10 +21,14 @@ OptionTradingStrategyAnalyzer 从专业交易员视角, 对 Option进行 分析�
         输出：indexsysdb.tb_option_trading_strategy_report
 
 
+
+
 OptionPutCallParityMonitor =Put-Call Parity 实时监
 
 OptPutCallParityReport
     1. 从 tb_option_pcp_monitor 拉取监控数据
     2. 生成图表：PCP偏差时序图、z-score分布、告警汇总、股息分解图
     3. 生成 PDF 报告
+
+
 """

@@ -12,7 +12,7 @@
 from datetime import datetime, timedelta
 
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionDailyIndicatorAnalyst import OptionDailyIndicatorAnalyst
+from dataIntegrator.modelService.option.OptionDailyIndicator.OptionDailyIndicatorAnalyst import OptionDailyIndicatorAnalyst
 
 logger = CommonLib.logger
 
