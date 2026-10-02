@@ -486,6 +486,34 @@ class ProtectivePutStrategyReport:
         ax.set_ylabel('组合盈亏 (元/单位)', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, linestyle='--')
 
+        # ---- 右端标签：每条线最右端(1.10K)打合约名称，颜色与线一致 ----
+        xlim = ax.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.22)
+
+        ax.annotate('未对冲(现货)', xy=(x[-1], unhedged_vals[-1]), xytext=(6, 0),
+                    textcoords='offset points', color=self.UNHEDGED_COLOR, fontsize=7,
+                    fontweight='bold', va='center', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor=self.UNHEDGED_COLOR, linewidth=0.5, alpha=0.85),
+                    zorder=10)
+
+        for idx, (_, row) in enumerate(df_latest.iterrows()):
+            vals = [row.get(f'scenario_pnl_{f:.2f}'.replace(".", "_") + "K", np.nan)
+                    for f in factors]
+            if all(pd.isna(v) for v in vals):
+                continue
+            color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
+            name = label_map.get(row['ts_code'], row['ts_code'])
+            # 垂直交错偏移，避免右端标签相互重叠
+            y_offset = (idx % 4 - 1.5) * 11
+            ax.annotate(name, xy=(x[-1], vals[-1]), xytext=(6, y_offset),
+                        textcoords='offset points', color=color, fontsize=7,
+                        fontweight='bold', va='center', ha='left',
+                        bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                                  edgecolor=color, linewidth=0.5, alpha=0.85),
+                        zorder=10)
+
         n_items = len(df_latest) + 1
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), fontsize=6.5,
                   ncol=min(n_items, 8), frameon=True, handlelength=1.2)
@@ -532,6 +560,23 @@ class ProtectivePutStrategyReport:
                         color='#c0392b',
                         bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
                                   edgecolor='#c0392b', alpha=0.85))
+
+        # ---- 右端标签：两条线末端打名称标签，颜色与线一致 ----
+        xlim = ax.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.14)
+        if len(daily) > 0:
+            for col, clr, txt in [(col_u, self.UNHEDGED_COLOR, '未对冲(现货)'),
+                                  (col_h, '#c0392b', '对冲后(现货+Put)')]:
+                s = daily[col].dropna()
+                if len(s) == 0:
+                    continue
+                ax.annotate(txt, xy=(s.index[-1], s.iloc[-1]), xytext=(6, 0),
+                            textcoords='offset points', color=clr, fontsize=8,
+                            fontweight='bold', va='center', ha='left',
+                            bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                                      edgecolor=clr, linewidth=0.5, alpha=0.85),
+                            zorder=10)
 
         fig.autofmt_xdate(rotation=45, ha='right')
         plt.tight_layout()
