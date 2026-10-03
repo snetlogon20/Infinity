@@ -20,6 +20,9 @@ from dataIntegrator.modelService.option.OptionTradingStrategyManager.CoveredCall
 from dataIntegrator.modelService.option.OptionTradingStrategyManager.BullCallSpreadStrategyAnalysis import (
     BullCallSpreadStrategyAnalysis
 )
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.BearPutSpreadStrategyAnalysis import (
+    BearPutSpreadStrategyAnalysis
+)
 
 from dataIntegrator import CommonLib
 
@@ -66,3 +69,4 @@ class OptionStrategyFactory:
 OptionStrategyFactory._registry['PROTECTIVE_PUT'] = ProtectivePutStrategyAnalysis
 OptionStrategyFactory._registry['COVERED_CALL'] = CoveredCallStrategyAnalysis
 OptionStrategyFactory._registry['BULL_CALL_SPREAD'] = BullCallSpreadStrategyAnalysis
+OptionStrategyFactory._registry['BEAR_PUT_SPREAD'] = BearPutSpreadStrategyAnalysis
