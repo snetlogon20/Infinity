@@ -80,13 +80,15 @@ class OptionDailyIndicatorReport:
 
     # ===================== 数据获取 =====================
 
-    def fetch_data(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+    def fetch_data(self, start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """从 ClickHouse 拉取 tb_tushare_opt_daily_indicator 表数据
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'（华夏上证50ETF），指数期权如 'HO2612%'
+                           目标表无 symbol 列，通过 df_tushare_opt_basic 的 symbol
+                           反查合约清单（ts_code IN 子查询），兼容 CFFEX symbol/ts_code 两种格式
             call_put: 行权方向 'C'/'P'，None 不过滤
 
         Returns:
@@ -101,17 +103,33 @@ class OptionDailyIndicatorReport:
             where_clauses.append(f"trade_date >= '{start_date}'")
         if end_date:
             where_clauses.append(f"trade_date <= '{end_date}'")
-        if ts_code_filter:
-            where_clauses.append(f"ts_code LIKE '{ts_code_filter}'")
+        if symbol_filter:
+            # ETF期权 ts_code 为8位数字（如 10000201.SH），必须按 basic.symbol 反查合约清单
+            where_clauses.append(
+                f"ts_code IN ("
+                f"SELECT DISTINCT ts_code FROM indexsysdb.df_tushare_opt_basic "
+                f"WHERE symbol LIKE '{symbol_filter}' OR ts_code LIKE '{symbol_filter}'"
+                f")"
+            )
         if call_put:
             where_clauses.append(f"call_put = '{call_put}'")
 
         where_str = " AND ".join(where_clauses) if where_clauses else "1=1"
+        # 目标表无 symbol/name 列，JOIN df_tushare_opt_basic 取合约名称用于图表标签
         sql = f"""
-        SELECT *
-        FROM indexsysdb.tb_tushare_opt_daily_indicator
+        SELECT
+            ind.*,
+            b.symbol                                          AS symbol,
+            b.name                                            AS name
+        FROM indexsysdb.tb_tushare_opt_daily_indicator ind
+        LEFT JOIN (
+            SELECT ts_code, any(symbol) AS symbol, any(name) AS name
+            FROM indexsysdb.df_tushare_opt_basic
+            GROUP BY ts_code
+        ) b
+            ON ind.ts_code = b.ts_code
         WHERE {where_str}
-        ORDER BY trade_date, ts_code
+        ORDER BY ind.trade_date, ind.ts_code
         """
         logger.info(f"SQL:\n{sql}")
         df = ClickhouseService.getDataFrameWithoutColumnsName(sql)
@@ -152,6 +170,27 @@ class OptionDailyIndicatorReport:
 
     # ===================== 图表通用工具 =====================
 
+    def _build_label_map(self, df):
+        """构建 ts_code → 显示名 映射（优先合约名称 name，回退 symbol，再回退 ts_code）
+
+        图表内部仍以 ts_code 作为分组/系列 key（保证数据结构与计算逻辑不变），
+        仅在图例、右端标签、封面等处用本映射把 ts_code 替换为可读名称。
+        """
+        label_map = {}
+        if 'ts_code' not in df.columns:
+            return label_map
+
+        cols = [c for c in ('ts_code', 'name', 'symbol') if c in df.columns]
+        subset = df[cols].astype(str).drop_duplicates(subset='ts_code')
+        for _, row in subset.iterrows():
+            label = str(row.get('name', '')).strip()
+            if label in ('', 'nan', 'None', 'NaT'):
+                label = str(row.get('symbol', '')).strip()
+            if label in ('', 'nan', 'None', 'NaT'):
+                label = str(row['ts_code'])
+            label_map[str(row['ts_code'])] = label
+        return label_map
+
     def _fig_to_bytesio(self, fig, dpi=180):
         """matplotlib figure → BytesIO"""
         buf = io.BytesIO()
@@ -168,8 +207,9 @@ class OptionDailyIndicatorReport:
                   handlelength=1.2)
 
     def _add_end_labels(self, ax, ts_codes, series_dict, y_col, colors=None,
-                         x_pad_frac=0.10, label_fontsize=7, single_label=None):
-        """在每条折线最右端打上 ts_code 标签（颜色与线一致），并扩展右侧空间
+                         x_pad_frac=0.10, label_fontsize=7, single_label=None,
+                         label_map=None):
+        """在每条折线最右端打上合约名称标签（颜色与线一致），并扩展右侧空间
 
         Args:
             ax: matplotlib axes（数据坐标系，用于定位标签位置）
@@ -180,6 +220,7 @@ class OptionDailyIndicatorReport:
             x_pad_frac: 右侧扩展比例，给标签留出空间
             label_fontsize: 标签字号
             single_label: 若提供，则所有线共用此单一标签（用于 spot_price 等）
+            label_map: {ts_code: 合约名称}，缺省则直接显示 ts_code
         """
         if colors is None:
             colors = self.CHART_COLORS
@@ -198,7 +239,12 @@ class OptionDailyIndicatorReport:
             color = colors[idx % len(colors)]
             x_last = sub.index[-1]
             y_last = sub.iloc[-1]
-            label_text = single_label if single_label else ts_code
+            if single_label:
+                label_text = single_label
+            elif label_map and ts_code in label_map:
+                label_text = label_map[ts_code]
+            else:
+                label_text = ts_code
             ax.annotate(
                 label_text,
                 xy=(x_last, y_last),
@@ -289,6 +335,8 @@ class OptionDailyIndicatorReport:
         all_dates, ts_codes, series_dict = self._prep_ts_code_data(df, ['spot_price', y_col])
         y2_ts_codes = [t for t in ts_codes if y_col in series_dict[t].columns
                         and series_dict[t][y_col].notna().sum() > 0]
+        # ts_code → 合约名称（图表标签用名称，更易读）
+        label_map = self._build_label_map(df)
 
         if len(ts_codes) == 0:
             logger.warning(f"No valid ts_code for chart {chart_num}, skipping")
@@ -312,7 +360,8 @@ class OptionDailyIndicatorReport:
                 color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
                 ax2.plot(series.index.tolist(), series.values,
                          color=color, linewidth=0.8, alpha=0.78,
-                         marker='o', markersize=3, label=ts_code)
+                         marker='o', markersize=3,
+                         label=label_map.get(ts_code, ts_code))
 
         ax2.axhline(y=0, color='gray', linewidth=0.5, linestyle='-')
         ax2.set_ylabel(y_col_cn, fontsize=11)
@@ -343,8 +392,8 @@ class OptionDailyIndicatorReport:
             ax3.set_ylabel(y3_label, fontsize=11, color='#e67e22')
             ax3.tick_params(axis='y', labelcolor='#e67e22')
 
-        # ---- 右端标签 ----
-        self._add_end_labels(ax2, ts_codes, series_dict, y_col)
+        # ---- 右端标签（显示合约名称） ----
+        self._add_end_labels(ax2, ts_codes, series_dict, y_col, label_map=label_map)
 
         # ---- X 轴格式 ----
         fig.autofmt_xdate(rotation=45, ha='right')
@@ -921,7 +970,7 @@ class OptionDailyIndicatorReport:
         }
 
     def _generate_pdf_report(self, df, chart_buffers,
-                              start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+                              start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """生成完整 PDF 报告"""
         styles = self._build_pdf_styles()
 
@@ -929,7 +978,7 @@ class OptionDailyIndicatorReport:
         now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         # 文件名基于日期范围 + 产品标识
-        filter_tag = ts_code_filter.replace('%', '') if ts_code_filter else 'all'
+        filter_tag = symbol_filter.replace('%', '') if symbol_filter else 'all'
         cp_tag = f"_{call_put}" if call_put else ""
         date_tag = f"{start_date}-{end_date}" if start_date and end_date else "custom"
         pdf_path = os.path.join(
@@ -964,11 +1013,20 @@ class OptionDailyIndicatorReport:
         trade_dates = sorted(df['trade_date'].unique()) if 'trade_date' in df.columns else []
         cover_date_range = f"{trade_dates[0]} — {trade_dates[-1]}" if len(trade_dates) > 0 else "N/A"
         unique_ts = df['ts_code'].nunique() if 'ts_code' in df.columns else 0
+
+        # 合约名称清单（替代 ts_code，便于阅读；最多展示 40 个）
+        label_map = self._build_label_map(df)
+        contract_names = sorted(set(label_map.values()))
+        names_display = '、'.join(contract_names[:40])
+        if len(contract_names) > 40:
+            names_display += f" 等 {len(contract_names)} 个合约"
+
         cover_text = (
             f"数据区间：{cover_date_range}<br/>"
             f"生成时间：{report_date}<br/>"
-            f"合约过滤：ts_code LIKE '{ts_code_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
+            f"合约过滤：symbol LIKE '{symbol_filter or '无'}' | 方向：{call_put or '全部'}<br/>"
             f"数据记录：{len(df)} 条 | 合约数量：{unique_ts}<br/>"
+            f"合约名称：{names_display or '无'}<br/>"
             f"<br/>INFINITY 量化系统 · 期权研究专用"
         )
         story.append(Paragraph(cover_text, styles['cover_info']))
@@ -1080,13 +1138,13 @@ class OptionDailyIndicatorReport:
 
     # ===================== 主流程 =====================
 
-    def run(self, start_date=None, end_date=None, ts_code_filter=None, call_put=None):
+    def run(self, start_date=None, end_date=None, symbol_filter=None, call_put=None):
         """运行期权日线指标报告生成主流程
 
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'（华夏上证50ETF），指数期权如 'HO2612%'
             call_put: 行权方向 'C'/'P'，None 表示全部
 
         Returns:
@@ -1100,11 +1158,11 @@ class OptionDailyIndicatorReport:
             # Step 1: 拉取数据
             logger.info("=" * 60)
             logger.info(f"Step 1/3: 从 ClickHouse 拉取数据 "
-                        f"(ts_code_filter={ts_code_filter}, call_put={call_put})")
+                        f"(symbol_filter={symbol_filter}, call_put={call_put})")
             logger.info("=" * 60)
             df = self.fetch_data(
                 start_date=start_date, end_date=end_date,
-                ts_code_filter=ts_code_filter, call_put=call_put
+                symbol_filter=symbol_filter, call_put=call_put
             )
             if df.empty:
                 logger.warning("数据为空，流程终止")
@@ -1238,7 +1296,7 @@ class OptionDailyIndicatorReport:
             pdf_path = self._generate_pdf_report(
                 df, chart_buffers,
                 start_date=start_date, end_date=end_date,
-                ts_code_filter=ts_code_filter, call_put=call_put
+                symbol_filter=symbol_filter, call_put=call_put
             )
 
             logger.info("\n" + "=" * 80)
@@ -1259,4 +1317,4 @@ class OptionDailyIndicatorReport:
 
 if __name__ == "__main__":
     report = OptionDailyIndicatorReport()
-    report.run(start_date="20260701", end_date="20260717", ts_code_filter="HO2612%")
+    report.run(start_date="20251222", end_date=CommonParameters.today, symbol_filter="510050%")

@@ -11,7 +11,8 @@
 数据流：
   df_tushare_opt_daily
     + vw_tushare_opt_basic_of_today (ON ts_code, Tushare仅提供每日最新快照无历史)
-    + df_tushare_cn_index_daily (ON trade_date + opt_code→ts_code)
+    + df_tushare_cn_index_daily (ON trade_date + opt_code→ts_code, 指数期权标的)
+    + df_tushare_fund_daily (ON trade_date + symbol前缀→ETF代码, ETF期权标的)
     ↓
   计算指标
     ↓
@@ -19,6 +20,7 @@
 """
 
 import math
+import re
 import numpy as np
 import pandas as pd
 from datetime import datetime, date
@@ -40,6 +42,7 @@ class OptionDailyIndicatorAnalyst:
     TABLE_BASIC = 'vw_tushare_opt_basic_of_today'  # Tushare仅提供每日最新快照，无历史数据，用 VIEW 取最新
     TABLE_INDEX_DAILY = 'df_tushare_cn_index_daily'
     TABLE_INDEX_DAILYBASIC = 'df_tushare_index_dailybasic'
+    TABLE_FUND_DAILY = 'df_tushare_fund_daily'      # ETF基金日线（ETF期权标的行情）
     TABLE_TARGET = 'tb_tushare_opt_daily_indicator'
 
     # === 默认参数 ===
@@ -63,8 +66,11 @@ class OptionDailyIndicatorAnalyst:
         'HO': '000016.SH',  # 上证50（cn_index_daily中可能缺失）
         'IO': '000300.SH',  # 沪深300
         'MO': '000852.SH',  # 中证1000
-        # SSE/SZSE ETF期权：合约代码包含标的ETF代码，暂不自动映射
     }
+    # === SSE/SZSE ETF期权标的提取 ===
+    # basic.symbol 前6位即标的ETF代码（如 510050C2609M03000 → 510050），
+    # 5xxxxx → .SH, 1xxxxx → .SZ（ETF期权 ts_code 为8位数字，不含标的信息）
+    ETF_SYMBOL_PATTERN = re.compile(r'^(\d{6})[CP]')
 
     # === 目标表字段顺序（trade_date 在首位，与建表 SQL 一致） ===
     TARGET_COLUMNS = [
@@ -89,19 +95,27 @@ class OptionDailyIndicatorAnalyst:
     # Level 0: 数据获取 — 子步骤
     # ================================================================
     def _build_where_clause(self, call_put=None, exercise_type=None,
-                            ts_code_filter=None,
+                            symbol_filter=None,
                             start_date=None, end_date=None):
-        """构建期权日线查询的动态 WHERE 子句"""
+        """构建期权日线查询的动态 WHERE 子句
+
+        symbol 过滤针对 basic.symbol（如 '510050%'）：
+        SSE/SZSE ETF期权 ts_code 为8位数字（如 10000201.SH），不含标的信息，
+        标的代码只存在于 basic.symbol（如 510050C2609M03000）；
+        CFFEX 指数期权 ts_code 直接含标的（如 HO2612-C-2500.CFX），两者兼容。
+        """
         where_clauses = [
             f"opt.trade_date >= '{start_date}'",
             f"opt.trade_date <= '{end_date}'"
         ]
         if call_put:
-            where_clauses.append(f"call_put = '{call_put}'")
+            where_clauses.append(f"basic.call_put = '{call_put}'")
         if exercise_type:
-            where_clauses.append(f"exercise_type = '{exercise_type}'")
-        if ts_code_filter:
-            where_clauses.append(f"basic.ts_code like '{ts_code_filter}'")
+            where_clauses.append(f"basic.exercise_type = '{exercise_type}'")
+        if symbol_filter:
+            where_clauses.append(
+                f"(basic.symbol like '{symbol_filter}' OR basic.ts_code like '{symbol_filter}')"
+            )
 
         return "\n            AND ".join(where_clauses)
 
@@ -110,6 +124,7 @@ class OptionDailyIndicatorAnalyst:
         sql = f"""
         SELECT
             opt.ts_code                                       AS ts_code,
+            basic.symbol                                      AS symbol,
             opt.trade_date                                    AS trade_date,
             opt.pre_settle                                    AS pre_settle,
             opt.pre_close                                     AS pre_close,
@@ -142,9 +157,12 @@ class OptionDailyIndicatorAnalyst:
 
         return df_opt_daily
 
-    def _fetch_index_daily_dict(self, start_date, end_date):
-        """拉取指数行情并构建 (trade_date, ts_code) → close 映射字典"""
-        logger.info("Fetching index daily data for spot price...")
+    def _fetch_spot_daily_dict(self, start_date, end_date):
+        """拉取标的行情（指数 + ETF基金）并构建 (trade_date, ts_code) → close 映射字典"""
+        logger.info("Fetching spot daily data (index + fund) for spot price...")
+        spot_dict = {}
+
+        # 指数日线（CFFEX指数期权标的）
         idx_sql = f"""
         SELECT trade_date, ts_code, close
         FROM indexsysdb.{self.TABLE_INDEX_DAILY}
@@ -155,15 +173,34 @@ class OptionDailyIndicatorAnalyst:
         logger.info(f"SQL:\n{idx_sql}")
         df_index_daily = ClickhouseService.getDataFrameWithoutColumnsName(idx_sql)
         logger.info(f"Fetched {len(df_index_daily)} rows of index daily data")
-
-        idx_dict = {}
         if len(df_index_daily) > 0:
             df_index_daily.columns = ['trade_date', 'ts_code', 'close']
             for _, row in df_index_daily.iterrows():
                 key = (str(row['trade_date']), str(row['ts_code']))
-                idx_dict[key] = float(row['close']) if pd.notna(row['close']) else np.nan
+                spot_dict[key] = float(row['close']) if pd.notna(row['close']) else np.nan
 
-        return idx_dict
+        # ETF基金日线（SSE/SZSE ETF期权标的，如 510050.SH）
+        fund_sql = f"""
+        SELECT trade_date, ts_code, close
+        FROM indexsysdb.{self.TABLE_FUND_DAILY}
+        WHERE trade_date >= '{start_date}'
+          AND trade_date <= '{end_date}'
+        ORDER BY trade_date, ts_code
+        """
+        try:
+            logger.info(f"SQL:\n{fund_sql}")
+            df_fund_daily = ClickhouseService.getDataFrameWithoutColumnsName(fund_sql)
+            logger.info(f"Fetched {len(df_fund_daily)} rows of fund daily data")
+            if len(df_fund_daily) > 0:
+                df_fund_daily.columns = ['trade_date', 'ts_code', 'close']
+                for _, row in df_fund_daily.iterrows():
+                    key = (str(row['trade_date']), str(row['ts_code']))
+                    spot_dict[key] = float(row['close']) if pd.notna(row['close']) else np.nan
+        except Exception as e:
+            logger.warning(f"Failed to fetch fund daily data "
+                           f"(table {self.TABLE_FUND_DAILY} may not exist): {e}")
+
+        return spot_dict
 
     def _convert_types(self, df_opt_daily):
         """类型转换：数值列 → float，文本列 → str"""
@@ -176,29 +213,34 @@ class OptionDailyIndicatorAnalyst:
             if col in df_opt_daily.columns:
                 df_opt_daily[col] = pd.to_numeric(df_opt_daily[col], errors='coerce')
 
-        for col in ['call_put', 's_month', 'maturity_date', 'exchange']:
+        for col in ['call_put', 's_month', 'maturity_date', 'exchange', 'symbol']:
             if col in df_opt_daily.columns:
                 df_opt_daily[col] = df_opt_daily[col].fillna('').astype(str)
 
         return df_opt_daily
 
     def _enrich_from_ts_code(self, df_opt_daily):
-        """从 ts_code 回退解析 call_put 和 exercise_price
+        """从 ts_code / symbol 回退解析 call_put 和 exercise_price
 
         当 LEFT JOIN basic 表未匹配到时，从合约代码正则提取。
-        支持两种合约代码格式:
-          带横线: PREFIXYYMM-C/P-STRIKE.EXCHANGE, 如 A2609-C-3400.DCE 或 HO2612-C-2500.CFX
-          无横线: PREFIXYYMMC/PSTRIKE.EXCHANGE, 如 HO2612C84000.SHF 或 CU2612P128000.SHF
+        CFFEX/商品格式: PREFIXYYMM-C/P-STRIKE.EXCHANGE, 如 A2609-C-3400.DCE 或 HO2612-C-2500.CFX
+        SSE/SZSE ETF格式(basic.symbol): 510050C2609M03000 → C/P + 行权价(末5位/1000, 如 03000 → 3.0)
         """
-        ts_codes = df_opt_daily['ts_code'].astype(str)
+        parsed = df_opt_daily['ts_code'].astype(str).str.extract(
+            r'^[A-Za-z]+\d{4}-([CP])-(\d+)\..*$', expand=True
+        )
+        parsed.columns = ['_parsed_cp', '_parsed_strike']
+        parsed['_parsed_strike'] = pd.to_numeric(parsed['_parsed_strike'], errors='coerce')
 
-        parsed_dash = ts_codes.str.extract(r'^[A-Za-z]+\d{4}-([CP])-(\d+)\..*$', expand=True)
-        parsed_flat = ts_codes.str.extract(r'^[A-Za-z]+\d{4}([CP])(\d+)\..*$', expand=True)
-
-        parsed = pd.DataFrame({
-            '_parsed_cp': parsed_dash[0].fillna(parsed_flat[0]),
-            '_parsed_strike': pd.to_numeric(parsed_dash[1].fillna(parsed_flat[1]), errors='coerce')
-        })
+        # ETF期权回退: 8位数字 ts_code 无标的信息，从 symbol 解析（M=月度合约, A=除权调整合约）
+        if 'symbol' in df_opt_daily.columns:
+            etf_parsed = df_opt_daily['symbol'].astype(str).str.extract(
+                r'^\d{6}([CP])\d{4}[AM](\d{5})$', expand=True
+            )
+            etf_parsed.columns = ['_parsed_cp', '_parsed_strike']
+            etf_parsed['_parsed_strike'] = pd.to_numeric(
+                etf_parsed['_parsed_strike'], errors='coerce') / 1000.0
+            parsed = parsed.combine_first(etf_parsed)
 
         mask_cp = df_opt_daily['call_put'].isna() | (df_opt_daily['call_put'] == '')
         df_opt_daily.loc[mask_cp, 'call_put'] = parsed.loc[mask_cp, '_parsed_cp']
@@ -211,77 +253,92 @@ class OptionDailyIndicatorAnalyst:
 
         return df_opt_daily
 
-    def _enrich_spot_prices(self, df_opt_daily, idx_dict, start_date, end_date):
-        """通过合约前缀映射获取标的 spot_price（含回退查询）
+    def _enrich_spot_prices(self, df_opt_daily, spot_dict, start_date, end_date):
+        """通过合约映射获取标的 spot_price（含回退查询）
 
         三步合一:
-        1. 合约前缀 → 指数代码映射 (CONTRACT_INDEX_MAP)
-        2. 用 idx_dict 主查询结果匹配 spot_price
-        3. 缺失的逐个指数代码回退查询
+        1. 合约 → 标的代码映射:
+           CFFEX指数期权: 合约前缀 → 指数代码 (CONTRACT_INDEX_MAP)
+           SSE/SZSE ETF期权: basic.symbol 前6位 → ETF代码 (5xxxxx.SH / 1xxxxx.SZ)
+        2. 用 spot_dict 主查询结果匹配 spot_price
+        3. 缺失的逐个标的代码回退查询（ETF查基金日线表，指数查指数日线表）
         """
-        # ---- Step 1: 合约前缀 → 指数代码 ----
-        def _get_index_code(ts_code):
-            ts_str = str(ts_code).strip()
+        # ---- Step 1: 合约 → 标的代码 ----
+        def _get_underlying_code(row):
+            # CFFEX指数期权: 合约前缀 → 指数代码
+            ts_str = str(row['ts_code']).strip()
             for prefix, index_code in self.CONTRACT_INDEX_MAP.items():
                 if ts_str.startswith(prefix):
                     return index_code
+            # SSE/SZSE ETF期权: symbol 前6位 → ETF代码
+            symbol_str = str(row.get('symbol', '') or '').strip()
+            m = self.ETF_SYMBOL_PATTERN.match(symbol_str)
+            if m:
+                fund_code = m.group(1)
+                suffix = '.SH' if fund_code.startswith('5') else '.SZ'
+                return fund_code + suffix
             return None
 
-        df_opt_daily['_index_code'] = df_opt_daily['ts_code'].apply(_get_index_code)
+        df_opt_daily['_underlying_code'] = df_opt_daily.apply(_get_underlying_code, axis=1)
 
-        # ---- Step 2: 用 idx_dict 匹配 spot_price ----
+        # ---- Step 2: 用 spot_dict 匹配 spot_price ----
         spot_prices = []
         for _, row in df_opt_daily.iterrows():
             trade_date = str(row['trade_date'])
-            index_code = row['_index_code']
-            if pd.notna(index_code) and index_code is not None:
-                spot = idx_dict.get((trade_date, index_code), np.nan)
+            underlying_code = row['_underlying_code']
+            if pd.notna(underlying_code) and underlying_code is not None:
+                spot = spot_dict.get((trade_date, underlying_code), np.nan)
             else:
                 spot = np.nan
             spot_prices.append(spot)
 
         df_opt_daily['spot_price'] = spot_prices
 
-        # ---- Step 3: 缺失 spot_price 的，逐个指数代码回退查询 ----
-        missing_mask = df_opt_daily['spot_price'].isna() & df_opt_daily['_index_code'].notna()
+        # ---- Step 3: 缺失 spot_price 的，逐个标的代码回退查询 ----
+        missing_mask = df_opt_daily['spot_price'].isna() & df_opt_daily['_underlying_code'].notna()
         if missing_mask.any():
-            missing_index_codes = df_opt_daily.loc[missing_mask, '_index_code'].unique()
+            missing_underlying_codes = df_opt_daily.loc[missing_mask, '_underlying_code'].unique()
             logger.info(f"Spot price missing for {missing_mask.sum()} rows, "
-                        f"missing index codes: {list(missing_index_codes)}. Attempting fallback query...")
+                        f"missing underlying codes: {list(missing_underlying_codes)}. Attempting fallback query...")
 
-            for index_code in missing_index_codes:
+            for underlying_code in missing_underlying_codes:
+                # ETF代码(5xxxxx.SH / 15xxxx.SZ)查基金日线表，指数代码查指数日线表
+                if underlying_code.startswith('5') or underlying_code.startswith('15'):
+                    spot_table = self.TABLE_FUND_DAILY
+                else:
+                    spot_table = self.TABLE_INDEX_DAILY
                 fallback_sql = f"""
                 SELECT trade_date, close
-                FROM indexsysdb.{self.TABLE_INDEX_DAILY}
-                WHERE ts_code = '{index_code}'
+                FROM indexsysdb.{spot_table}
+                WHERE ts_code = '{underlying_code}'
                   AND trade_date >= '{start_date}'
                   AND trade_date <= '{end_date}'
                 ORDER BY trade_date
                 """
                 logger.info(f"SQL:\n{fallback_sql}")
                 try:
-                    df_index_fallback = ClickhouseService.getDataFrameWithoutColumnsName(fallback_sql)
-                    if len(df_index_fallback) > 0:
-                        df_index_fallback.columns = ['trade_date', 'close']
+                    df_fallback = ClickhouseService.getDataFrameWithoutColumnsName(fallback_sql)
+                    if len(df_fallback) > 0:
+                        df_fallback.columns = ['trade_date', 'close']
                         fallback_dict = {}
-                        for _, fb_row in df_index_fallback.iterrows():
+                        for _, fb_row in df_fallback.iterrows():
                             fallback_dict[str(fb_row['trade_date'])] = (
                                 float(fb_row['close']) if pd.notna(fb_row['close']) else np.nan
                             )
 
                         for idx in df_opt_daily.index[missing_mask]:
-                            if df_opt_daily.loc[idx, '_index_code'] == index_code:
+                            if df_opt_daily.loc[idx, '_underlying_code'] == underlying_code:
                                 td = str(df_opt_daily.loc[idx, 'trade_date'])
                                 if td in fallback_dict:
                                     df_opt_daily.loc[idx, 'spot_price'] = fallback_dict[td]
                 except Exception as e:
-                    logger.warning(f"Fallback query failed for index {index_code}: {e}")
+                    logger.warning(f"Fallback query failed for underlying {underlying_code}: {e}")
 
             logger.info(f"After fallback: spot_price available for "
                         f"{df_opt_daily['spot_price'].notna().sum()}/{len(df_opt_daily)} rows")
 
         # 清理临时列 + 统计
-        df_opt_daily.drop(columns=['_index_code'], inplace=True)
+        df_opt_daily.drop(columns=['_underlying_code'], inplace=True)
 
         spot_count = df_opt_daily['spot_price'].notna().sum()
         total = len(df_opt_daily)
@@ -300,16 +357,19 @@ class OptionDailyIndicatorAnalyst:
     # Level 0: 数据获取 — 主入口
     # ================================================================
     def fetch_data(self, start_date=None, end_date=None,
-                   call_put=None, exercise_type=None, ts_code_filter=None,
+                   call_put=None, exercise_type=None, symbol_filter=None,
                    debug_export=False):
-        """从 ClickHouse 获取期权日线 + 基础信息，并通过合约前缀匹配标的指数行情
+        """从 ClickHouse 获取期权日线 + 基础信息，并通过合约/symbol匹配标的行情
 
         Args:
-            start_date: 期权日线 & 指数行情起始日期 YYYYMMDD，默认90天前
-            end_date: 期权日线 & 指数行情截止日期 YYYYMMDD，默认今天
+            start_date: 期权日线 & 标的行情起始日期 YYYYMMDD，默认90天前
+            end_date: 期权日线 & 标的行情截止日期 YYYYMMDD，默认今天
             call_put: 行权方向 'C'(看涨) / 'P'(看跌)，None 表示不过滤
             exercise_type: 行权方式 '欧式' / '美式'，None 表示不过滤
-            ts_code_filter: 合约代码过滤条件（LIKE 模式），如 'HO2612%'，None 表示不过滤
+            symbol_filter: 标的过滤条件（LIKE 模式）：
+                           ETF期权如 '510050%'（匹配 basic.symbol），
+                           指数期权如 'HO2612%'（自动兼容 basic.symbol / basic.ts_code），
+                           None 表示不过滤
             debug_export: 是否导出 debug Excel，默认 False
 
         Returns:
@@ -327,7 +387,7 @@ class OptionDailyIndicatorAnalyst:
         # 2. 构建 WHERE + 拉取期权日线
         where_str = self._build_where_clause(
             call_put=call_put, exercise_type=exercise_type,
-            ts_code_filter=ts_code_filter,
+            symbol_filter=symbol_filter,
             start_date=start_date, end_date=end_date
         )
         df_opt_daily = self._fetch_option_daily_with_basic(where_str)
@@ -336,15 +396,15 @@ class OptionDailyIndicatorAnalyst:
             logger.warning("No data fetched, returning empty DataFrame")
             return df_opt_daily
 
-        # 3. 拉取指数行情映射字典
-        idx_dict = self._fetch_index_daily_dict(start_date, end_date)
+        # 3. 拉取标的行情映射字典（指数 + ETF基金）
+        spot_dict = self._fetch_spot_daily_dict(start_date, end_date)
 
         # 4. 数据清洗
         df_opt_daily = self._convert_types(df_opt_daily)
         df_opt_daily = self._enrich_from_ts_code(df_opt_daily)
 
-        # 5. Spot 价格匹配（前缀映射 → dict 匹配 → 回退查询，三步合一）
-        df_opt_daily = self._enrich_spot_prices(df_opt_daily, idx_dict, start_date, end_date)
+        # 5. Spot 价格匹配（合约映射 → dict 匹配 → 回退查询，三步合一）
+        df_opt_daily = self._enrich_spot_prices(df_opt_daily, spot_dict, start_date, end_date)
 
         # 6. Debug 导出（受 debug_export 开关控制）
         if debug_export:
@@ -777,7 +837,7 @@ class OptionDailyIndicatorAnalyst:
 
             # ---- 逐行匹配股息率 q ----
             ts_code_val = str(row.get('ts_code', ''))
-            # 从合约代码推导标的指数代码
+            # 从合约代码推导标的指数代码（ETF期权无对应指数，q 保持默认 DEFAULT_DIVIDEND_YIELD=0.0）
             index_code_for_div = None
             for prefix, idx_code in self.CONTRACT_INDEX_MAP.items():
                 if ts_code_val.startswith(prefix):
@@ -963,16 +1023,16 @@ class OptionDailyIndicatorAnalyst:
 
         return df_option
 
-    def save_to_clickhouse(self, df_option, call_put=None, ts_code_filter=None):
+    def save_to_clickhouse(self, df_option, call_put=None):
         """写入 ClickHouse 目标表
 
-        策略：按 trade_date + 可选过滤条件 增量删除后插入（保留历史数据）。
-              传入 call_put / ts_code_filter 确保只删除同批数据，不会误删其他配置的历史记录。
+        策略：按 trade_date + 本批 ts_code 列表 增量删除后插入（保留历史数据）。
+              目标表无 symbol 列，且 ETF 期权 ts_code 为8位数字（LIKE '510050%' 匹配不到），
+              因此必须按本批数据的 ts_code IN (...) 精确删除，避免重复插入。
 
         Args:
             df_option: 待写入的 DataFrame
             call_put: 行权方向 'C'/'P'，与 fetch 一致，用于缩小 DELETE 范围
-            ts_code_filter: 合约代码过滤（LIKE），与 fetch 一致，用于缩小 DELETE 范围
         """
         logger.info(f"OptionDailyIndicatorAnalyst.save_to_clickhouse: Saving {len(df_option)} rows to {self.TABLE_TARGET}")
 
@@ -1001,22 +1061,23 @@ class OptionDailyIndicatorAnalyst:
             else:
                 df_output[col] = pd.to_numeric(df_output[col], errors='coerce').fillna(0.0)
 
-        # 增量删除：仅删除本次涉及的 trade_date + 过滤条件匹配的数据
+        # 增量删除：仅删除本次涉及的 trade_date + 本批 ts_code 的数据
         trade_dates = df_output['trade_date'].unique().tolist()
         dates_str = "','".join(trade_dates)
-        delete_conditions = [f"trade_date IN ('{dates_str}')"]
-
+        ts_codes = df_output['ts_code'].unique().tolist()
+        codes_str = "','".join(ts_codes)
+        delete_conditions = [
+            f"trade_date IN ('{dates_str}')",
+            f"ts_code IN ('{codes_str}')"
+        ]
         if call_put:
             delete_conditions.append(f"call_put = '{call_put}'")
-        if ts_code_filter:
-            delete_conditions.append(f"ts_code LIKE '{ts_code_filter}'")
 
         del_sql = f"ALTER TABLE indexsysdb.{self.TABLE_TARGET} DELETE WHERE {' AND '.join(delete_conditions)}"
         logger.info(f"SQL:\n{del_sql}")
         ClickhouseService.execute_sql(del_sql)
-        logger.info(f"Deleted data for trade_dates: {trade_dates}"
-                    f"{', call_put=' + call_put if call_put else ''}"
-                    f"{', ts_code like ' + ts_code_filter if ts_code_filter else ''}")
+        logger.info(f"Deleted data for {len(trade_dates)} trade_dates x {len(ts_codes)} ts_codes"
+                    f"{', call_put=' + call_put if call_put else ''}")
 
         # 写入
         ClickhouseService.save_dataframe_to_clickhouse(
@@ -1027,15 +1088,15 @@ class OptionDailyIndicatorAnalyst:
         logger.info(f"Saved {len(df_output)} rows to {self.TABLE_TARGET}")
 
     def run(self, start_date=None, end_date=None,
-            call_put=None, exercise_type=None, ts_code_filter=None):
+            call_put=None, exercise_type=None, symbol_filter=None):
         """主流程：拉取 → 计算 → 保存
 
         Args:
-            start_date: 期权日线 & 指数行情起始日期 YYYYMMDD
-            end_date: 期权日线 & 指数行情截止日期 YYYYMMDD
+            start_date: 期权日线 & 标的行情起始日期 YYYYMMDD
+            end_date: 期权日线 & 标的行情截止日期 YYYYMMDD
             call_put: 行权方向 'C'/'P'，None 不过滤
             exercise_type: 行权方式 '欧式'/'美式'，None 不过滤
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'，指数期权如 'HO2612%'
 
         Returns:
             pd.DataFrame: 计算后的完整数据
@@ -1048,7 +1109,7 @@ class OptionDailyIndicatorAnalyst:
         logger.info("\nStep 1/5: Fetching option daily data from ClickHouse...")
         df_option = self.fetch_data(
             start_date=start_date, end_date=end_date,
-            call_put=call_put, exercise_type=exercise_type, ts_code_filter=ts_code_filter
+            call_put=call_put, exercise_type=exercise_type, symbol_filter=symbol_filter
         )
 
         if len(df_option) == 0:
@@ -1070,7 +1131,7 @@ class OptionDailyIndicatorAnalyst:
 
         # Step 5: 保存
         logger.info("\nStep 5/5: Saving to ClickHouse...")
-        self.save_to_clickhouse(df_option, call_put=call_put, ts_code_filter=ts_code_filter)
+        self.save_to_clickhouse(df_option, call_put=call_put)
 
         # Summary
         logger.info("\n" + "=" * 80)
@@ -1089,15 +1150,25 @@ class OptionDailyIndicatorAnalyst:
 if __name__ == "__main__":
     from dataIntegrator import CommonParameters
 
-    # 定义报告配置
+    # 定义报告配置：华夏上证50ETF期权（小合约），symbol like '510050%'
     report_configs = [
         {
-            "name": "HO2612看涨欧式期权",
-            "start_date": "20260717",
-            "end_date": "20260717",
+            "name": "华夏上证50ETF看涨欧式期权",
+            "start_date": "20251222",
+            #"end_date": "20260717",
+            "end_date": CommonParameters.today,
             "call_put": "C",
             "exercise_type": "欧式",
-            "ts_code_filter": "HO2612%",
+            "symbol_filter": "510050%",
+        },
+        {
+            "name": "华夏上证50ETF看跌欧式期权",
+            "start_date": "20251222",
+            #"end_date": "20260717",
+            "end_date": CommonParameters.today,
+            "call_put": "P",
+            "exercise_type": "欧式",
+            "symbol_filter": "510050%",
         },
     ]
 

@@ -1,0 +1,3 @@
+$action = New-ScheduledTaskAction -Execute "D:\workspace_python\infinity\CICD\batch\data\run_DataRefreshManager.bat" -WorkingDirectory "D:\workspace_python\infinity\CICD\batch\data"
+$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Friday -At "21:00"
+Register-ScheduledTask -TaskName "Refreshdata" -Action $action -Trigger $trigger -Force

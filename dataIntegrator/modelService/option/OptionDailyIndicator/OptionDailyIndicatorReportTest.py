@@ -1,5 +1,5 @@
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionDailyIndicatorReport import \
+from dataIntegrator.modelService.option.OptionDailyIndicator.OptionDailyIndicatorReport import \
     OptionDailyIndicatorReport
 
 logger = CommonLib.logger
@@ -13,23 +13,24 @@ class OptionDailyIndicatorReportTest:
         logger.info("Starting OptionDailyIndicatorReportTest")
         logger.info("=" * 80)
 
-        # 定义报告配置：每个 ts_code_filter + call_put 组合为独立产品
+        # 定义报告配置：华夏上证50ETF期权（小合约），symbol like '510050%'
+        # 每个 symbol_filter + call_put 组合为独立产品
         report_configs = [
             {
-                "name": "HO2612看涨欧式期权",
+                "name": "华夏上证50ETF看涨欧式期权",
                 "start_date": "20251222",
                 #"end_date": "20260717",
                 "end_date": CommonParameters.today,
                 "call_put": "C",
-                "ts_code_filter": "HO2612%",
+                "symbol_filter": "510050_2612%", #一个月的期权数据，否则太大，报表没有作用
             },
             {
-                "name": "HO2612看跌欧式期权",
+                "name": "华夏上证50ETF看跌欧式期权",
                 "start_date": "20251222",
                 #"end_date": "20260717",
-                "end_date": CommonParameters.today,
+                "end_date": CommonParameters.today, #一个月的期权数据，否则太大，报表没有作用
                 "call_put": "P",
-                "ts_code_filter": "HO2612%",
+                "symbol_filter": "510050_2612%",
             },
         ]
 
@@ -44,7 +45,7 @@ class OptionDailyIndicatorReportTest:
                 pdf_path = dailyIndicatorReport.run(
                     start_date=config.get("start_date"),
                     end_date=config.get("end_date"),
-                    ts_code_filter=config.get("ts_code_filter"),
+                    symbol_filter=config.get("symbol_filter"),
                     call_put=config.get("call_put"),
                 )
                 if pdf_path:

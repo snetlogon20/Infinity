@@ -8,38 +8,21 @@ logger = CommonLib.logger
 
 class TuShareOptBasicService(TuShareService):
 
-    # opt_basic 接口单次调用最多返回 12000 行（实测，超出部分静默截断），翻页步长
+    # opt_basic 单次调用最多返回约 12000 行，超出部分会被 TuShare 静默截断，必须分页拉取
     OPT_BASIC_PAGE_SIZE = 5000
 
-    # 全量模式（exchange=''）下需要遍历的交易所
-    ALL_OPT_EXCHANGES = ['SSE', 'SZSE', 'CFFEX', 'SHFE', 'DCE', 'CZCE', 'INE', 'GFEX']
-
-    # SHFE 期权代码前缀映射（opt_basic → opt_daily）
-    # tushare 的 opt_basic 对上期所沪铜期权用标的前缀 CU（如 CU2612C84000.SHF），
-    # 而 opt_daily 用交易所原生代码 HO（如 HO2612C84000.SHF），两表按 ts_code JOIN 时全部失配。
-    # 入库前统一映射为 opt_daily 的写法。
-    SHFE_OPT_PREFIX_MAP = {'CU': 'HO'}
-
     @classmethod
-    def _normalizeOptCode(self, df):
-        """将 SHFE 沪铜期权 ts_code 前缀 CU→HO，与 opt_daily 对齐"""
-        for src_prefix, dst_prefix in self.SHFE_OPT_PREFIX_MAP.items():
-            mask = df['ts_code'].astype(str).str.match(rf'^{src_prefix}\d{{4}}[CP]\d+\.SHF$')
-            if mask.any():
-                df.loc[mask, 'ts_code'] = df.loc[mask, 'ts_code'].astype(str).str.replace(
-                    rf'^{src_prefix}', dst_prefix, regex=True)
-                logger.info(f"SHFE 期权代码前缀映射 {src_prefix}->{dst_prefix}: {int(mask.sum())} 行")
-        return df
-
-    @classmethod
-    def prepareDataFrame(self, exchange=""):
+    def prepareDataFrame(self, exchange="", symbol_prefix=None):
         """
         获取期权基础信息
         opt_basic 接口根据交易所代码获取该交易所所有期权合约基础信息
 
-        重要：opt_basic 单次调用最多返回 12000 行（实测），全市场数据远超此数，
-        一次性调用会导致 SHFE 等交易所数据被静默截断。
-        因此必须「按交易所 + offset 翻页」拉取。
+        Args:
+            exchange: 交易所代码（SSE/SZSE/CFFEX/DCE/CZCE/SHFE/INE/GFEX），空串=全市场
+            symbol_prefix: 标的代码前缀过滤（如 '510050' = 华夏上证50ETF期权）。
+                           TuShare 不支持按 symbol 服务端过滤，此处拉取后在内存中过滤。
+                           注意：SSE ETF 期权的 ts_code 是 8 位数字（如 10000201.SH），
+                           标的信息只在 symbol 字段中（如 510050C2900M0250.SSE）。
         """
         logger.info("prepareData started")
 
@@ -48,36 +31,36 @@ class TuShareOptBasicService(TuShareService):
                       'exercise_type,exercise_price,opt_multiplier,s_month,maturity_date,'
                       'list_price,list_date,delist_date,last_edate,last_ddate,quote_unit,min_price_chg')
 
-            # 按交易所遍历（单交易所也要翻页，SHFE 一家就超过 16000 行）
-            exchanges = [exchange] if exchange else self.ALL_OPT_EXCHANGES
+            # 分页拉取，避免单次调用超过行数上限被静默截断
+            all_dfs = []
+            offset = 0
+            while True:
+                df = self.pro.opt_basic(exchange=exchange, fields=fields,
+                                        offset=offset, limit=self.OPT_BASIC_PAGE_SIZE)
+                if df is None or df.empty:
+                    break
+                all_dfs.append(df)
+                logger.info(f"  opt_basic 分页拉取: offset={offset}, 本页 {len(df)} 行")
+                if len(df) < self.OPT_BASIC_PAGE_SIZE:
+                    break
+                offset += self.OPT_BASIC_PAGE_SIZE
 
-            frames = []
-            for ex in exchanges:
-                offset = 0
-                while True:
-                    chunk = self.pro.opt_basic(exchange=ex, fields=fields,
-                                               offset=offset, limit=self.OPT_BASIC_PAGE_SIZE)
-                    if chunk is None or len(chunk) == 0:
-                        break
-                    frames.append(chunk)
-                    logger.info(f"opt_basic[{ex}] offset={offset}: {len(chunk)} 行")
-                    if len(chunk) < self.OPT_BASIC_PAGE_SIZE:
-                        break
-                    offset += self.OPT_BASIC_PAGE_SIZE
-
-            if not frames:
+            if not all_dfs:
+                logger.warning(f"opt_basic 未获取到数据 (exchange='{exchange}')")
                 self.dataFrame = pd.DataFrame()
-                logger.warning("期权基础信息数据为空")
                 return self.dataFrame
 
-            self.dataFrame = pd.concat(frames, ignore_index=True) \
-                .drop_duplicates(subset='ts_code', ignore_index=True)
-
+            self.dataFrame = pd.concat(all_dfs, ignore_index=True).drop_duplicates(subset=['ts_code'])
             row_count = len(self.dataFrame)
             logger.info(f"成功获取期权基础信息数据，共 {row_count} 行")
 
-            # SHFE 沪铜期权代码前缀归一化（CU→HO），保证与 opt_daily 可按 ts_code JOIN
-            self.dataFrame = self._normalizeOptCode(self.dataFrame)
+            # 按标的代码前缀过滤（如 510050 ETF 期权）
+            if symbol_prefix:
+                mask = (self.dataFrame['symbol'].astype(str)
+                        .str.upper()
+                        .str.startswith(str(symbol_prefix).upper()))
+                self.dataFrame = self.dataFrame[mask]
+                logger.info(f"按 symbol 前缀 '{symbol_prefix}' 过滤后剩余 {len(self.dataFrame)} 行")
 
             # 添加 trade_date 列，值为当天日期
             self.dataFrame['trade_date'] = CommonParameters.today
@@ -162,16 +145,23 @@ class TuShareOptBasicService(TuShareService):
         logger.info("saveDateToClickHouse completed")
 
     @classmethod
-    def deleteDateFromClickHouse(self):
+    def deleteDateFromClickHouse(self, symbol_prefix=None):
         """
         按 trade_date 删除当天数据，避免覆盖历史数据
+
+        Args:
+            symbol_prefix: 标的代码前缀（如 '510050'）。非空时只删除该标的的当天快照，
+                           不影响其他标的已入库的数据；为 None 时删除当天全量数据（兼容旧行为）
         """
         logger.info("deleteDateFromClickHouse started")
 
         try:
             del_sql = f"ALTER TABLE indexsysdb.df_tushare_opt_basic DELETE WHERE trade_date = '{CommonParameters.today}'"
+            if symbol_prefix:
+                del_sql += f" AND symbol LIKE '{symbol_prefix}%'"
             self.clickhouseClient.execute(del_sql)
-            logger.info(f"已删除 trade_date = {CommonParameters.today} 的旧数据")
+            logger.info(f"已删除 trade_date = {CommonParameters.today} 的旧数据"
+                        + (f" (symbol LIKE '{symbol_prefix}%')" if symbol_prefix else " (全量)"))
         except Exception as e:
             self.writeLogError(e, className=self.__class__.__name__, functionName=sys._getframe().f_code.co_name)
             raise e

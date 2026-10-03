@@ -1,5 +1,5 @@
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionDailyIndicatorManager import OptionDailyIndicatorManager
+from dataIntegrator.modelService.option.OptionDailyIndicator.OptionDailyIndicatorManager import OptionDailyIndicatorManager
 logger = CommonLib.logger
 
 # ================================================================
@@ -10,25 +10,26 @@ if __name__ == "__main__":
     print("OptionDailyIndicatorManagerTest")
     print("=" * 80)
 
-    # 定义测试配置：每个 ts_code_filter + call_put 组合为独立产品
+    # 定义测试配置：华夏上证50ETF期权（小合约），symbol like '510050%'
+    # 每个 symbol_filter + call_put 组合为独立产品
     report_configs = [
         {
-            "name": "HO2612看涨欧式期权",
+            "name": "华夏上证50ETF看涨欧式期权",
             "start_date": "20251222",
             #"end_date": "20260717",
             "end_date": CommonParameters.today,
             "call_put": "C",
             "exercise_type": "欧式",
-            "ts_code_filter": "HO2612%",
+            "symbol_filter": "510050%",
         },
         {
-            "name": "HO2612看跌欧式期权",
+            "name": "华夏上证50ETF看跌欧式期权",
             "start_date": "20251222",
             #"end_date": "20260717",
             "end_date": CommonParameters.today,
             "call_put": "P",
             "exercise_type": "欧式",
-            "ts_code_filter": "HO2612%",
+            "symbol_filter": "510050%",
         },
     ]
 
@@ -47,7 +48,7 @@ if __name__ == "__main__":
                 end_date=config.get("end_date"),
                 call_put=config.get("call_put"),
                 exercise_type=config.get("exercise_type"),
-                ts_code_filter=config.get("ts_code_filter"),
+                symbol_filter=config.get("symbol_filter"),
             )
             logger.info(f"✅ 第 {idx} 个配置计算完成，记录数: {len(df_option_result)}")
 

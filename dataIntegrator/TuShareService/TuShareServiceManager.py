@@ -29,6 +29,7 @@ from dataIntegrator.TuShareService.TuShareIndexGlobalService import TuShareIndex
 from dataIntegrator.TuShareService.TuShareOptBasicService import TuShareOptBasicService
 from dataIntegrator.TuShareService.TuShareOptDailyService import TuShareOptDailyService
 from dataIntegrator.TuShareService.TuShareIndexDailyBasicService import TuShareIndexDailyBasicService
+from dataIntegrator.TuShareService.TuShareFundDailyService import TuShareFundDailyService
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.modelService.commonService.CalendarService import CalendarService
 from dataIntegrator.TuShareService.TuShareJobLogger import TuShareJobLogger
@@ -941,6 +942,76 @@ class TuShareServiceManager():
             logger.error(f"❌ 期权日线数据处理失败：{str(e)}")
             raise e
 
+    @classmethod
+    def callTuShareFundDailyService(self, param_dict):
+        """
+        刷新期权标的ETF基金日线数据
+        参考 TuShareFundDailyServiceTest
+        目标表: indexsysdb.df_tushare_fund_daily（ETF期权 spot_price 数据源）
+        """
+        job_logger = TuShareJobLogger()
+        job_logger.start_job("callTuShareFundDailyService", param_dict)
+
+        try:
+            logger.info("callTuShareFundDailyService started...")
+
+            start_date = param_dict.get("start_date")
+            end_date = param_dict.get("end_date")
+
+            fund_list = TuShareFundDailyService.OPTION_UNDERLYING_ETF_LIST
+
+            logger.info(f"开始批量处理 {len(fund_list)} 个期权标的ETF...")
+            logger.info(f"日期范围: {start_date} ~ {end_date}")
+
+            total_records = 0
+            success_count = 0
+            failed_count = 0
+
+            for fund_code in fund_list:
+                try:
+                    logger.info(f"\n{'=' * 60}")
+                    logger.info(f"正在处理基金: {fund_code}")
+                    logger.info(f"{'=' * 60}")
+
+                    tuShareService = TuShareFundDailyService()
+                    dataFrame = tuShareService.prepareDataFrame(fund_code, start_date, end_date)
+
+                    if dataFrame.empty:
+                        logger.warning(f"{fund_code} 没有获取到数据，跳过...")
+                        continue
+
+                    csvFilePath = os.path.join(
+                        CommonParameters.outBoundPath,
+                        f"df_tushare_fund_daily_{fund_code.replace('.', '_')}_{start_date[:4]}.csv")
+
+                    jsonString = tuShareService.convertDataFrame2JSON()
+                    tuShareService.saveDateFrameToDisk(csvFilePath)
+                    tuShareService.deleteDateFromClickHouse(fund_code, start_date, end_date)
+                    tuShareService.saveDateToClickHouse()
+
+                    total_records += len(dataFrame)
+                    success_count += 1
+                    logger.info(f"✅ {fund_code} 处理完成，共 {len(dataFrame)} 条记录")
+
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"❌ {fund_code} 处理失败：{str(e)}")
+                    logger.error(traceback.format_exc())
+                    continue
+
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"批量处理完成！共处理 {len(fund_list)} 个基金")
+            logger.info(f"成功: {success_count}, 失败: {failed_count}, 总记录数: {total_records}")
+            logger.info(f"{'=' * 60}")
+
+            job_logger.end_job_success(records_processed=total_records)
+            logger.info("callTuShareFundDailyService ended...")
+
+        except Exception as e:
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            logger.error(f"❌ ETF基金日线数据处理失败：{str(e)}")
+            raise e
+
     #@classmethod
     def callTuShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
@@ -982,6 +1053,7 @@ class TuShareServiceManager():
                 "callTuShareOptDailyService": {"start_date": start_date,"end_date": end_date},  # 期权日线行情（精确模式：只拉指定22个HO2612合约，批量入库）
                 #  TuShareYieldCurveConvertableBondService 需要特殊权限的token，无法使用
                 "callTuShareIndexDailyBasicService": {"start_date": start_date,"end_date": end_date},  # 大盘指数每日指标
+                "callTuShareFundDailyService": {"start_date": start_date, "end_date": end_date},  # 期权标的ETF基金日线行情（510050等，写入df_tushare_fund_daily）
             }
 
             # 按顺序调用方法

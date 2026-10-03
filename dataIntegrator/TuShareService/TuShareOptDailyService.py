@@ -12,6 +12,70 @@ logger = CommonLib.logger
 
 class TuShareOptDailyService(TuShareService):
 
+    # opt_daily 单次调用有行数上限（超出会被静默截断），按交易日全市场拉取时必须分页
+    OPT_DAILY_PAGE_SIZE = 5000
+
+    # ts_code 后缀 → 交易所代码映射（用于混合多交易所合约清单时自动分组拉取）
+    # 如 10000201.SH → SSE, HO2612-C-2500.CFX → CFFEX
+    TS_CODE_SUFFIX_EXCHANGE_MAP = {
+        '.SH': 'SSE',
+        '.SZ': 'SZSE',
+        '.CFX': 'CFFEX',
+        '.DCE': 'DCE',
+        '.CZC': 'CZCE',
+        '.SHF': 'SHFE',
+        '.INE': 'INE',
+        '.GF': 'GFEX',
+    }
+
+    @classmethod
+    def group_ts_code_list_by_exchange(self, ts_code_list):
+        """按 ts_code 后缀把合约清单分组到对应交易所
+
+        无法识别后缀的合约归入 ''（全市场）组。
+
+        Returns:
+            dict: {exchange_code: [ts_code, ...]}
+        """
+        groups = {}
+        for ts_code in ts_code_list:
+            ts_str = str(ts_code).strip()
+            exchange = ''
+            for suffix, exch in self.TS_CODE_SUFFIX_EXCHANGE_MAP.items():
+                if ts_str.endswith(suffix):
+                    exchange = exch
+                    break
+            groups.setdefault(exchange, []).append(ts_str)
+        return groups
+
+    @classmethod
+    def _fetch_opt_daily_by_date(self, trade_date_str, exchange=None):
+        """
+        按交易日分页拉取期权日线数据（全市场或单交易所），避免超过单次行数上限被截断
+
+        Args:
+            trade_date_str: 交易日期 YYYYMMDD
+            exchange: 交易所（SSE/SZSE/CFFEX/DCE/SHFE/CZCE），None=全市场
+
+        Returns:
+            DataFrame: 该交易日全部行情数据，无数据时返回空 DataFrame
+        """
+        all_dfs = []
+        offset = 0
+        while True:
+            df = self.pro.opt_daily(trade_date=trade_date_str, exchange=exchange,
+                                    offset=offset, limit=self.OPT_DAILY_PAGE_SIZE)
+            if df is None or df.empty:
+                break
+            all_dfs.append(df)
+            if len(df) < self.OPT_DAILY_PAGE_SIZE:
+                break
+            offset += self.OPT_DAILY_PAGE_SIZE
+
+        if not all_dfs:
+            return pandas.DataFrame()
+        return pandas.concat(all_dfs, ignore_index=True)
+
     @classmethod
     def prepareDataFrame(self, ts_code=None, trade_date=None, start_date=None, end_date=None, exchange=None):
         """
@@ -103,7 +167,7 @@ class TuShareOptDailyService(TuShareService):
             batch_no += 1
             date_str = current.strftime("%Y%m%d")
             try:
-                df = self.pro.opt_daily(trade_date=date_str, exchange=exchange)
+                df = self._fetch_opt_daily_by_date(date_str, exchange=exchange)
                 if not df.empty:
                     all_dfs.append(df)
                     logger.info(f"  第 {batch_no} 批: {date_str}，获取 {len(df)} 条记录")
@@ -312,41 +376,52 @@ class TuShareOptDailyService(TuShareService):
         """
         批量获取期权日线数据（推荐方式，效率高）
 
-        每个交易日只调用一次 API（按 trade_date + exchange 拉全量），
+        每个交易日按交易所拉取（按 trade_date + exchange 拉全量），
         在内存中过滤目标合约，最后一次性存入 ClickHouse。
+
+        支持跨交易所混合合约清单：
+        - exchange 显式传入时，全部合约按该交易所拉取（原行为不变）
+        - exchange 为空时，按 ts_code 后缀自动分组（如 .SH→SSE, .CFX→CFFEX），
+          各交易所分别拉取，可同时处理 SSE ETF期权 + CFFEX 指数期权
 
         Args:
             ts_code_list: 目标合约代码列表
             trade_date_list: 交易日期列表
-            exchange: 交易所，默认空串表示全交易所
+            exchange: 交易所，默认空串表示按 ts_code 后缀自动分组
         """
         logger.info(f"批量查询期权日线数据: {len(ts_code_list)} 个合约 x {len(trade_date_list)} 个交易日")
+
+        # 按交易所分组（显式指定 exchange 时不分组）
+        if exchange:
+            exchange_groups = {exchange: list(ts_code_list)}
+        else:
+            exchange_groups = self.group_ts_code_list_by_exchange(ts_code_list)
+        logger.info(f"交易所分组: {[(exch or '全市场', len(codes)) for exch, codes in exchange_groups.items()]}")
 
         all_dfs = []
         tuShareService = TuShareOptDailyService()
 
-        for i, trade_date_str in enumerate(trade_date_list):
-            try:
-                logger.info(f"  [{i + 1}/{len(trade_date_list)}] 获取 {trade_date_str} 的全量期权日线数据...")
-                df = tuShareService.pro.opt_daily(
-                    trade_date=trade_date_str,
-                    exchange=exchange
-                )
-                if df.empty:
-                    logger.warning(f"  {trade_date_str} 获取数据为空，跳过")
-                    continue
+        for exch, group_codes in exchange_groups.items():
+            for i, trade_date_str in enumerate(trade_date_list):
+                try:
+                    logger.info(f"  [{exch or '全市场'}] [{i + 1}/{len(trade_date_list)}] "
+                                f"获取 {trade_date_str} 的期权日线数据...")
+                    df = tuShareService._fetch_opt_daily_by_date(trade_date_str, exchange=exch)
+                    if df.empty:
+                        logger.warning(f"  {trade_date_str} ({exch or '全市场'}) 获取数据为空，跳过")
+                        continue
 
-                # 过滤目标合约
-                df_filtered = df[df['ts_code'].isin(ts_code_list)]
-                logger.info(f"  全量 {len(df)} 条 -> 过滤后 {len(df_filtered)} 条")
+                    # 过滤目标合约
+                    df_filtered = df[df['ts_code'].isin(group_codes)]
+                    logger.info(f"  全量 {len(df)} 条 -> 过滤后 {len(df_filtered)} 条")
 
-                if not df_filtered.empty:
-                    all_dfs.append(df_filtered)
+                    if not df_filtered.empty:
+                        all_dfs.append(df_filtered)
 
-                time.sleep(0.3)
-            except Exception as e:
-                logger.warning(f"  {trade_date_str} 获取失败: {e}")
-                time.sleep(0.5)
+                    time.sleep(0.3)
+                except Exception as e:
+                    logger.warning(f"  {trade_date_str} ({exch or '全市场'}) 获取失败: {e}")
+                    time.sleep(0.5)
 
         if not all_dfs:
             logger.warning("所有日期均未获取到目标合约数据，跳过")

@@ -23,7 +23,7 @@ OptionTradingStrategyAnalyzerReport — 测试入口
 
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
-from dataIntegrator.modelService.option.OptionTradingStrategyAnalyzerReport import \
+from dataIntegrator.modelService.option.OptionTradingStrategyAnalyzer.OptionTradingStrategyAnalyzerReport import \
     OptionTradingStrategyAnalyzerReport
 
 logger = CommonLib.logger

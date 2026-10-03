@@ -12,7 +12,7 @@
 from datetime import datetime, timedelta
 
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionDailyIndicatorAnalyst import OptionDailyIndicatorAnalyst
+from dataIntegrator.modelService.option.OptionDailyIndicator.OptionDailyIndicatorAnalyst import OptionDailyIndicatorAnalyst
 
 logger = CommonLib.logger
 
@@ -30,15 +30,15 @@ class OptionDailyIndicatorManager:
         logger.info("OptionDailyIndicatorManager.__init__: initialized")
 
     def run(self, start_date=None, end_date=None,
-                 call_put=None, exercise_type=None, ts_code_filter=None):
+                 call_put=None, exercise_type=None, symbol_filter=None):
         """运行测试
 
         Args:
-            start_date: 期权日线 & 指数行情起始日期 YYYYMMDD
-            end_date: 期权日线 & 指数行情截止日期 YYYYMMDD
+            start_date: 期权日线 & 标的行情起始日期 YYYYMMDD
+            end_date: 期权日线 & 标的行情截止日期 YYYYMMDD
             call_put: 行权方向 'C'/'P'，None 不过滤
             exercise_type: 行权方式 '欧式'/'美式'，None 不过滤
-            ts_code_filter: 合约代码过滤（LIKE），如 'HO2612%'
+            symbol_filter: 标的过滤（LIKE），ETF期权如 '510050%'（匹配 basic.symbol），指数期权如 'HO2612%'
         """
         logger.info("=" * 80)
         logger.info("OptionDailyIndicatorManager.run: Starting")
@@ -57,7 +57,7 @@ class OptionDailyIndicatorManager:
         logger.info("\n📥 Step 1: Fetching data...")
         df_option_data = self.service.fetch_data(
             start_date=start_date, end_date=end_date,
-            call_put=call_put, exercise_type=exercise_type, ts_code_filter=ts_code_filter
+            call_put=call_put, exercise_type=exercise_type, symbol_filter=symbol_filter
         )
         logger.info(f"Fetched {len(df_option_data)} rows, {len(df_option_data.columns)} columns")
 
@@ -161,7 +161,7 @@ class OptionDailyIndicatorManager:
 
         # ---- Step 3: 保存 ----
         logger.info("\n💾 Step 3: Saving to ClickHouse...")
-        self.service.save_to_clickhouse(df_option_data, call_put=call_put, ts_code_filter=ts_code_filter)
+        self.service.save_to_clickhouse(df_option_data, call_put=call_put)
 
         logger.info("\n" + "=" * 80)
         logger.info("✅ Test completed!")
