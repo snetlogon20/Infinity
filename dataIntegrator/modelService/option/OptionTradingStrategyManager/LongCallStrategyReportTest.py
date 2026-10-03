@@ -1,15 +1,15 @@
 r"""
-Protective Put 策略 PDF 报告 — 测试入口
+Long Call 策略 PDF 报告 — 测试入口
 
 运行方式：
-    python -m dataIntegrator.modelService.option.OptionTradingStrategyManager.ProtectivePutStrategyReportTest
+    python -m dataIntegrator.modelService.option.OptionTradingStrategyManager.LongCallStrategyReportTest
 
 前置条件：
-    先运行 ProtectivePutStrategyAnalysisTest 完成 tb_option_trading_strategy_protective_put 落库
+    先运行 LongCallStrategyAnalysisTest 完成 tb_option_trading_strategy_long_call 落库
 
 功能：
-    调用 ProtectivePutStrategyReport 按配置从 tb_option_trading_strategy_protective_put 读取
-    strategy_type='PROTECTIVE_PUT' 的分析结果，生成 PDF 报告（含指标表格、10张图表、
+    调用 LongCallStrategyReport 按配置从 tb_option_trading_strategy_long_call 读取
+    strategy_type='LONG_CALL' 的分析结果，生成 PDF 报告（含指标表格、10张图表、
     数字化交易员点评），输出到 CommonParameters.optionAnalysisReportPath：
     D:\workspace_python\infinity_data\outbound\report\OptionAnalysis
 
@@ -17,49 +17,50 @@ Protective Put 策略 PDF 报告 — 测试入口
     - name:           报告名称
     - start_date:     数据起始日期 YYYYMMDD（与分析落库区间一致）
     - end_date:       数据截止日期 YYYYMMDD
-    - call_put:       'P'（Protective Put 只用认沽侧）
-    - symbol_filter:  LIKE 模式过滤 symbol，如 '510050P2612%'
+    - call_put:       'C'（Long Call 只用认购侧）
+    - symbol_filter:  LIKE 模式过滤 symbol，如 '510050C2612%'
 """
 
 from dataIntegrator import CommonLib, CommonParameters
-from dataIntegrator.modelService.option.OptionTradingStrategyManager.ProtectivePutStrategyReport import (
-    ProtectivePutStrategyReport
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.LongCallStrategyReport import (
+    LongCallStrategyReport
 )
 
 logger = CommonLib.logger
 
 
-class ProtectivePutStrategyReportTest:
-    """Protective Put 策略 PDF 报告测试类"""
+class LongCallStrategyReportTest:
+    """Long Call 策略 PDF 报告测试类"""
 
     def run(self):
         """按配置批量生成 PDF 报告"""
         logger.info("=" * 80)
-        logger.info("Starting ProtectivePutStrategyReportTest")
+        logger.info("Starting LongCallStrategyReportTest")
         logger.info("=" * 80)
 
         # ============================================================
-        # 报告配置列表 — 与 ProtectivePutStrategyAnalysisTest 保持一致
+        # 报告配置列表 — 与 LongCallStrategyAnalysisTest 保持一致
         # ============================================================
         report_configs = [
             {
-                "name": "华夏上证50ETF认沽期权（Protective Put）",
+                "name": "华夏上证50ETF认购期权（Long Call 牛市买购）",
                 "start_date": "20251222",
+                # "end_date": "20260717",
                 "end_date": CommonParameters.today,
-                "call_put": "P",
-                "symbol_filter": "510050P2612%",
+                "call_put": "C",
+                "symbol_filter": "510050C2612%",
             },
             # 追加配置示例（换月滚动时改 symbol_filter 即可）:
             # {
-            #     "name": "华夏上证50ETF认沽期权2603（Protective Put）",
+            #     "name": "华夏上证50ETF认购期权2603（Long Call 牛市买购）",
             #     "start_date": "20251222",
             #     "end_date": CommonParameters.today,
-            #     "call_put": "P",
-            #     "symbol_filter": "510050P2603%",
+            #     "call_put": "C",
+            #     "symbol_filter": "510050C2603%",
             # },
         ]
 
-        report = ProtectivePutStrategyReport()
+        report = LongCallStrategyReport()
 
         success_count = 0
         fail_count = 0
@@ -78,7 +79,7 @@ class ProtectivePutStrategyReportTest:
                     logger.info(f"  ✅ PDF 报告已生成: {filepath}")
                     success_count += 1
                 else:
-                    logger.warning(f"  ⚠️ 数据为空（先运行 ProtectivePutStrategyAnalysisTest），报告跳过")
+                    logger.warning(f"  ⚠️ 数据为空（先运行 LongCallStrategyAnalysisTest），报告跳过")
                     skip_count += 1
 
             except Exception as e:
@@ -90,12 +91,12 @@ class ProtectivePutStrategyReportTest:
 
         # 总结
         logger.info("\n" + "=" * 80)
-        logger.info("ProtectivePutStrategyReportTest 完成")
+        logger.info("LongCallStrategyReportTest 完成")
         logger.info(f"  成功: {success_count}, 跳过(空数据): {skip_count}, 失败: {fail_count}")
         logger.info(f"  输出目录: {report.REPORT_DIR}")
         logger.info("=" * 80)
 
 
 if __name__ == "__main__":
-    test = ProtectivePutStrategyReportTest()
+    test = LongCallStrategyReportTest()
     test.run()

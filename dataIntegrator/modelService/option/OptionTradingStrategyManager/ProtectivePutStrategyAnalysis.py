@@ -14,8 +14,9 @@ Protective Put（保护性认沽）策略分析 — 高级交易员/风控视角
   - df_tushare_opt_basic           : symbol/name 反查（ETF 期权 ts_code 为8位数字）
 
 落库：
-  - tb_option_trading_strategy     : strategy_type='PROTECTIVE_PUT'，
+  - tb_option_trading_strategy_protective_put : strategy_type='PROTECTIVE_PUT'，
                                      每行带 analysis_time / analysis_params / analysis_version
+  - 跨策略查询走 vw_option_trading_strategy_union 联合视图
 
 使用（symbol 直接指定标的+方向+到期月，如华夏上证50ETF 2612 认沽）：
   config = {
@@ -47,7 +48,10 @@ class ProtectivePutStrategyAnalysis(OptionStrategyBase):
     STRATEGY_TYPE = 'PROTECTIVE_PUT'
     ANALYSIS_VERSION = 'v1'
 
-    # === 目标表字段（与 tb_option_trading_strategy.sql 建表一致） ===
+    # === 目标专表（基类 TABLE_TARGET 已抽象化，必须显式指定） ===
+    TABLE_TARGET = 'tb_option_trading_strategy_protective_put'
+
+    # === 目标表字段（与 tb_option_trading_strategy_protective_put.sql 建表一致） ===
     TARGET_COLUMNS = [
         # 策略标识与审计
         'strategy_type', 'analysis_time', 'analysis_params', 'analysis_version',

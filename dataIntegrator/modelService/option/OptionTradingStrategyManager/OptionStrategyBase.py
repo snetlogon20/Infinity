@@ -9,14 +9,19 @@ r"""
     - tb_tushare_opt_daily_indicator : BS定价/Greeks/价态等通用指标
     - df_tushare_opt_basic           : symbol/name/exchange 反查（ETF期权 ts_code 为8位数字）
 
-落库：
-    - tb_option_trading_strategy     : 按 strategy_type 分区共用一张表，
-                                       每行记录 analysis_time / analysis_params / analysis_version 审计字段
+落库（每策略一张专表 + 联合视图）：
+    - tb_option_trading_strategy_protective_put : strategy_type='PROTECTIVE_PUT'
+    - tb_option_trading_strategy_covered_call   : strategy_type='COVERED_CALL'
+    - vw_option_trading_strategy_union          : 两表公共字段 UNION 视图（跨策略查询入口）
+    每行记录 analysis_time / analysis_params / analysis_version 审计字段。
+    子类必须覆写 TABLE_TARGET 指明自己的专表，未覆写运行时报错。
 
-后续策略（covered call / collar 等）接入步骤：
-    1. 继承 OptionStrategyBase，填 STRATEGY_TYPE / TARGET_COLUMNS / DEFAULT_SCENARIOS
-    2. 实现三个钩子方法
-    3. 在 OptionStrategyFactory 注册
+后续策略（collar 等）接入步骤：
+    1. 建专表 tb_option_trading_strategy_<strategy>（含审计字段）
+    2. 继承 OptionStrategyBase，填 STRATEGY_TYPE / TABLE_TARGET / TARGET_COLUMNS / DEFAULT_SCENARIOS
+    3. 实现三个钩子方法
+    4. 在 OptionStrategyFactory 注册
+    5. （可选）把公共字段补进 vw_option_trading_strategy_union（注意 UNION ALL 按位置对齐，需重建视图）
 """
 
 import json
@@ -37,7 +42,8 @@ class OptionStrategyBase:
     # === 表名常量 ===
     TABLE_INDICATOR = 'tb_tushare_opt_daily_indicator'
     TABLE_BASIC = 'df_tushare_opt_basic'
-    TABLE_TARGET = 'tb_option_trading_strategy'
+    # 目标专表：子类必须覆写（每策略一张表），未覆写在 save_to_clickhouse 中报错
+    TABLE_TARGET = None
 
     # === 子类必须覆盖的钩子常量 ===
     STRATEGY_TYPE = 'BASE'          # 策略类型标识（落库分区键）
@@ -267,11 +273,18 @@ class OptionStrategyBase:
     # Step 7: 落库（通用，含审计字段与增量删除）
     # ================================================================
     def save_to_clickhouse(self, df, config):
-        """写入 tb_option_trading_strategy（含分析时间戳与参数）
+        """写入策略专表（含分析时间戳与参数）
 
         增量删除范围：strategy_type + trade_date + call_put + symbol LIKE，
         确保只删除同批数据，不误删其他策略/其他配置的历史记录。
         """
+        if not self.TABLE_TARGET:
+            raise NotImplementedError(
+                f"{type(self).__name__} 未覆写 TABLE_TARGET，"
+                f"请为策略 '{self.STRATEGY_TYPE}' 指定专表 "
+                f"(如 tb_option_trading_strategy_<strategy>)"
+            )
+
         logger.info(f"Saving {len(df)} rows to {self.TABLE_TARGET} "
                     f"(strategy_type={self.STRATEGY_TYPE})")
 

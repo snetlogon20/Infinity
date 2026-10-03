@@ -1,9 +1,9 @@
 r"""
-Protective Put（保护性认沽）策略 PDF 报告生成器 — 资深交易员/风控视角
+Covered Call（备兑开仓）策略 PDF 报告生成器 — 资深交易员/风控视角
 
 数据源：
-    tb_option_trading_strategy_protective_put (strategy_type='PROTECTIVE_PUT',
-    由 ProtectivePutStrategyAnalysis 写入，含 analysis_time/analysis_params 审计字段)
+    tb_option_trading_strategy_covered_call (strategy_type='COVERED_CALL',
+    由 CoveredCallStrategyAnalysis 写入，含 analysis_time/analysis_params 审计字段)
 
 报告结构：
     封面 → 数据概览(数字) → 最新交易日核心指标总览(表格) → 10张图表(各配数字说明)
@@ -42,15 +42,15 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 
-class ProtectivePutStrategyReport:
-    """Protective Put 策略 报告生成器"""
+class CoveredCallStrategyReport:
+    """Covered Call 策略 报告生成器"""
 
     REPORT_DIR = CommonParameters.optionAnalysisReportPath
-    TABLE_SOURCE = 'tb_option_trading_strategy_protective_put'
-    STRATEGY_TYPE = 'PROTECTIVE_PUT'
+    TABLE_SOURCE = 'tb_option_trading_strategy_covered_call'
+    STRATEGY_TYPE = 'COVERED_CALL'
 
-    # 情景因子（与分析端 DEFAULT_SCENARIOS 一致）
-    SCENARIO_FACTORS = [0.80, 0.85, 0.90, 0.95, 1.00, 1.03, 1.05, 1.10]
+    # 情景因子（与分析端 DEFAULT_SCENARIOS 一致，上行为主）
+    SCENARIO_FACTORS = [0.85, 0.90, 0.95, 1.00, 1.03, 1.05, 1.10, 1.15]
 
     CHART_COLORS = [
         '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12',
@@ -93,8 +93,8 @@ class ProtectivePutStrategyReport:
 
     # ===================== 数据获取 =====================
 
-    def fetch_data(self, start_date=None, end_date=None, symbol_filter=None, call_put='P'):
-        """从 tb_option_trading_strategy_protective_put 拉取 PROTECTIVE_PUT 策略分析结果"""
+    def fetch_data(self, start_date=None, end_date=None, symbol_filter=None, call_put='C'):
+        """从 tb_option_trading_strategy_covered_call 拉取 COVERED_CALL 策略分析结果"""
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName="fetch_data",
                           event=f"Fetching data from {self.TABLE_SOURCE}")
@@ -127,12 +127,14 @@ class ProtectivePutStrategyReport:
             'exercise_price', 'opt_multiplier', 'spot_price', 'premium',
             'implied_vol', 'iv_rank', 'delta', 'gamma', 'theta', 'vega',
             'bs_theoretical_price', 'close_vs_theoretical', 'close_vs_theoretical_pct',
-            'protected_floor', 'protected_floor_pct_of_spot',
-            'max_loss', 'max_loss_cny', 'max_loss_pct_of_spot',
-            'protection_per_cost', 'downside_capture',
-            'hedge_cost_ratio', 'annualized_hedge_cost_pct',
-            'theta_cost_daily', 'theta_cost_total', 'theta_cost_pct_of_premium',
-            'breakeven_S_T', 'breakeven_S_T_pct', 'upside_giveup_pct',
+            'max_profit', 'max_profit_cny', 'max_profit_pct_of_spot',
+            'upside_cap_S_T', 'upside_giveup_pct',
+            'premium_cushion', 'premium_cushion_pct_of_spot',
+            'downside_breakeven_S_T', 'downside_breakeven_S_T_pct',
+            'max_loss', 'max_loss_cny', 'max_loss_pct_of_spot', 'cushion_effect',
+            'premium_yield_pct', 'annualized_premium_yield_pct',
+            'theta_income_daily', 'theta_income_total', 'theta_income_pct_of_premium',
+            'assignment_prob',
             'portfolio_delta', 'residual_exposure_pct',
             'risk_free_rate', 'dividend_yield',
         ] + [f'scenario_pnl_{f:.2f}'.replace('.', '_') + suf
@@ -289,14 +291,14 @@ class ProtectivePutStrategyReport:
         return self._fig_to_bytesio(fig)
 
     def gen_chart1_spot_premium(self, df):
-        """图1：现货价(Y1) + 各合约 Put 权利金(Y2)"""
+        """图1：现货价(Y1) + 各合约 Call 权利金(Y2)"""
         ts_codes, series_dict = self._prep_series(df, ['spot_price', 'premium'])
         if not ts_codes:
             return None
         label_map = self._build_label_map(df)
 
         fig, ax1 = plt.subplots(figsize=(20, 8))
-        fig.suptitle('图1：标的现货价格 + 各合约 Put 权利金 (premium)',
+        fig.suptitle('图1：标的现货价格 + 各合约 Call 权利金 (premium)',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
         # Y1: spot
@@ -329,7 +331,7 @@ class ProtectivePutStrategyReport:
                 ax2.plot(s.index.tolist(), s.values, color=color, linewidth=0.9,
                          alpha=0.8, marker='o', markersize=3,
                          label=label_map.get(ts_code, ts_code))
-        ax2.set_ylabel('premium (Put 权利金)', fontsize=11)
+        ax2.set_ylabel('premium (Call 权利金)', fontsize=11)
 
         xlim = ax2.get_xlim()
         if xlim[1] > xlim[0]:
@@ -364,42 +366,43 @@ class ProtectivePutStrategyReport:
     def gen_chart2_iv(self, df):
         return self._gen_metric_chart(
             df, 'implied_vol', '隐含波动率 (implied_vol, 小数)',
-            chart_num=2, title_prefix='图2：各合约 隐含波动率 IV（保险定价的核心输入）')
+            chart_num=2, title_prefix='图2：各合约 隐含波动率 IV（备兑收入的核心输入）')
 
     def gen_chart3_iv_rank(self, df):
         return self._gen_metric_chart(
             df, 'iv_rank', 'IV 分位数 iv_rank (0~1)',
-            chart_num=3, title_prefix='图3：IV 分位数 — 保险贵贱温度计',
+            chart_num=3, title_prefix='图3：IV 分位数 — 卖方收入温度计',
             ref_lines=[
-                (0.35, '#27ae60', '--', '便宜区间 (<=0.35)'),
-                (0.55, '#f39c12', '--', '合理区间'),
-                (0.80, '#c0392b', '--', '恐慌定价 (>0.80)'),
+                (0.20, '#c0392b', '--', '枯竭区间 (<=0.20, 卖方不利)'),
+                (0.50, '#f39c12', '--', '中性'),
+                (0.65, '#27ae60', '--', '卖方有利 (>=0.65)'),
             ])
 
-    def gen_chart4_hedge_cost(self, df):
+    def gen_chart4_premium_yield(self, df):
         return self._gen_metric_chart(
-            df, 'hedge_cost_ratio', '对冲成本比 P/S0 (%)',
-            chart_num=4, title_prefix='图4：对冲成本比(实线) + 年化对冲成本(虚线)',
-            y2_col='annualized_hedge_cost_pct', y2_label='年化对冲成本 (%)')
-
-    def gen_chart5_ppc(self, df):
-        return self._gen_metric_chart(
-            df, 'protection_per_cost', '保险杠杆 protection_per_cost = (K-P)/P',
-            chart_num=5, title_prefix='图5：保险杠杆 — 每 1 元保费锁定的下行价值',
+            df, 'premium_yield_pct', '静态收益率 C/S0 (%)',
+            chart_num=4, title_prefix='图4：静态收益率(实线) + 年化静态收益率(虚线)',
+            y2_col='annualized_premium_yield_pct', y2_label='年化静态收益率 (%)',
             ref_lines=[
-                (1.0, '#c0392b', '--', '盈亏平衡线 (=1)'),
-                (2.0, '#f39c12', '--', '良好 (=2)'),
-                (3.0, '#27ae60', '--', '优秀 (=3)'),
+                (0.5, '#c0392b', '--', '薄收益 (=0.5%)'),
+                (1.0, '#f39c12', '--', '可接受 (=1%)'),
+                (2.0, '#27ae60', '--', '优质 (=2%)'),
             ])
 
-    def gen_chart6_max_loss_delta(self, df):
+    def gen_chart5_max_profit(self, df):
         return self._gen_metric_chart(
-            df, 'max_loss_pct_of_spot', '对冲后最大亏损占现价 (%)',
-            chart_num=6, title_prefix='图6：对冲后最大回撤(实线) + 组合净Delta(虚线)',
-            y2_col='portfolio_delta', y2_label='组合净Delta (1+Δput)')
+            df, 'max_profit_pct_of_spot', '最大盈利占现价 (%)',
+            chart_num=5, title_prefix='图5：组合最大盈利(实线) + 被行权概率(虚线)',
+            y2_col='assignment_prob', y2_label='被行权概率 (≈delta)')
+
+    def gen_chart6_cushion_delta(self, df):
+        return self._gen_metric_chart(
+            df, 'premium_cushion_pct_of_spot', '权利金缓冲占现价 (%)',
+            chart_num=6, title_prefix='图6：下行缓冲(实线) + 组合净Delta(虚线)',
+            y2_col='portfolio_delta', y2_label='组合净Delta (1-Δcall)')
 
     def gen_chart7_payoff_curve(self, df):
-        """图7：到期盈亏曲线（最新交易日）：X=S_T 连续，对冲组合 vs 未对冲"""
+        """图7：到期盈亏曲线（最新交易日）：X=S_T 连续，备兑组合 vs 未备兑"""
         latest_date = df['trade_date'].max()
         df_latest = df[df['trade_date'] == latest_date].dropna(
             subset=['spot_price', 'exercise_price', 'premium'])
@@ -407,26 +410,27 @@ class ProtectivePutStrategyReport:
             return None
 
         S0 = float(df_latest['spot_price'].iloc[0])
-        x = np.linspace(0.75 * S0, 1.25 * S0, 200)
+        x = np.linspace(0.85 * S0, 1.25 * S0, 200)
         label_map = self._build_label_map(df)
 
         fig, ax = plt.subplots(figsize=(20, 10))
-        fig.suptitle(f'图7：Protective Put 到期盈亏曲线（{latest_date}）— '
-                     f'X轴=到期标的价 S_T，对冲组合(彩线) vs 未对冲(灰虚线)',
+        fig.suptitle(f'图7：Covered Call 到期盈亏曲线（{latest_date}）— '
+                     f'X轴=到期标的价 S_T，备兑组合(彩线) vs 未备兑(灰虚线)',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
-        # 未对冲基准
+        # 未备兑基准
         ax.plot(x, x - S0, color=self.UNHEDGED_COLOR, linewidth=2.5, linestyle='--',
-                alpha=0.9, label='未对冲 (仅持有现货)')
+                alpha=0.9, label='未备兑 (仅持有现货)')
 
         for idx, (_, row) in enumerate(df_latest.iterrows()):
-            K, P = float(row['exercise_price']), float(row['premium'])
-            y = (x - S0) + np.maximum(K - x, 0) - P
+            K, C = float(row['exercise_price']), float(row['premium'])
+            y = (x - S0) - np.maximum(x - K, 0) + C
             color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
             name = label_map.get(row['ts_code'], row['ts_code'])
             ax.plot(x, y, color=color, linewidth=1.2, alpha=0.8, label=name)
-            # 右端标签
-            ax.annotate(name, xy=(x[-1], y[-1]), xytext=(6, 0),
+            # 右端标签（右侧各合约均封顶收敛，垂直交错避免重叠）
+            y_offset = (idx % 4 - 1.5) * 11
+            ax.annotate(name, xy=(x[-1], y[-1]), xytext=(6, y_offset),
                         textcoords='offset points', color=color, fontsize=7,
                         fontweight='bold', va='center', ha='left',
                         bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
@@ -449,7 +453,7 @@ class ProtectivePutStrategyReport:
         return self._fig_to_bytesio(fig)
 
     def gen_chart8_scenario_pnl(self, df):
-        """图8：情景盈亏对比（最新交易日）：X=情景因子，对冲 vs 未对冲（元/单位）"""
+        """图8：情景盈亏对比（最新交易日）：X=情景因子，备兑 vs 未备兑（元/单位）"""
         latest_date = df['trade_date'].max()
         df_latest = df[df['trade_date'] == latest_date]
         if df_latest.empty:
@@ -458,18 +462,18 @@ class ProtectivePutStrategyReport:
 
         fig, ax = plt.subplots(figsize=(20, 10))
         fig.suptitle(f'图8：多情景到期盈亏对比（{latest_date}）— X轴=S_T/K 情景因子，'
-                     f'对冲组合(彩线) vs 未对冲(灰虚线)',
+                     f'备兑组合(彩线) vs 未备兑(灰虚线)',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
         factors = self.SCENARIO_FACTORS
         x = np.arange(len(factors))
         xticklabels = [f'{f:.2f}K' for f in factors]
 
-        # 未对冲（取均值，各合约 S0 相同所以等价于任一合约）
+        # 未备兑（取均值，各合约 S0 相同所以等价于任一合约）
         unhedged_vals = [df_latest[f'unhedged_pnl_{f:.2f}'.replace(".", "_") + "K"].mean()
                          for f in factors]
         ax.plot(x, unhedged_vals, color=self.UNHEDGED_COLOR, linewidth=2.5, linestyle='--',
-                 marker='D', markersize=6, alpha=0.9, label='未对冲 (仅持有现货)')
+                 marker='D', markersize=6, alpha=0.9, label='未备兑 (仅持有现货)')
 
         for idx, (_, row) in enumerate(df_latest.iterrows()):
             vals = [row.get(f'scenario_pnl_{f:.2f}'.replace(".", "_") + "K", np.nan)
@@ -486,12 +490,12 @@ class ProtectivePutStrategyReport:
         ax.set_ylabel('组合盈亏 (元/单位)', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, linestyle='--')
 
-        # ---- 右端标签：每条线最右端(1.10K)打合约名称，颜色与线一致 ----
+        # ---- 右端标签：每条线最右端(1.15K)打合约名称，颜色与线一致 ----
         xlim = ax.get_xlim()
         if xlim[1] > xlim[0]:
             ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.22)
 
-        ax.annotate('未对冲(现货)', xy=(x[-1], unhedged_vals[-1]), xytext=(6, 0),
+        ax.annotate('未备兑(现货)', xy=(x[-1], unhedged_vals[-1]), xytext=(6, 0),
                     textcoords='offset points', color=self.UNHEDGED_COLOR, fontsize=7,
                     fontweight='bold', va='center', ha='left',
                     bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
@@ -520,10 +524,10 @@ class ProtectivePutStrategyReport:
         plt.tight_layout()
         return self._fig_to_bytesio(fig)
 
-    def gen_chart9_protection_effect(self, df):
-        """图9：0.90K 情景 对冲后 vs 未对冲 平均盈亏时间序列（保护效果演变）"""
-        col_h = 'scenario_pnl_0_90K'
-        col_u = 'unhedged_pnl_0_90K'
+    def gen_chart9_cushion_effect(self, df):
+        """图9：0.95K 情景 备兑后 vs 未备兑 平均盈亏时间序列（缓冲效果演变）"""
+        col_h = 'scenario_pnl_0_95K'
+        col_u = 'unhedged_pnl_0_95K'
         if col_h not in df.columns or col_u not in df.columns:
             return None
 
@@ -532,18 +536,18 @@ class ProtectivePutStrategyReport:
             return None
 
         fig, ax = plt.subplots(figsize=(20, 8))
-        fig.suptitle('图9：0.90K 情景（标的下跌约10%）平均盈亏 — 对冲后(红) vs 未对冲(灰)，'
-                     '两线差距即保险赔付效果',
+        fig.suptitle('图9：0.95K 情景（标的下跌约5%）平均盈亏 — 备兑后(红) vs 未备兑(灰)，'
+                     '两线差距即权利金缓冲效果',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
         ax.plot(daily.index.tolist(), daily[col_u], color=self.UNHEDGED_COLOR,
                 linewidth=2.2, linestyle='--', marker='o', markersize=4,
-                label='未对冲平均盈亏')
+                label='未备兑平均盈亏')
         ax.plot(daily.index.tolist(), daily[col_h], color='#c0392b',
-                linewidth=2.2, marker='s', markersize=4, label='对冲后平均盈亏')
+                linewidth=2.2, marker='s', markersize=4, label='备兑后平均盈亏')
         ax.fill_between(daily.index.tolist(), daily[col_u], daily[col_h],
                         where=(daily[col_h] > daily[col_u]),
-                        color='#27ae60', alpha=0.15, label='保险赔付区间')
+                        color='#27ae60', alpha=0.15, label='权利金缓冲区间')
 
         ax.axhline(y=0, color='gray', linewidth=0.8, linestyle='-', alpha=0.6)
         ax.set_ylabel('盈亏 (元/单位)', fontsize=12, fontweight='bold')
@@ -554,7 +558,7 @@ class ProtectivePutStrategyReport:
 
         # 最新数值标注
         if len(daily) > 0:
-            ax.annotate(f'最新: 对冲{daily[col_h].iloc[-1]:+.3f} / 未对冲{daily[col_u].iloc[-1]:+.3f}',
+            ax.annotate(f'最新: 备兑{daily[col_h].iloc[-1]:+.3f} / 未备兑{daily[col_u].iloc[-1]:+.3f}',
                         xy=(daily.index[-1], daily[col_h].iloc[-1]), xytext=(10, 10),
                         textcoords='offset points', fontsize=9, fontweight='bold',
                         color='#c0392b',
@@ -566,8 +570,8 @@ class ProtectivePutStrategyReport:
         if xlim[1] > xlim[0]:
             ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.14)
         if len(daily) > 0:
-            for col, clr, txt in [(col_u, self.UNHEDGED_COLOR, '未对冲(现货)'),
-                                  (col_h, '#c0392b', '对冲后(现货+Put)')]:
+            for col, clr, txt in [(col_u, self.UNHEDGED_COLOR, '未备兑(现货)'),
+                                  (col_h, '#c0392b', '备兑后(现货-Call)')]:
                 s = daily[col].dropna()
                 if len(s) == 0:
                     continue
@@ -584,9 +588,9 @@ class ProtectivePutStrategyReport:
 
     def gen_chart10_theta(self, df):
         return self._gen_metric_chart(
-            df, 'theta_cost_pct_of_premium', '时间衰减占权利金比例 (%)',
-            chart_num=10, title_prefix='图10：时间衰减成本占比 — 保费的每日消耗速度',
-            ref_lines=[(100.0, '#c0392b', '--', '100%（保费将全部衰减）')])
+            df, 'theta_income_pct_of_premium', '时间衰减收入占权利金比例 (%)',
+            chart_num=10, title_prefix='图10：时间衰减收入占比 — 卖方租金的累积速度',
+            ref_lines=[(100.0, '#c0392b', '--', '100%（权利金全部落袋）')])
 
     # ===================== 统计与点评（数字） =====================
 
@@ -618,10 +622,11 @@ class ProtectivePutStrategyReport:
             'spot': float(latest['spot_price'].iloc[0]) if len(latest) else np.nan,
             'iv_mean': latest['implied_vol'].mean() if len(latest) else np.nan,
             'iv_rank_mean': latest['iv_rank'].mean() if len(latest) else np.nan,
-            'hedge_cost_mean': latest['hedge_cost_ratio'].mean() if len(latest) else np.nan,
-            'ann_cost_mean': latest['annualized_hedge_cost_pct'].mean() if len(latest) else np.nan,
-            'max_loss_mean': latest['max_loss_pct_of_spot'].mean() if len(latest) else np.nan,
-            'ppc_mean': latest['protection_per_cost'].mean() if len(latest) else np.nan,
+            'yield_mean': latest['premium_yield_pct'].mean() if len(latest) else np.nan,
+            'ann_yield_mean': latest['annualized_premium_yield_pct'].mean() if len(latest) else np.nan,
+            'max_profit_mean': latest['max_profit_pct_of_spot'].mean() if len(latest) else np.nan,
+            'cushion_mean': latest['premium_cushion_pct_of_spot'].mean() if len(latest) else np.nan,
+            'assign_mean': latest['assignment_prob'].mean() if len(latest) else np.nan,
             'pdelta_mean': latest['portfolio_delta'].mean() if len(latest) else np.nan,
             'days_min': int(latest['days_to_maturity'].min()) if len(latest) else np.nan,
             'signal_counts': latest['trade_signal'].value_counts().to_dict() if len(latest) else {},
@@ -630,8 +635,8 @@ class ProtectivePutStrategyReport:
 
     def _build_latest_table_data(self, latest, label_map):
         """最新交易日核心指标总览表数据"""
-        col_h = 'scenario_pnl_0_90K'
-        col_u = 'unhedged_pnl_0_90K'
+        col_h = 'scenario_pnl_0_95K'
+        col_u = 'unhedged_pnl_0_95K'
         rows = []
         for _, r in latest.sort_values('exercise_price').iterrows():
             name = label_map.get(r['ts_code'], r['ts_code'])
@@ -643,21 +648,21 @@ class ProtectivePutStrategyReport:
                 self._fmt(r['premium'], '{:.4g}'),
                 self._fmt(r['implied_vol'] * 100 if pd.notna(r.get('implied_vol')) else np.nan, '{:.1f}'),
                 self._fmt(r.get('iv_rank'), '{:.2f}'),
-                self._fmt(r.get('protected_floor'), '{:.4g}'),
-                self._fmt(r.get('max_loss_pct_of_spot'), '{:+.2f}'),
-                self._fmt(r.get('hedge_cost_ratio') * 100 if pd.notna(r.get('hedge_cost_ratio')) else np.nan, '{:.2f}'),
-                self._fmt(r.get('annualized_hedge_cost_pct'), '{:.1f}'),
-                self._fmt(r.get('protection_per_cost'), '{:.2f}'),
-                self._fmt(r.get('breakeven_S_T_pct'), '{:+.2f}'),
+                self._fmt(r.get('max_profit_pct_of_spot'), '{:+.2f}'),
+                self._fmt(r.get('upside_giveup_pct'), '{:+.2f}'),
+                self._fmt(r.get('premium_cushion_pct_of_spot'), '{:.2f}'),
+                self._fmt(r.get('downside_breakeven_S_T_pct'), '{:+.2f}'),
+                self._fmt(r.get('premium_yield_pct'), '{:.2f}'),
+                self._fmt(r.get('annualized_premium_yield_pct'), '{:.1f}'),
                 self._fmt(r.get('portfolio_delta'), '{:.3f}'),
-                self._fmt(r.get('downside_capture'), '{:.2f}'),
+                self._fmt(r.get('assignment_prob'), '{:.2f}'),
                 self._fmt(r.get(col_h), '{:+.4g}') + ' / ' + self._fmt(r.get(col_u), '{:+.4g}'),
                 str(r.get('trade_signal', '')),
             ])
-        header = ['合约名称', '行权价K', '权利金P', 'IV%', 'IV分位',
-                  '价值底K-P', '最大亏损%', '成本比%', '年化成本%',
-                  '保险杠杆', '平衡涨幅%', '净Delta', '下跌捕获',
-                  '0.90K盈亏(对冲/未对冲)', '信号']
+        header = ['合约名称', '行权价K', '权利金C', 'IV%', 'IV分位',
+                  '最大盈利%', '让渡涨幅%', '缓冲%', '下行平衡%',
+                  '静态收益%', '年化收益%', '净Delta', '行权概率',
+                  '0.95K盈亏(备兑/未备兑)', '信号']
         return header, rows
 
     def _build_trader_commentary(self, df, stats):
@@ -666,69 +671,83 @@ class ProtectivePutStrategyReport:
         label_map = self._build_label_map(df)
         paras = []
 
-        # ---- 1. 波动率环境 ----
+        # ---- 1. 波动率环境（卖方视角，与 Protective Put 相反） ----
         iv_r = stats['iv_rank_mean']
         iv_m = stats['iv_mean']
         if pd.notna(iv_r):
-            if iv_r <= 0.35:
-                env_txt = (f"当前 IV 处于近60日 {iv_r*100:.0f}% 的低分位（均值 {iv_m*100:.1f}%），"
-                           f"保险定价便宜——这是买入保护的舒适窗口，历史经验上应优先锁定长期限保护。")
-            elif iv_r <= 0.55:
-                env_txt = (f"当前 IV 处于近60日 {iv_r*100:.0f}% 的中位水平（均值 {iv_m*100:.1f}%），"
-                           f"保险价格公允，可按计划正常续保。")
-            elif iv_r <= 0.80:
-                env_txt = (f"当前 IV 已升至近60日 {iv_r*100:.0f}% 分位（均值 {iv_m*100:.1f}%），"
-                           f"保险偏贵——若必须对冲，建议降低保护比例或改用领口策略（Collar）对冲成本。")
+            if iv_r >= 0.65:
+                env_txt = (f"当前 IV 处于近60日 {iv_r*100:.0f}% 的高分位（均值 {iv_m*100:.1f}%），"
+                           f"权利金定价偏贵——这是卖出备兑收租的舒适窗口，"
+                           f"应优先加卖近月高 IV 合约锁定收益。")
+            elif iv_r >= 0.50:
+                env_txt = (f"当前 IV 处于近60日 {iv_r*100:.0f}% 的中高位水平（均值 {iv_m*100:.1f}%），"
+                           f"权利金公允，可按计划正常滚动备兑。")
+            elif iv_r >= 0.20:
+                env_txt = (f"当前 IV 处于近60日 {iv_r*100:.0f}% 的低位（均值 {iv_m*100:.1f}%），"
+                           f"权利金偏薄——备兑性价比下降，建议降低卖出比例或虚值一档换更高行权价。")
             else:
-                env_txt = (f"当前 IV 高达近60日 {iv_r*100:.0f}% 分位（均值 {iv_m*100:.1f}%），"
-                           f"市场处于恐慌定价状态。此时买 Put 是在最贵的时候买保险，"
-                           f"除非有明确下行判断，否则建议等待 IV 回落或分批建仓。")
-            paras.append(('波动率环境判断', env_txt))
+                env_txt = (f"当前 IV 低至近60日 {iv_r*100:.0f}% 分位（均值 {iv_m*100:.1f}%），"
+                           f"波动率枯竭。此时卖 Call 是在最便宜的时候卖保险，"
+                           f"除非有明确的高抛目标价，否则建议等待 IV 回升再行备兑。")
+            paras.append(('波动率环境判断（卖方视角）', env_txt))
 
-        # ---- 2. 对冲成本 ----
-        hc = stats['hedge_cost_mean']
-        ac = stats['ann_cost_mean']
-        if pd.notna(hc):
-            paras.append(('对冲成本评估',
-                          f"最新交易日平均对冲成本比 P/S0 = {hc*100:.2f}%，"
-                          f"年化对冲成本 {ac:.1f}%（若每月滚动续保）。"
-                          f"对照现货长期年化收益，年化保护成本超过 {ac:.0f}% 时，"
-                          f"保护策略将显著侵蚀组合收益，需要严格控制对冲比例。"))
+        # ---- 2. 收益增强评估 ----
+        y_m = stats['yield_mean']
+        ay_m = stats['ann_yield_mean']
+        if pd.notna(y_m):
+            paras.append(('备兑收益评估',
+                          f"最新交易日平均静态收益率 C/S0 = {y_m:.2f}%，"
+                          f"年化 {ay_m:.1f}%（按滚动续卖口径）。"
+                          f"对长期持有现货的组合，年化增强收益 {ay_m:.0f}% 相当于把持有成本直接降低同幅度；"
+                          f"但需与上行让渡机会成本权衡——若标的趋势上涨，备兑会拖累相对收益。"))
 
-        # ---- 3. 最优保护合约推荐 ----
-        cand = latest[latest['protection_per_cost'].notna()]
+        # ---- 3. 最优备兑合约推荐 ----
+        cand = latest[latest['premium_yield_pct'].notna()]
         if len(cand) > 0:
-            best = cand.loc[cand['protection_per_cost'].idxmax()]
+            best = cand.loc[cand['premium_yield_pct'].idxmax()]
             name = label_map.get(best['ts_code'], best['ts_code'])
-            paras.append(('最优保护合约（保险杠杆维度）',
-                          f"{name}：行权价 K={best['exercise_price']:.4g}、权利金 P={best['premium']:.4g}、"
-                          f"保险杠杆 (K-P)/P = {best['protection_per_cost']:.2f}"
-                          f"（每 1 元保费锁定 {best['protection_per_cost']:.1f} 元下行价值），"
-                          f"最大亏损占现价 {best['max_loss_pct_of_spot']:+.2f}%，"
+            paras.append(('最优备兑合约（静态收益率维度）',
+                          f"{name}：行权价 K={best['exercise_price']:.4g}、权利金 C={best['premium']:.4g}、"
+                          f"静态收益率 {best['premium_yield_pct']:.2f}%（年化 {best['annualized_premium_yield_pct']:.1f}%），"
+                          f"最大盈利占现价 {best['max_profit_pct_of_spot']:+.2f}%，"
+                          f"上行让渡 {best['upside_giveup_pct']:+.2f}%，"
+                          f"被行权概率≈{self._fmt(best.get('assignment_prob'), '{:.2f}')}，"
                           f"IV分位 {self._fmt(best.get('iv_rank'), '{:.2f}')}，"
                           f"信号：{best.get('trade_signal', 'N/A')}。"
                           f"交易信号明细可见下方汇总表。"))
 
-        # ---- 4. 下行保护效果（0.90K 情景） ----
-        col_h, col_u = 'scenario_pnl_0_90K', 'unhedged_pnl_0_90K'
+        # ---- 4. 下行缓冲效果（0.95K 情景） ----
+        col_h, col_u = 'scenario_pnl_0_95K', 'unhedged_pnl_0_95K'
         if col_h in latest.columns and col_u in latest.columns:
             h_m, u_m = latest[col_h].mean(), latest[col_u].mean()
             if pd.notna(h_m) and pd.notna(u_m) and u_m < 0:
                 saved = h_m - u_m
-                paras.append(('下行保护效果（0.90K 情景）',
-                              f"若标的下跌约 10%（S_T=0.90K），未对冲平均亏损 {u_m:+.4g} 元/单位，"
-                              f"对冲后平均亏损收窄至 {h_m:+.4g} 元/单位，"
-                              f"保险赔付 {saved:+.4g} 元/单位，平均下跌捕获率 "
-                              f"{latest['downside_capture'].mean():.2f}"
-                              f"（0=完全保护，1=无保护）。"))
+                paras.append(('下行缓冲效果（0.95K 情景）',
+                              f"若标的下跌约 5%（S_T=0.95K），未备兑平均亏损 {u_m:+.4g} 元/单位，"
+                              f"备兑后亏损收窄至 {h_m:+.4g} 元/单位，"
+                              f"权利金缓冲吸收 {saved:+.4g} 元/单位，平均缓冲效果 "
+                              f"{latest['cushion_effect'].mean():.2f}"
+                              f"（1=亏损被完全吸收）。注意缓冲只有一层权利金，深跌时保护极其有限。"))
 
-        # ---- 5. 到期与展期风险 ----
+        # ---- 5. 上行封顶代价（1.10K 情景） ----
+        col_h10, col_u10 = 'scenario_pnl_1_10K', 'unhedged_pnl_1_10K'
+        if col_h10 in latest.columns and col_u10 in latest.columns:
+            h_m, u_m = latest[col_h10].mean(), latest[col_u10].mean()
+            if pd.notna(h_m) and pd.notna(u_m) and u_m > h_m:
+                giveup = u_m - h_m
+                paras.append(('上行封顶代价（1.10K 情景）',
+                              f"若标的上涨约 10%（S_T=1.10K），未备兑平均盈利 {u_m:+.4g} 元/单位，"
+                              f"备兑后仅 {h_m:+.4g} 元/单位——封顶让渡 {giveup:.4g} 元/单位。"
+                              f"这是备兑策略的核心代价：用确定性租金换取上涨空间，"
+                              f"只适合震荡市或高抛减仓意愿明确的组合。"))
+
+        # ---- 6. 到期与展期风险 ----
         d_min = stats['days_min']
         if pd.notna(d_min):
             if d_min <= 10:
                 paras.append(('到期与展期风险',
                               f"距最近合约到期仅 {d_min:.0f} 天，临近到期 Gamma 风险放大、"
-                              f"时间衰减加速（年化成本指标将急剧恶化），建议立即展期至远月合约。"))
+                              f"若现货逼近行权价将被快速推入实值（被行权概率急剧上升），建议立即展期。"))
             elif d_min <= 30:
                 paras.append(('到期与展期风险',
                               f"距最近合约到期 {d_min:.0f} 天，应开始规划展期，"
@@ -737,13 +756,15 @@ class ProtectivePutStrategyReport:
                 paras.append(('到期与展期风险',
                               f"距最近合约到期 {d_min:.0f} 天，期限结构健康，暂无展期压力。"))
 
-        # ---- 6. 残余敞口 ----
+        # ---- 7. 残余敞口与被行权管理 ----
         pd_mean = stats['pdelta_mean']
+        ap_mean = stats['assign_mean']
         if pd.notna(pd_mean):
-            paras.append(('对冲后残余敞口',
-                          f"组合平均净 Delta = {pd_mean:.3f}（剩余方向性敞口 {pd_mean*100:.1f}%）。"
-                          f"注意：Put 的 Delta 随价格下跌而增大（趋近-1），下跌越深保护越足；"
-                          f"但上涨时 Delta 趋近 0，组合几乎完全恢复现货敞口——这正是 Protective Put 的 asymmetric 特性。"))
+            paras.append(('对冲后残余敞口与被行权管理',
+                          f"组合平均净 Delta = {pd_mean:.3f}（剩余方向性敞口 {pd_mean*100:.1f}%），"
+                          f"平均被行权概率≈{ap_mean:.2f}。"
+                          f"注意：Call 的 Delta 随价格上涨而增大，越涨被行权概率越高；"
+                          f"Delta 趋近 1 意味着现货将被行权价交割——备兑者应提前决定是接受交割还是向上移仓。"))
 
         return paras
 
@@ -805,8 +826,8 @@ class ProtectivePutStrategyReport:
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         now_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         symbol_filter = config.get('symbol_filter')
-        call_put = config.get('call_put', 'P')
-        name = config.get('name', 'Protective Put')
+        call_put = config.get('call_put', 'C')
+        name = config.get('name', 'Covered Call')
 
         # 最新一轮分析审计信息
         analysis_time_str, analysis_version = 'N/A', 'N/A'
@@ -821,7 +842,7 @@ class ProtectivePutStrategyReport:
         date_tag = f"{stats['date_start']}-{stats['date_end']}"
         pdf_path = os.path.join(
             self.REPORT_DIR,
-            f"ProtectivePutStrategy_{filter_tag}_{date_tag}_{now_ts}.pdf")
+            f"CoveredCallStrategy_{filter_tag}_{date_tag}_{now_ts}.pdf")
 
         doc = SimpleDocTemplate(pdf_path, pagesize=landscape(A4),
                                 rightMargin=40, leftMargin=40, topMargin=36, bottomMargin=28)
@@ -830,8 +851,8 @@ class ProtectivePutStrategyReport:
 
         # ===== 封面 =====
         story.append(Spacer(1, 1.4 * inch))
-        story.append(Paragraph('保护性认沽策略分析报告', styles['title']))
-        story.append(Paragraph('Protective Put Strategy Analysis Report',
+        story.append(Paragraph('备兑开仓策略分析报告', styles['title']))
+        story.append(Paragraph('Covered Call Strategy Analysis Report',
                                ParagraphStyle('Sub', parent=styles['normal'], alignment=1,
                                               fontSize=11, fontName=self.reportlab_font,
                                               textColor=colors.HexColor('#888888'))))
@@ -843,7 +864,7 @@ class ProtectivePutStrategyReport:
             names_display += f" 等 {len(contract_names)} 个合约"
 
         cover_text = (
-            f"策略：Protective Put（持有现货 + 买入认沽）<br/>"
+            f"策略：Covered Call（持有现货 + 卖出认购）<br/>"
             f"数据区间：{stats['date_start']} — {stats['date_end']}（{stats['n_days']} 个交易日）<br/>"
             f"报告生成时间：{report_date}<br/>"
             f"分析时间戳：{analysis_time_str}（算法版本 {analysis_version}）<br/>"
@@ -860,12 +881,12 @@ class ProtectivePutStrategyReport:
         overview_text = (
             f"本报告基于 {self.TABLE_SOURCE} 表（strategy_type='{self.STRATEGY_TYPE}'）"
             f"{stats['n_rows']} 条记录，覆盖 {stats['date_start']} 至 {stats['date_end']} "
-            f"共 {stats['n_days']} 个交易日、{stats['n_contracts']} 个认沽合约。<br/>"
+            f"共 {stats['n_days']} 个交易日、{stats['n_contracts']} 个认购合约。<br/>"
             f"最新交易日 {stats['latest_date']}：现货价 {stats['spot']:.4g}，"
             f"IV 均值 {stats['iv_mean']*100:.1f}%（IV 分位均值 {stats['iv_rank_mean']:.2f}），"
-            f"平均对冲成本比 {stats['hedge_cost_mean']*100:.2f}%（年化 {stats['ann_cost_mean']:.1f}%），"
-            f"对冲后平均最大亏损 {stats['max_loss_mean']:+.2f}%（未对冲跌停风险为 -100%），"
-            f"平均保险杠杆 {stats['ppc_mean']:.2f}，组合平均净 Delta {stats['pdelta_mean']:.3f}，"
+            f"平均静态收益率 {stats['yield_mean']:.2f}%（年化 {stats['ann_yield_mean']:.1f}%），"
+            f"平均最大盈利 {stats['max_profit_mean']:+.2f}%，平均权利金缓冲 {stats['cushion_mean']:.2f}%，"
+            f"平均被行权概率≈{stats['assign_mean']:.2f}，组合平均净 Delta {stats['pdelta_mean']:.3f}，"
             f"最近到期 {stats['days_min']:.0f} 天。"
         )
         story.append(Paragraph(overview_text, styles['normal']))
@@ -881,9 +902,10 @@ class ProtectivePutStrategyReport:
         story.append(self._make_table(header, rows, col_widths))
         story.append(Spacer(1, 0.08 * inch))
         story.append(Paragraph(
-            '注：最大亏损% = (K-P-S0)/S0（对冲后最大回撤）；成本比% = P/S0；保险杠杆 = (K-P)/P；'
-            '平衡涨幅% = P/S0（上行需涨过 S0+P 组合才盈利）；净Delta = 1+Δput（残余方向敞口）；'
-            '下跌捕获 = 0.90K情景对冲后亏损/未对冲亏损（0=完全保护）；IV分位基于合约近60日IV历史。',
+            '注：最大盈利% = (K-S0+C)/S0（S_T>=K时封顶收益）；让渡涨幅% = (K-S0)/S0（超过K的涨幅全部放弃）；'
+            '缓冲% = C/S0（下跌C以内组合不亏）；下行平衡% = -C/S0（跌穿S0-C开始亏损）；'
+            '静态收益% = C/S0（持有到期的租金收益）；净Delta = 1-Δcall（残余方向敞口）；'
+            '行权概率≈delta=N(d1)（到期S_T>K概率）；缓冲效果为0.95K情景权利金吸收亏损比例；IV分位基于合约近60日IV历史。',
             styles['table_note']))
         story.append(PageBreak())
 
@@ -891,55 +913,56 @@ class ProtectivePutStrategyReport:
         chart_sections = []
         if chart_buffers.get('chart1'):
             prem_last = latest['premium'].mean()
-            chart_sections.append(('chart1', '图1：现货价格 + Put 权利金',
+            chart_sections.append(('chart1', '图1：现货价格 + Call 权利金',
                                    f"最新现货 {stats['spot']:.4g}，平均权利金 {prem_last:.4g} 元/单位。"
-                                   f"权利金随现货下跌而上升（Put 价值与标的负相关），观察两者背离可判断保护成本的日内变化。"))
+                                   f"权利金随现货上涨而上升（Call 价值与标的相关），"
+                                   f"IV 走高时权利金与现货背离——那正是备兑收入最丰厚的窗口。"))
         if chart_buffers.get('chart2'):
             iv_max = latest['implied_vol'].max()
             iv_min = latest['implied_vol'].min()
             chart_sections.append(('chart2', '图2：隐含波动率 IV',
                                    f"最新 IV 区间 {iv_min*100:.1f}% ~ {iv_max*100:.1f}%。"
-                                   f"低行权价（深 OTM）Put 通常 IV 更高——恐慌偏斜（Skew），"
-                                   f"是保护成本高的结构性原因。"))
+                                   f"高行权价（虚值）Call 通常 IV 更低——上行偏斜（Skew）较缓，"
+                                   f"卖出虚值备兑虽安全但租金也更薄。"))
         if chart_buffers.get('chart3'):
-            chart_sections.append(('chart3', '图3：IV 分位数（保险贵贱温度计）',
+            chart_sections.append(('chart3', '图3：IV 分位数（卖方收入温度计）',
                                    f"最新 IV 分位均值 {stats['iv_rank_mean']:.2f}。"
-                                   f"低于 0.35（绿线）= 保险便宜；高于 0.80（红线）= 恐慌定价，"
-                                   f"此时应考虑推迟建仓或用 Collar 压缩成本。"))
+                                   f"高于 0.65（绿线）= 卖方定价有利，应收租；低于 0.20（红线）= 波动率枯竭，"
+                                   f"备兑性价比最差，应等待 IV 回升。"))
         if chart_buffers.get('chart4'):
-            chart_sections.append(('chart4', '图4：对冲成本比 + 年化对冲成本',
-                                   f"最新平均成本比 {stats['hedge_cost_mean']*100:.2f}%，"
-                                   f"年化 {stats['ann_cost_mean']:.1f}%。年化口径反映滚动续保的真实成本，"
-                                   f"若年化成本超过组合预期收益，保护策略得不偿失。"))
+            chart_sections.append(('chart4', '图4：静态收益率 + 年化静态收益率',
+                                   f"最新平均静态收益率 {stats['yield_mean']:.2f}%，"
+                                   f"年化 {stats['ann_yield_mean']:.1f}%。年化口径反映滚动续卖的真实'租金'水平，"
+                                   f"是衡量备兑增强效果的黄金标准——高于 2%/月（绿线）即优质。"))
         if chart_buffers.get('chart5'):
-            ppc_max = latest['protection_per_cost'].max()
-            chart_sections.append(('chart5', '图5：保险杠杆 (K-P)/P',
-                                   f"最新平均保险杠杆 {stats['ppc_mean']:.2f}，最高 {ppc_max:.2f}。"
-                                   f"高于 2（黄线）为良好，高于 3（绿线）为优秀；低于 1（红线）意味着保费相对保护过贵。"))
+            mp_best = latest['max_profit_pct_of_spot'].max()
+            chart_sections.append(('chart5', '图5：最大盈利 + 被行权概率',
+                                   f"最新平均最大盈利 {stats['max_profit_mean']:+.2f}%（最好合约 {mp_best:+.2f}%）。"
+                                   f"被行权概率（虚线）越高，最大盈利越接近锁定，但现货被交割的概率也越大——"
+                                   f"实值备兑本质上是'带租金的限价卖出'。"))
         if chart_buffers.get('chart6'):
-            ml_best = latest['max_loss_pct_of_spot'].max()
-            chart_sections.append(('chart6', '图6：对冲后最大回撤 + 组合净Delta',
-                                   f"最新平均最大亏损 {stats['max_loss_mean']:+.2f}%（最好合约 {ml_best:+.2f}%）。"
-                                   f"净Delta越接近0对冲越充分，但注意 Delta 的动态性——上涨时敞口会自动恢复。"))
+            chart_sections.append(('chart6', '图6：下行缓冲 + 组合净Delta',
+                                   f"最新平均权利金缓冲 {stats['cushion_mean']:.2f}%。"
+                                   f"注意：缓冲只有一层权利金，深跌时保护极其有限——"
+                                   f"Covered Call 是收益增强策略而非对冲策略，不要把它当保险用。"))
         if chart_buffers.get('chart7'):
-            be_mean = latest['breakeven_S_T_pct'].mean()
             chart_sections.append(('chart7', '图7：到期盈亏曲线',
-                                   f"彩线为对冲组合、灰虚线为未对冲。对冲曲线左侧被价值底 K-P 托底（水平段），"
-                                   f"右侧与未对冲平行但低一个权利金 P。平均盈亏平衡涨幅 {be_mean:+.2f}%。"))
+                                   "彩线为备兑组合、灰虚线为未备兑。备兑曲线右侧被 K+C 封顶（水平段），"
+                                   "左侧与未备兑平行但高一个权利金 C——'让渡上涨、缓冲下跌'的结构一目了然。"))
         if chart_buffers.get('chart8'):
             chart_sections.append(('chart8', '图8：多情景盈亏对比',
-                                   "横轴为情景因子（0.80K~1.10K）。下跌情景下对冲线（彩）明显高于未对冲线（灰），"
-                                   "两者差距即保险赔付；上涨情景下对冲线仅低一个权利金——这就是'付保费买底价'的结构。"))
+                                   "横轴为情景因子（0.85K~1.15K）。下跌情景下备兑线（彩）仅比未备兑线（灰）高一个权利金；"
+                                   "上涨情景下备兑线封顶走平而未备兑继续上行——这就是'收租金换封顶'的代价。"))
         if chart_buffers.get('chart9'):
-            chart_sections.append(('chart9', '图9：保护效果时间序列（0.90K情景）',
-                                   "对冲后（红）与未对冲（灰）的平均盈亏差距随时间变化：差距收窄通常意味着"
-                                   "IV 下降或时间衰减侵蚀了 Put 价值，需要评估是否补充保护。"))
+            chart_sections.append(('chart9', '图9：缓冲效果时间序列（0.95K情景）',
+                                   "备兑后（红）与未备兑（灰）的平均盈亏差距随时间变化：差距即当日权利金水平。"
+                                   "差距收窄通常意味着 IV 回落或临近到期权利金耗尽，是移仓再卖的信号。"))
         if chart_buffers.get('chart10'):
-            theta_mean = latest['theta_cost_pct_of_premium'].mean()
-            chart_sections.append(('chart10', '图10：时间衰减成本占比',
-                                   f"最新平均时间衰减占权利金 {theta_mean:.1f}%。"
-                                   f"接近或超过 100% 意味着持有到期保费将全部耗尽——对保护策略这是预期内的'保费消耗'，"
-                                   f"但应避免在到期前一周内建仓（衰减非线性加速）。"))
+            theta_mean = latest['theta_income_pct_of_premium'].mean()
+            chart_sections.append(('chart10', '图10：时间衰减收入占比',
+                                   f"最新平均时间衰减收入占权利金 {theta_mean:.1f}%。"
+                                   f"对卖方而言 theta 是收入而非成本——持有到期权利金全部落袋（100%）。"
+                                   f"但最后两周衰减非线性加速，同时 Gamma 风险放大，建议提前移仓而非持有到到期日。"))
 
         for i, (key, title, note) in enumerate(chart_sections):
             section_cn = ['三', '四', '五', '六', '七', '八', '九', '十',
@@ -963,7 +986,7 @@ class ProtectivePutStrategyReport:
             story.append(self._make_table(['信号', '合约数', '占比'], sig_rows,
                                           [150, 100, 100], font_size=9))
             story.append(Spacer(1, 0.12 * inch))
-        # 信号明细（非 NEUTRAL/AVOID 的代表合约 + 理由）
+        # 信号明细（代表合约 + 理由）
         detail = latest[latest['trade_signal'].isin(['STRONG_BUY', 'BUY', 'CONSIDER', 'AVOID'])]
         if len(detail) > 0:
             detail = detail.sort_values('trade_signal')
@@ -972,13 +995,13 @@ class ProtectivePutStrategyReport:
                 nm = label_map.get(r['ts_code'], r['ts_code'])
                 reason = str(r.get('signal_reason', ''))[:80]
                 detail_rows.append([nm[:16], self._fmt(r['exercise_price'], '{:.4g}'),
-                                    self._fmt(r.get('protection_per_cost'), '{:.2f}'),
+                                    self._fmt(r.get('premium_yield_pct'), '{:.2f}'),
                                     self._fmt(r.get('iv_rank'), '{:.2f}'),
                                     str(r['trade_signal']), reason])
             story.append(Paragraph('重点信号明细（含原因）', styles['h2']))
             story.append(self._make_table(
-                ['合约名称', '行权价K', '保险杠杆', 'IV分位', '信号', '信号原因'],
-                detail_rows, [110, 60, 60, 55, 70, page_width - 355], font_size=6.5))
+                ['合约名称', '行权价K', '静态收益%', 'IV分位', '信号', '信号原因'],
+                detail_rows, [110, 60, 65, 55, 70, page_width - 360], font_size=6.5))
         story.append(PageBreak())
 
         # ===== 资深交易员综合点评 =====
@@ -993,18 +1016,19 @@ class ProtectivePutStrategyReport:
         # ===== 指标口径说明 =====
         story.append(Paragraph('十六、指标口径说明', styles['h1']))
         glossary = (
-            "策略定义：持有现货 S0 + 买入认沽 Put(K)，支付权利金 P；"
-            "到期组合价值 = S_T + max(0, K−S_T)，恒不低于 K（价值硬底）。<br/>"
-            "价值底 protected_floor = K−P：组合到期最小价值。<br/>"
-            "最大亏损 max_loss = K−P−S0；最大亏损% = (K−P−S0)/S0，即对冲后最大回撤。<br/>"
-            "保险杠杆 protection_per_cost = (K−P)/P：每 1 元保费锁定的下行价值，越高保险性价比越好。<br/>"
-            "对冲成本比 hedge_cost_ratio = P/S0；年化对冲成本 = P/S0/T×100（T 为年化期限，滚动续保口径）。<br/>"
-            "盈亏平衡点 breakeven_S_T = S0+P：上行需涨过此点组合才盈利；平衡涨幅% = P/S0。<br/>"
-            "下跌捕获 downside_capture：0.90K 情景对冲后亏损 ÷ 未对冲亏损，0=完全保护，1=无保护。<br/>"
-            "组合净Delta portfolio_delta = 1+Δput：对冲后残余方向性敞口。<br/>"
-            "IV分位 iv_rank：当日 IV 在该合约近 60 日 IV 历史中的分位数（0~1），衡量保险贵贱。<br/>"
-            "信号规则：STRONG_BUY = 保险杠杆≥3 且 IV分位≤0.35 且 Put 低估；"
-            "BUY = 杠杆≥2 且 IV分位≤0.55；CONSIDER = 杠杆≥1.5；NEUTRAL = 杠杆≥1.0；其余 AVOID。"
+            "策略定义：持有现货 S0 + 卖出认购 Call(K)，收取权利金 C；"
+            "到期组合价值 = S_T − max(0, S_T−K) + C，恒不超过 K+C（上行封顶）。<br/>"
+            "最大盈利 max_profit = K−S0+C；最大盈利% = (K−S0+C)/S0，S_T≥K 时封顶取得。<br/>"
+            "上行让渡 upside_giveup% = (K−S0)/S0：超过 K 的涨幅全部放弃。<br/>"
+            "权利金缓冲 premium_cushion = C：下跌 C 以内组合不亏；下行盈亏平衡点 = S0−C。<br/>"
+            "最大亏损 max_loss = C−S0（S_T=0 时）：仅比裸持现货少亏一个权利金。<br/>"
+            "静态收益率 premium_yield% = C/S0；年化静态收益率 = C/S0/T×100（滚动续卖口径）。<br/>"
+            "被行权概率 assignment_prob ≈ delta = N(d1)：到期 S_T>K 的概率近似。<br/>"
+            "缓冲效果 cushion_effect：0.95K 情景权利金吸收亏损的比例，1=完全吸收。<br/>"
+            "组合净Delta portfolio_delta = 1−Δcall：备兑后残余方向性敞口。<br/>"
+            "IV分位 iv_rank：当日 IV 在该合约近 60 日 IV 历史中的分位数（0~1），衡量卖方定价贵贱。<br/>"
+            "信号规则：STRONG_BUY = 静态收益率≥2% 且 IV分位≥0.65 且 Call 高估；"
+            "BUY = 收益率≥1.5% 且 IV分位≥0.50；CONSIDER = 收益率≥1%；NEUTRAL = 收益率≥0.5%；其余 AVOID。"
         )
         story.append(Paragraph(glossary, styles['normal']))
         story.append(Spacer(1, 0.15 * inch))
@@ -1015,8 +1039,9 @@ class ProtectivePutStrategyReport:
             "本报告基于历史期权日线数据与 BS 模型理论值进行量化分析，仅供参考，不构成投资建议。<br/>"
             "情景盈亏为到期静态假设（S_T=K×factor），未考虑路径风险、保证金占用与交易成本。<br/>"
             "IV 与 Greeks 为 BS 框架理论值，受流动性、波动率微笑、跳空影响可能与实际偏离。<br/>"
-            "ETF 期权存在行权交割与合约调整（除权除息）风险，展期时需核对合约要素。<br/>"
-            "保护策略的最大亏损仍为 K−P−S0（非零），极端行情下保险并不能完全消除损失。"
+            "备兑策略下行仅有权利金缓冲，深跌时几乎等同于裸持现货，不能替代真正的下行对冲。<br/>"
+            "被行权将导致现货以行权价交割（高抛兑现），持有意愿变化前需提前管理头寸。<br/>"
+            "ETF 期权存在行权交割与合约调整（除权除息）风险，展期时需核对合约要素。"
         )
         story.append(Paragraph(risk_text, styles['normal']))
 
@@ -1039,12 +1064,12 @@ class ProtectivePutStrategyReport:
         name = config.get('name', 'Unknown')
         start_date = config.get('start_date')
         end_date = config.get('end_date')
-        call_put = config.get('call_put', 'P')
+        call_put = config.get('call_put', 'C')
         symbol_filter = config.get('symbol_filter')
 
         self.writeLogInfo(className=self.__class__.__name__,
                           functionName="run",
-                          event=f"Generating ProtectivePutStrategyReport: {name}")
+                          event=f"Generating CoveredCallStrategyReport: {name}")
 
         try:
             # Step 1: 拉取数据
@@ -1053,7 +1078,7 @@ class ProtectivePutStrategyReport:
             df = self.fetch_data(start_date=start_date, end_date=end_date,
                                  symbol_filter=symbol_filter, call_put=call_put)
             if df.empty:
-                logger.warning("数据为空（请先运行 ProtectivePutStrategyAnalysis 落库），流程终止")
+                logger.warning("数据为空（请先运行 CoveredCallStrategyAnalysis 落库），流程终止")
                 return None
 
             # Step 2: 清洗 + 图表
@@ -1064,12 +1089,12 @@ class ProtectivePutStrategyReport:
             chart_buffers['chart1'] = self.gen_chart1_spot_premium(df)
             chart_buffers['chart2'] = self.gen_chart2_iv(df)
             chart_buffers['chart3'] = self.gen_chart3_iv_rank(df)
-            chart_buffers['chart4'] = self.gen_chart4_hedge_cost(df)
-            chart_buffers['chart5'] = self.gen_chart5_ppc(df)
-            chart_buffers['chart6'] = self.gen_chart6_max_loss_delta(df)
+            chart_buffers['chart4'] = self.gen_chart4_premium_yield(df)
+            chart_buffers['chart5'] = self.gen_chart5_max_profit(df)
+            chart_buffers['chart6'] = self.gen_chart6_cushion_delta(df)
             chart_buffers['chart7'] = self.gen_chart7_payoff_curve(df)
             chart_buffers['chart8'] = self.gen_chart8_scenario_pnl(df)
-            chart_buffers['chart9'] = self.gen_chart9_protection_effect(df)
+            chart_buffers['chart9'] = self.gen_chart9_cushion_effect(df)
             chart_buffers['chart10'] = self.gen_chart10_theta(df)
 
             chart_count = sum(1 for v in chart_buffers.values() if v is not None)
@@ -1080,7 +1105,7 @@ class ProtectivePutStrategyReport:
             pdf_path = self._generate_pdf_report(df, chart_buffers, config)
 
             logger.info("\n" + "=" * 80)
-            logger.info("✅ Protective Put 策略分析报告 生成完成！")
+            logger.info("✅ Covered Call 策略分析报告 生成完成！")
             logger.info(f"   Report: {pdf_path}")
             logger.info(f"   Data rows: {len(df)}")
             logger.info(f"   Charts: {chart_count} 张")
@@ -1095,11 +1120,11 @@ class ProtectivePutStrategyReport:
 
 
 if __name__ == "__main__":
-    report = ProtectivePutStrategyReport()
+    report = CoveredCallStrategyReport()
     report.run({
-        "name": "华夏上证50ETF认沽期权（Protective Put）",
+        "name": "华夏上证50ETF认购期权（Covered Call）",
         "start_date": "20251222",
         "end_date": CommonParameters.today,
-        "call_put": "P",
-        "symbol_filter": "510050P2612%",
+        "call_put": "C",
+        "symbol_filter": "510050C2612%",
     })
