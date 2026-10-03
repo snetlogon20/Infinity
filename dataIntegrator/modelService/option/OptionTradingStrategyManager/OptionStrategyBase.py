@@ -305,7 +305,9 @@ class OptionStrategyBase:
         str_cols = {'strategy_type', 'analysis_params', 'analysis_version',
                     'trade_date', 'ts_code', 'symbol', 'opt_name', 'opt_exchange',
                     'call_put', 's_month', 'maturity_date',
-                    'moneyness_status', 'price_bias', 'trade_signal', 'signal_reason'}
+                    'moneyness_status', 'price_bias', 'trade_signal', 'signal_reason',
+                    # 价差组合的卖出腿字符串字段（Bull Call Spread 等）
+                    'ts_code_short', 'symbol_short', 'opt_name_short', 'price_bias_short'}
         for col in df_output.columns:
             if col == 'analysis_time':
                 continue  # datetime 对象直接写入 DateTime 列

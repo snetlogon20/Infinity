@@ -17,9 +17,10 @@ from dataIntegrator.modelService.option.OptionTradingStrategyManager.ProtectiveP
 from dataIntegrator.modelService.option.OptionTradingStrategyManager.CoveredCallStrategyAnalysis import (
     CoveredCallStrategyAnalysis
 )
-from dataIntegrator.modelService.option.OptionTradingStrategyManager.LongCallStrategyAnalysis import (
-    LongCallStrategyAnalysis
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.BullCallSpreadStrategyAnalysis import (
+    BullCallSpreadStrategyAnalysis
 )
+
 from dataIntegrator import CommonLib
 
 logger = CommonLib.logger
@@ -64,4 +65,4 @@ class OptionStrategyFactory:
 # ================================================================
 OptionStrategyFactory._registry['PROTECTIVE_PUT'] = ProtectivePutStrategyAnalysis
 OptionStrategyFactory._registry['COVERED_CALL'] = CoveredCallStrategyAnalysis
-OptionStrategyFactory._registry['LONG_CALL'] = LongCallStrategyAnalysis
+OptionStrategyFactory._registry['BULL_CALL_SPREAD'] = BullCallSpreadStrategyAnalysis
