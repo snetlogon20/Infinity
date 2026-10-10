@@ -38,6 +38,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -1126,6 +1127,15 @@ class BearPutSpreadStrategyReport:
                           functionName="run",
                           event=f"Generating BearPutSpreadStrategyReport: {name}")
 
+        # 报表任务日志（与 BondYieldComparator 相同的 ReportJobLogger 机制）
+        job_logger = ReportJobLogger()
+        job_logger.start_job(self.__class__.__name__, 'OptionStrategyReport',
+                             params={'report_name': config.get('name'),
+                                     'start_date': config.get('start_date'),
+                                     'end_date': config.get('end_date'),
+                                     'call_put': config.get('call_put'),
+                                     'symbol_filter': config.get('symbol_filter')})
+
         try:
             # Step 1: 拉取数据
             logger.info(f"Step 1/3: 拉取 {self.TABLE_SOURCE} 数据 "
@@ -1134,6 +1144,7 @@ class BearPutSpreadStrategyReport:
                                  symbol_filter=symbol_filter, call_put=call_put)
             if df.empty:
                 logger.warning("数据为空（请先运行 BearPutSpreadStrategyAnalysis 落库），流程终止")
+                job_logger.end_job_success(records_processed=0)
                 return None
 
             # Step 2: 清洗 + 图表
@@ -1165,12 +1176,15 @@ class BearPutSpreadStrategyReport:
             logger.info(f"   Data rows: {len(df)}")
             logger.info(f"   Charts: {chart_count} 张")
             logger.info("=" * 80)
+            job_logger.end_job_success(records_processed=len(df))
+
             return pdf_path
 
         except Exception as e:
             import traceback
             logger.error(f"报告生成失败: {e}")
             logger.error(traceback.format_exc())
+            job_logger.end_job_failed(str(e), traceback.format_exc())
             raise
 
 

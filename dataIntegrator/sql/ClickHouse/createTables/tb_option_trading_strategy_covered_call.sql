@@ -5,6 +5,10 @@
 -- 增量写入: 按 trade_date + symbol_filter + call_put 删除后插入
 -- 审计: analysis_time/analysis_params/analysis_version 记录每轮分析的时间戳与参数
 
+-- 存量表升级(免重建):
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_covered_call ADD COLUMN IF NOT EXISTS score Float64;
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_covered_call ADD COLUMN IF NOT EXISTS contract_rank UInt32;
+
 --drop table indexsysdb.tb_option_trading_strategy_covered_call;
 --ALTER TABLE indexsysdb.tb_option_trading_strategy_covered_call DELETE WHERE 1=1;
 --ALTER TABLE indexsysdb.tb_option_trading_strategy_covered_call DELETE WHERE trade_date = '20251224';
@@ -70,6 +74,9 @@ CREATE TABLE indexsysdb.tb_option_trading_strategy_covered_call (
     -- 对冲后敞口
     portfolio_delta Float64 COMMENT '组合净Delta: 1-delta_call, 剩余方向性敞口',
     residual_exposure_pct Float64 COMMENT '剩余敞口(%): (1-delta_call)*100',
+    -- 评分与排名(同日候选行权价横向比较)
+    score Float64 COMMENT '综合评分(=年化时间价值收益率%=(C-max(0,S0-K))/S0/T): 备兑真正的租金(剔除内在价值), 同日候选合约的排名依据',
+    contract_rank UInt32 COMMENT '同日按score降序排名(1=当日最优备兑合约)',
     -- 多情景盈亏: S_T=K*factor, 组合P&L=(S_T-S0)-max(0,S_T-K)+C
     scenario_pnl_0_85K Float64 COMMENT '情景盈亏(S_T=0.85K)',
     scenario_pnl_0_85K_cny Float64 COMMENT '情景盈亏元/张(S_T=0.85K)',

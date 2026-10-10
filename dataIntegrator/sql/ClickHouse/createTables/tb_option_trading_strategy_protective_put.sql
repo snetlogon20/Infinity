@@ -9,6 +9,10 @@
 -- 由旧表改名而来(存量数据保留):
 -- RENAME TABLE indexsysdb.tb_option_trading_strategy TO indexsysdb.tb_option_trading_strategy_protective_put;
 
+-- 存量表升级(免重建):
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_protective_put ADD COLUMN IF NOT EXISTS score Float64;
+--ALTER TABLE indexsysdb.tb_option_trading_strategy_protective_put ADD COLUMN IF NOT EXISTS contract_rank UInt32;
+
 --drop table indexsysdb.tb_option_trading_strategy_protective_put;
 --ALTER TABLE indexsysdb.tb_option_trading_strategy_protective_put DELETE WHERE strategy_type = 'PROTECTIVE_PUT';
 --ALTER TABLE indexsysdb.tb_option_trading_strategy_protective_put DELETE WHERE strategy_type = 'PROTECTIVE_PUT' AND trade_date = '20251224';
@@ -70,6 +74,9 @@ CREATE TABLE indexsysdb.tb_option_trading_strategy_protective_put (
     -- 对冲后敞口
     portfolio_delta Float64 COMMENT '组合净Delta: 1+delta_put, 剩余方向性敞口',
     residual_exposure_pct Float64 COMMENT '剩余敞口(%): (1+delta_put)*100',
+    -- 评分与排名(同日候选行权价横向比较)
+    score Float64 COMMENT '综合评分(=(S0-(K-P))/P): 保险效率, 每1元保费保护的下行幅度, 同日候选合约排名依据',
+    contract_rank UInt32 COMMENT '同日按score降序排名(1=当日保险效率最高的行权价)',
     -- 多情景盈亏: S_T=K*factor, 组合P&L=(S_T-S0)+max(0,K-S_T)-P
     scenario_pnl_0_80K Float64 COMMENT '情景盈亏(S_T=0.80K)',
     scenario_pnl_0_80K_cny Float64 COMMENT '情景盈亏元/张(S_T=0.80K)',

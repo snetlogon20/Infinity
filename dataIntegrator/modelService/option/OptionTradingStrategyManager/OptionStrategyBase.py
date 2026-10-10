@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -44,6 +45,8 @@ class OptionStrategyBase:
     TABLE_BASIC = 'df_tushare_opt_basic'
     # 目标专表：子类必须覆写（每策略一张表），未覆写在 save_to_clickhouse 中报错
     TABLE_TARGET = None
+    # 增量删除时用于 symbol LIKE 过滤的列名（子类可覆写，如 Calendar Spread 用 symbol_near）
+    DELETE_SYMBOL_COLUMN = 'symbol'
 
     # === 子类必须覆盖的钩子常量 ===
     STRATEGY_TYPE = 'BASE'          # 策略类型标识（落库分区键）
@@ -306,8 +309,16 @@ class OptionStrategyBase:
                     'trade_date', 'ts_code', 'symbol', 'opt_name', 'opt_exchange',
                     'call_put', 's_month', 'maturity_date',
                     'moneyness_status', 'price_bias', 'trade_signal', 'signal_reason',
-                    # 价差组合的卖出腿字符串字段（Bull Call Spread 等）
-                    'ts_code_short', 'symbol_short', 'opt_name_short', 'price_bias_short'}
+                    # 价差组合的卖出腿字符串字段（Bull/Bear Spread 等）
+                    'ts_code_short', 'symbol_short', 'opt_name_short', 'price_bias_short',
+                    # 蝴蝶价差的第二买入腿字符串字段（Butterfly Spread 高翼）
+                    'ts_code_long2', 'symbol_long2', 'opt_name_long2', 'price_bias_long2',
+                    # 跨式组合的 Put 腿字符串字段（Long/Short Straddle 等）
+                    'ts_code_put', 'symbol_put', 'opt_name_put', 'price_bias_put',
+                    # 日历价差的近月/远月腿字符串字段（Calendar Spread，跨月配对）
+                    'ts_code_near', 'symbol_near', 'opt_name_near', 'opt_exchange_near', 'price_bias_near',
+                    'ts_code_far', 'symbol_far', 'opt_name_far', 'price_bias_far',
+                    's_month_near', 's_month_far', 'maturity_date_near', 'maturity_date_far'}
         for col in df_output.columns:
             if col == 'analysis_time':
                 continue  # datetime 对象直接写入 DateTime 列
@@ -332,7 +343,7 @@ class OptionStrategyBase:
         if call_put:
             delete_conditions.append(f"call_put = '{call_put}'")
         if symbol_filter:
-            delete_conditions.append(f"symbol LIKE '{symbol_filter}'")
+            delete_conditions.append(f"{self.DELETE_SYMBOL_COLUMN} LIKE '{symbol_filter}'")
 
         del_sql = (f"ALTER TABLE indexsysdb.{self.TABLE_TARGET} DELETE WHERE "
                    f"{' AND '.join(delete_conditions)}")
@@ -382,43 +393,59 @@ class OptionStrategyBase:
         logger.info(f"  Strategy: {self.STRATEGY_TYPE}, version={self.ANALYSIS_VERSION}")
         logger.info("=" * 80)
 
-        # Step 1: 拉取数据
-        logger.info("\nStep 1/6: Fetching data...")
-        df = self.fetch_data(
-            start_date=start_date, end_date=end_date,
-            call_put=call_put, symbol_filter=symbol_filter,
-            exercise_type=exercise_type,
-        )
-        if len(df) == 0:
-            logger.warning(f"[{name}] No data found, skipping")
-            return None
+        # 报表任务日志（与 BondYieldComparator 相同的 ReportJobLogger 机制）
+        job_logger = ReportJobLogger()
+        job_logger.start_job(self.__class__.__name__, 'OptionStrategyAnalysis',
+                             params={'report_name': name, 'start_date': start_date,
+                                     'end_date': end_date, 'call_put': call_put,
+                                     'symbol_filter': symbol_filter})
 
-        # Step 2: 清洗
-        logger.info("\nStep 2/6: Cleaning and filtering...")
-        df = self._clean_and_filter(df)
-        if len(df) == 0:
-            logger.warning(f"[{name}] No valid data after cleaning, skipping")
-            return None
+        try:
+            # Step 1: 拉取数据
+            logger.info("\nStep 1/6: Fetching data...")
+            df = self.fetch_data(
+                start_date=start_date, end_date=end_date,
+                call_put=call_put, symbol_filter=symbol_filter,
+                exercise_type=exercise_type,
+            )
+            if len(df) == 0:
+                logger.warning(f"[{name}] No data found, skipping")
+                job_logger.end_job_success(records_processed=0)
+                return None
 
-        # Step 3: IV 分位（保险贵不贵，信号输入）
-        logger.info("\nStep 3/6: Calculating IV rank...")
-        df = self.calc_iv_rank(df, end_date)
+            # Step 2: 清洗
+            logger.info("\nStep 2/6: Cleaning and filtering...")
+            df = self._clean_and_filter(df)
+            if len(df) == 0:
+                logger.warning(f"[{name}] No valid data after cleaning, skipping")
+                job_logger.end_job_success(records_processed=0)
+                return None
 
-        # Step 4: 策略核心盈亏（子类钩子）
-        logger.info("\nStep 4/6: Calculating strategy P&L...")
-        df = self.calc_strategy_pnl(df)
+            # Step 3: IV 分位（保险贵不贵，信号输入）
+            logger.info("\nStep 3/6: Calculating IV rank...")
+            df = self.calc_iv_rank(df, end_date)
 
-        # Step 5: 多情景盈亏（子类钩子）
-        logger.info("\nStep 5/6: Calculating scenario P&L...")
-        df = self.calc_scenario_pnl(df)
+            # Step 4: 策略核心盈亏（子类钩子）
+            logger.info("\nStep 4/6: Calculating strategy P&L...")
+            df = self.calc_strategy_pnl(df)
 
-        # Step 6: 交易信号 + 落库（含审计字段）
-        logger.info("\nStep 6/6: Assigning trade signals and saving to ClickHouse...")
-        df = self._assign_trade_signals(df)
-        self.save_to_clickhouse(df, config)
+            # Step 5: 多情景盈亏（子类钩子）
+            logger.info("\nStep 5/6: Calculating scenario P&L...")
+            df = self.calc_scenario_pnl(df)
 
-        logger.info(f"\n{'='*80}")
-        logger.info(f"[{name}] Analysis done: {len(df)} rows -> {self.TABLE_TARGET}")
-        logger.info(f"{'='*80}")
+            # Step 6: 交易信号 + 落库（含审计字段）
+            logger.info("\nStep 6/6: Assigning trade signals and saving to ClickHouse...")
+            df = self._assign_trade_signals(df)
+            self.save_to_clickhouse(df, config)
 
-        return df
+            logger.info(f"\n{'='*80}")
+            logger.info(f"[{name}] Analysis done: {len(df)} rows -> {self.TABLE_TARGET}")
+            logger.info(f"{'='*80}")
+
+            job_logger.end_job_success(records_processed=len(df))
+            return df
+
+        except Exception as e:
+            import traceback
+            job_logger.end_job_failed(str(e), traceback.format_exc())
+            raise

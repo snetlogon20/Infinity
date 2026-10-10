@@ -92,6 +92,8 @@ class CoveredCallStrategyAnalysis(OptionStrategyBase):
         'unhedged_pnl_1_10K', 'unhedged_pnl_1_10K_pct',
         'scenario_pnl_1_15K', 'scenario_pnl_1_15K_cny', 'scenario_pnl_1_15K_pct',
         'unhedged_pnl_1_15K', 'unhedged_pnl_1_15K_pct',
+        # 评分与排名（同日候选行权价横向比较）
+        'score', 'contract_rank',
         # 交易信号
         'trade_signal', 'signal_reason',
     ]
@@ -196,6 +198,18 @@ class CoveredCallStrategyAnalysis(OptionStrategyBase):
             ['严重低估', '低估', '公允', '高估', '严重高估'],
             default='N/A'
         )
+
+        # ---------- 6. 评分与排名（收租效率） ----------
+        # score = 年化时间价值收益率：备兑真正的"租金"是卖出的时间价值
+        # （extrinsic = C - max(0, S0-K)，虚值/平值 Call 即全部权利金）。
+        # 若用含内在价值的总权利金 C/S0/T，深实值 Call 会因名义权利金大而排第一——
+        # 但卖出它等于折价卖现货而非收租，且最大盈利 K-S0+C≈0，到期收益图退化为水平线。
+        # 风险维度（让渡%、被行权概率）不塞进分数，在排名表中并列展示。
+        time_value = np.maximum(C - np.maximum(S - K, 0), 0)
+        df['score'] = np.where(
+            (S > 0) & (years > 0), time_value / S / years * 100, np.nan)
+        df['contract_rank'] = df.groupby('trade_date')['score'].rank(
+            ascending=False, method='first').fillna(0).astype(int)
 
         # ---------- 摘要日志 ----------
         logger.info(f"Strategy P&L calculated for {len(df)} rows")

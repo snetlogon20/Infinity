@@ -30,6 +30,9 @@ from dataIntegrator.analysisService.report.financialAnalysis.RunPDAnalysisReport
 from dataIntegrator.analysisService.report.bonds.RunConvertibleBondManagerReport import RunConvertibleBondManagerReport
 from dataIntegrator.analysisService.report.bonds.RunBondYieldComparator import RunBondYieldComparator
 from dataIntegrator.analysisService.report.systemSupport.RunSystemBatchStatusReport import RunSystemBatchStatusReport
+from dataIntegrator.modelService.option.OptionTradingStrategyManager import (
+    OptionTradingStrategyManager
+)
 
 logger = CommonLib.logger
 
@@ -54,6 +57,9 @@ class ReportRunner:
         self._pd_runner = RunPDAnalysisReport()
         self._macro_economic_indicator_analysis_runner = RunMacroEconomicIndicatorAnalysis()
         self._macro_economic_indicator_report_runner = RunMacroEconomicIndicatorReport()
+
+        # 期权策略分析与报告（12 个策略：分析落库 + PDF 报告，工厂模式统一入口）
+        self._option_trading_strategy_runner = OptionTradingStrategyManager()
 
         # 永远把System Batch Status Report放在最后面跑
         self._system_batch_status_runner = RunSystemBatchStatusReport()
@@ -81,6 +87,7 @@ class ReportRunner:
                 "Convertible Bond Manager Report":               self._convertible_bond_runner.run,
                 "Macro Economic Indicator Data Generation":      self._macro_economic_indicator_analysis_runner.run,
                 "Macro Economic Indicator Report":               self._macro_economic_indicator_report_runner.run,
+                "Option Trading Strategy Analysis & Reports":    self._option_trading_strategy_runner.run,
                 #永远把System Batch Status Report放在最后面跑
                 "System Batch Status Report":                    self._system_batch_status_runner.generate_report,
             }

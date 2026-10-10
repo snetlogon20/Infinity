@@ -33,6 +33,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -136,6 +137,7 @@ class CoveredCallStrategyReport:
             'theta_income_daily', 'theta_income_total', 'theta_income_pct_of_premium',
             'assignment_prob',
             'portfolio_delta', 'residual_exposure_pct',
+            'score', 'contract_rank',
             'risk_free_rate', 'dividend_yield',
         ] + [f'scenario_pnl_{f:.2f}'.replace('.', '_') + suf
              for f in self.SCENARIO_FACTORS for suf in ('', '_cny', '_pct')] \
@@ -402,7 +404,14 @@ class CoveredCallStrategyReport:
             y2_col='portfolio_delta', y2_label='组合净Delta (1-Δcall)')
 
     def gen_chart7_payoff_curve(self, df):
-        """图7：到期盈亏曲线（最新交易日）：X=S_T 连续，备兑组合 vs 未备兑"""
+        """图7：教科书到期收益结构（两线图）— 代表合约=当日评分第一
+
+        - 红实线加粗为组合到期收益 (S_T-S0) - max(0, S_T-K) + C；
+        - 绿虚线为最大盈利平台 K-S0+C（S_T>=K 盈利封顶，'封顶厂字'）；
+        - 绿点为下行盈亏平衡点 S0-C（下跌 C 以内组合不亏）；
+        - 橙点线为行权价拐点 K，灰虚线为未备兑现货（与组合的间距即权利金缓冲）；
+        - 盈利/亏损区域着色，其余行权价合约淡化为背景。
+        """
         latest_date = df['trade_date'].max()
         df_latest = df[df['trade_date'] == latest_date].dropna(
             subset=['spot_price', 'exercise_price', 'premium'])
@@ -410,45 +419,111 @@ class CoveredCallStrategyReport:
             return None
 
         S0 = float(df_latest['spot_price'].iloc[0])
-        x = np.linspace(0.85 * S0, 1.25 * S0, 200)
         label_map = self._build_label_map(df)
 
+        # ---- 代表合约：同日评分第一（年化时间价值收益率最高），无评分时回退时间价值 ----
+        rep = None
+        if 'contract_rank' in df_latest.columns:
+            mask = df_latest['contract_rank'].fillna(0).astype(int) == 1
+            if mask.any():
+                rep = df_latest[mask].iloc[0]
+        if rep is None:
+            tv = df_latest['premium'] - np.maximum(
+                df_latest['spot_price'] - df_latest['exercise_price'], 0)
+            rep = df_latest.loc[tv.idxmax()]
+        K, C = float(rep['exercise_price']), float(rep['premium'])
+        rep_name = label_map.get(rep['ts_code'], rep['ts_code'])
+
+        x = np.linspace(0.85 * S0, 1.25 * S0, 400)
+        payoff_spot = x - S0
+        payoff_combo = payoff_spot - np.maximum(x - K, 0) + C
+
         fig, ax = plt.subplots(figsize=(20, 10))
-        fig.suptitle(f'图7：Covered Call 到期盈亏曲线（{latest_date}）— '
-                     f'X轴=到期标的价 S_T，备兑组合(彩线) vs 未备兑(灰虚线)',
+        fig.suptitle(f'图7：Covered Call 教科书到期收益结构（两线图）— '
+                     f'{rep_name}（{latest_date}，当日评分第1）',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
-        # 未备兑基准
-        ax.plot(x, x - S0, color=self.UNHEDGED_COLOR, linewidth=2.5, linestyle='--',
-                alpha=0.9, label='未备兑 (仅持有现货)')
-
+        # ---- 其余合约的组合线淡化为背景 ----
         for idx, (_, row) in enumerate(df_latest.iterrows()):
-            K, C = float(row['exercise_price']), float(row['premium'])
-            y = (x - S0) - np.maximum(x - K, 0) + C
+            if row['ts_code'] == rep['ts_code']:
+                continue
+            y_i = (x - S0) - np.maximum(x - float(row['exercise_price']), 0) \
+                + float(row['premium'])
+            ax.plot(x, y_i, color=self.CHART_COLORS[idx % len(self.CHART_COLORS)],
+                    linewidth=0.7, alpha=0.25)
+
+        # ---- 盈亏区间着色 ----
+        ax.fill_between(x, payoff_combo, 0, where=(payoff_combo > 0), color='#27ae60',
+                        alpha=0.10, label='盈利区间')
+        ax.fill_between(x, payoff_combo, 0, where=(payoff_combo <= 0), color='#c0392b',
+                        alpha=0.10, label='亏损区间')
+
+        # ---- 两线：未备兑现货（灰虚线）+ 备兑组合（红实线加粗） ----
+        ax.plot(x, payoff_spot, color=self.UNHEDGED_COLOR, linewidth=1.8, linestyle='--',
+                alpha=0.85, label='未备兑: S_T - S0')
+        ax.plot(x, payoff_combo, color='#c0392b', linewidth=3.2, zorder=9,
+                label=f'备兑组合: (S_T-S0) - max(S_T-K, 0) + C  [K={K:.4g}, C={C:.4g}]')
+
+        # ---- 关键标注：最大盈利平台（右侧封顶） ----
+        max_p = K - S0 + C
+        ax.axhline(y=max_p, color='#27ae60', linewidth=1.4, linestyle='--', alpha=0.9, zorder=6)
+        ax.text(x[-1], max_p, f' 最大盈利平台 = K-S0+C = {max_p:.4g}\n (S_T>=K, 盈利封顶)',
+                fontsize=9.5, color='#27ae60', va='center', ha='right', fontweight='bold')
+        # 行权价拐点 K
+        ax.axvline(x=K, color='#f39c12', linewidth=1.6, linestyle=':', alpha=0.95, zorder=6)
+        ax.text(K, 0.02, f' 行权价拐点 K = {K:.4g}', transform=ax.get_xaxis_transform(),
+                fontsize=9.5, color='#f39c12', va='bottom', fontweight='bold')
+
+        # ---- 下行盈亏平衡点 S0-C ----
+        ax.plot([S0 - C], [0], marker='o', markersize=10, color='#27ae60', zorder=11)
+        ax.annotate(f'下行盈亏平衡点 = S0-C = {S0 - C:.4g}\n'
+                    f'（下跌 {C / S0 * 100:.2f}% 以内组合不亏，权利金缓冲）',
+                    xy=(S0 - C, 0), xytext=(-14, 42), textcoords='offset points',
+                    fontsize=10, fontweight='bold', color='#27ae60', ha='right',
+                    arrowprops=dict(arrowstyle='->', color='#27ae60', linewidth=1.2),
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                              edgecolor='#27ae60', alpha=0.9), zorder=12)
+
+        # ---- 当前现货位置 ----
+        ax.axvline(x=S0, color=self.SPOT_COLOR, linewidth=1.0, linestyle=':', alpha=0.6, zorder=5)
+        ax.text(S0, 0.55, f' 当前现货 S0 = {S0:.4g}', transform=ax.get_xaxis_transform(),
+                fontsize=9, color=self.SPOT_COLOR, va='center', rotation=90, alpha=0.8)
+
+        # ---- 右端名称标签（学习图6）：标明每条线对应的合约 ----
+        xlim = ax.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.22)
+        ax.annotate('未备兑现货', xy=(x[-1], payoff_spot[-1]), xytext=(6, 10),
+                    textcoords='offset points', color=self.UNHEDGED_COLOR, fontsize=8.5,
+                    fontweight='bold', va='center', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor=self.UNHEDGED_COLOR, linewidth=0.6, alpha=0.9),
+                    zorder=10)
+        ax.annotate(f'{rep_name}·备兑组合', xy=(x[-1], payoff_combo[-1]), xytext=(6, -24),
+                    textcoords='offset points', color='#c0392b', fontsize=8.5,
+                    fontweight='bold', va='center', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor='#c0392b', linewidth=0.6, alpha=0.95), zorder=11)
+        # 背景合约右端小标签（哪条淡化线对应哪个行权价合约）
+        for idx, (_, row) in enumerate(df_latest.iterrows()):
+            if row['ts_code'] == rep['ts_code']:
+                continue
+            y_end = payoff_spot[-1] - max(x[-1] - float(row['exercise_price']), 0) \
+                + float(row['premium'])
             color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
-            name = label_map.get(row['ts_code'], row['ts_code'])
-            ax.plot(x, y, color=color, linewidth=1.2, alpha=0.8, label=name)
-            # 右端标签（右侧各合约均封顶收敛，垂直交错避免重叠）
-            y_offset = (idx % 4 - 1.5) * 11
-            ax.annotate(name, xy=(x[-1], y[-1]), xytext=(6, y_offset),
-                        textcoords='offset points', color=color, fontsize=7,
-                        fontweight='bold', va='center', ha='left',
-                        bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
-                                  edgecolor=color, linewidth=0.5, alpha=0.85))
+            nm = label_map.get(row['ts_code'], row['ts_code'])
+            ax.annotate(nm, xy=(x[-1], y_end), xytext=(6, (idx % 5 - 2) * 13),
+                        textcoords='offset points', color=color, fontsize=6.5,
+                        fontweight='bold', va='center', ha='left', alpha=0.9,
+                        bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                                  edgecolor=color, linewidth=0.4, alpha=0.8), zorder=9)
 
-        # 现价 / 零线标注
-        ax.axvline(x=S0, color=self.SPOT_COLOR, linewidth=1.2, linestyle=':', alpha=0.8)
-        ax.text(S0, ax.get_ylim()[0], f' S0={S0:.3f}', fontsize=8,
-                color=self.SPOT_COLOR, va='bottom')
         ax.axhline(y=0, color='gray', linewidth=0.8, linestyle='-', alpha=0.6)
-
         ax.set_xlabel('到期标的价 S_T', fontsize=12, fontweight='bold')
         ax.set_ylabel('组合盈亏 (元/单位)', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, linestyle='--')
-
-        n_items = len(df_latest) + 1
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), fontsize=6.5,
-                  ncol=min(n_items, 8), frameon=True, handlelength=1.2)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), fontsize=8.5,
+                  ncol=2, frameon=True, handlelength=1.6)
         plt.tight_layout()
         return self._fig_to_bytesio(fig)
 
@@ -637,13 +712,19 @@ class CoveredCallStrategyReport:
         """最新交易日核心指标总览表数据"""
         col_h = 'scenario_pnl_0_95K'
         col_u = 'unhedged_pnl_0_95K'
+        # 按同日评分排名排序（1=当日最优备兑合约），无排名时回退行权价排序
+        if 'contract_rank' in latest.columns and latest['contract_rank'].notna().any():
+            latest_sorted = latest.sort_values('contract_rank')
+        else:
+            latest_sorted = latest.sort_values('exercise_price')
         rows = []
-        for _, r in latest.sort_values('exercise_price').iterrows():
+        for _, r in latest_sorted.iterrows():
             name = label_map.get(r['ts_code'], r['ts_code'])
             if len(name) > 14:
                 name = name[:13] + '…'
             rows.append([
                 name,
+                self._fmt(r.get('contract_rank'), '{:.0f}'),
                 self._fmt(r['exercise_price'], '{:.4g}'),
                 self._fmt(r['premium'], '{:.4g}'),
                 self._fmt(r['implied_vol'] * 100 if pd.notna(r.get('implied_vol')) else np.nan, '{:.1f}'),
@@ -656,12 +737,13 @@ class CoveredCallStrategyReport:
                 self._fmt(r.get('annualized_premium_yield_pct'), '{:.1f}'),
                 self._fmt(r.get('portfolio_delta'), '{:.3f}'),
                 self._fmt(r.get('assignment_prob'), '{:.2f}'),
+                self._fmt(r.get('score'), '{:.2f}'),
                 self._fmt(r.get(col_h), '{:+.4g}') + ' / ' + self._fmt(r.get(col_u), '{:+.4g}'),
                 str(r.get('trade_signal', '')),
             ])
-        header = ['合约名称', '行权价K', '权利金C', 'IV%', 'IV分位',
+        header = ['合约名称', '排名', '行权价K', '权利金C', 'IV%', 'IV分位',
                   '最大盈利%', '让渡涨幅%', '缓冲%', '下行平衡%',
-                  '静态收益%', '年化收益%', '净Delta', '行权概率',
+                  '静态收益%', '年化收益%', '净Delta', '行权概率', '评分',
                   '0.95K盈亏(备兑/未备兑)', '信号']
         return header, rows
 
@@ -701,13 +783,19 @@ class CoveredCallStrategyReport:
                           f"对长期持有现货的组合，年化增强收益 {ay_m:.0f}% 相当于把持有成本直接降低同幅度；"
                           f"但需与上行让渡机会成本权衡——若标的趋势上涨，备兑会拖累相对收益。"))
 
-        # ---- 3. 最优备兑合约推荐 ----
-        cand = latest[latest['premium_yield_pct'].notna()]
-        if len(cand) > 0:
-            best = cand.loc[cand['premium_yield_pct'].idxmax()]
+        # ---- 3. 最优备兑合约推荐（评分第一：年化时间价值收益率最高） ----
+        if 'score' in latest.columns and latest['score'].notna().any():
+            cand = latest[latest['score'].notna()]
+            best = cand.loc[cand['score'].idxmax()]
+        else:
+            tv = latest['premium'] - np.maximum(
+                latest['spot_price'] - latest['exercise_price'], 0)
+            best = latest.loc[tv.idxmax()]
+        if best is not None:
             name = label_map.get(best['ts_code'], best['ts_code'])
-            paras.append(('最优备兑合约（静态收益率维度）',
-                          f"{name}：行权价 K={best['exercise_price']:.4g}、权利金 C={best['premium']:.4g}、"
+            paras.append(('最优备兑合约（评分维度：年化时间价值收益率）',
+                          f"{name}（当日评分第1）：行权价 K={best['exercise_price']:.4g}、"
+                          f"权利金 C={best['premium']:.4g}、"
                           f"静态收益率 {best['premium_yield_pct']:.2f}%（年化 {best['annualized_premium_yield_pct']:.1f}%），"
                           f"最大盈利占现价 {best['max_profit_pct_of_spot']:+.2f}%，"
                           f"上行让渡 {best['upside_giveup_pct']:+.2f}%，"
@@ -902,9 +990,10 @@ class CoveredCallStrategyReport:
         story.append(self._make_table(header, rows, col_widths))
         story.append(Spacer(1, 0.08 * inch))
         story.append(Paragraph(
-            '注：最大盈利% = (K-S0+C)/S0（S_T>=K时封顶收益）；让渡涨幅% = (K-S0)/S0（超过K的涨幅全部放弃）；'
+            '注：排名 = 同日按评分（年化静态收益率）降序（1=当日最优备兑合约）；'
+            '最大盈利% = (K-S0+C)/S0（S_T>=K时封顶收益）；让渡涨幅% = (K-S0)/S0（超过K的涨幅全部放弃）；'
             '缓冲% = C/S0（下跌C以内组合不亏）；下行平衡% = -C/S0（跌穿S0-C开始亏损）；'
-            '静态收益% = C/S0（持有到期的租金收益）；净Delta = 1-Δcall（残余方向敞口）；'
+            '静态收益% = C/S0（持有到期的租金收益）；评分 = 年化时间价值收益率%（=(C-max(0,S0-K))/S0/T×100，剔除内在价值）；净Delta = 1-Δcall（残余方向敞口）；'
             '行权概率≈delta=N(d1)（到期S_T>K概率）；缓冲效果为0.95K情景权利金吸收亏损比例；IV分位基于合约近60日IV历史。',
             styles['table_note']))
         story.append(PageBreak())
@@ -946,9 +1035,12 @@ class CoveredCallStrategyReport:
                                    f"注意：缓冲只有一层权利金，深跌时保护极其有限——"
                                    f"Covered Call 是收益增强策略而非对冲策略，不要把它当保险用。"))
         if chart_buffers.get('chart7'):
-            chart_sections.append(('chart7', '图7：到期盈亏曲线',
-                                   "彩线为备兑组合、灰虚线为未备兑。备兑曲线右侧被 K+C 封顶（水平段），"
-                                   "左侧与未备兑平行但高一个权利金 C——'让渡上涨、缓冲下跌'的结构一目了然。"))
+            chart_sections.append(('chart7', '图7：教科书到期收益结构（两线图）',
+                                   "代表合约为当日评分第一（年化时间价值收益率最高，通常为平值/浅虚值）的合约。"
+                                   "红实线为组合到期收益：右侧被 K 封顶形成最大盈利平台 K-S0+C（绿虚线），"
+                                   "左侧斜率为 1 但比未备兑（灰虚线）高一个权利金 C（下行缓冲）；"
+                                   "绿点为下行盈亏平衡点 S0-C（下跌 C 以内不亏），橙点线为行权价拐点 K。"
+                                   "彩色细线为其余行权价合约（淡化背景）——行权价越高，封顶越远、权利金越薄。"))
         if chart_buffers.get('chart8'):
             chart_sections.append(('chart8', '图8：多情景盈亏对比',
                                    "横轴为情景因子（0.85K~1.15K）。下跌情景下备兑线（彩）仅比未备兑线（灰）高一个权利金；"
@@ -971,7 +1063,15 @@ class CoveredCallStrategyReport:
             story.append(Spacer(1, 0.08 * inch))
             buf = chart_buffers.get(key)
             if buf is not None:
-                story.append(RLImage(buf, width=page_width, height=page_width * 0.42))
+                # 按图片真实宽高比等比缩放：宽度撑满页面、高度封顶，
+                # 避免固定 0.42 比例把高图（如图7三线图）纵向压扁
+                img = RLImage(buf)
+                w0, h0 = float(img.imageWidth), float(img.imageHeight)
+                max_h = 390  # landscape(A4) 可用高度约 530pt，预留标题与说明文字
+                scale = min(page_width / w0, max_h / h0)
+                img.drawWidth = w0 * scale
+                img.drawHeight = h0 * scale
+                story.append(img)
             story.append(Spacer(1, 0.06 * inch))
             story.append(Paragraph(note, styles['normal']))
             story.append(PageBreak())
@@ -1027,6 +1127,10 @@ class CoveredCallStrategyReport:
             "缓冲效果 cushion_effect：0.95K 情景权利金吸收亏损的比例，1=完全吸收。<br/>"
             "组合净Delta portfolio_delta = 1−Δcall：备兑后残余方向性敞口。<br/>"
             "IV分位 iv_rank：当日 IV 在该合约近 60 日 IV 历史中的分位数（0~1），衡量卖方定价贵贱。<br/>"
+            "评分与排名：score = 年化时间价值收益率 = (C-max(0,S0-K))/S0/T×100（备兑真正的租金；"
+            "含内在价值的总权利金会把深实值合约误排第一——卖出深实值等于折价卖现货而非收租）；"
+            "contract_rank = 同日按 score 降序排名（1=当日最优备兑合约，通常为平值/浅虚值）。"
+            "注意排名未纳入让渡幅度与被行权概率等风险维度，应结合表中并列指标权衡。<br/>"
             "信号规则：STRONG_BUY = 静态收益率≥2% 且 IV分位≥0.65 且 Call 高估；"
             "BUY = 收益率≥1.5% 且 IV分位≥0.50；CONSIDER = 收益率≥1%；NEUTRAL = 收益率≥0.5%；其余 AVOID。"
         )
@@ -1071,6 +1175,15 @@ class CoveredCallStrategyReport:
                           functionName="run",
                           event=f"Generating CoveredCallStrategyReport: {name}")
 
+        # 报表任务日志（与 BondYieldComparator 相同的 ReportJobLogger 机制）
+        job_logger = ReportJobLogger()
+        job_logger.start_job(self.__class__.__name__, 'OptionStrategyReport',
+                             params={'report_name': config.get('name'),
+                                     'start_date': config.get('start_date'),
+                                     'end_date': config.get('end_date'),
+                                     'call_put': config.get('call_put'),
+                                     'symbol_filter': config.get('symbol_filter')})
+
         try:
             # Step 1: 拉取数据
             logger.info(f"Step 1/3: 拉取 {self.TABLE_SOURCE} 数据 "
@@ -1079,6 +1192,7 @@ class CoveredCallStrategyReport:
                                  symbol_filter=symbol_filter, call_put=call_put)
             if df.empty:
                 logger.warning("数据为空（请先运行 CoveredCallStrategyAnalysis 落库），流程终止")
+                job_logger.end_job_success(records_processed=0)
                 return None
 
             # Step 2: 清洗 + 图表
@@ -1110,12 +1224,15 @@ class CoveredCallStrategyReport:
             logger.info(f"   Data rows: {len(df)}")
             logger.info(f"   Charts: {chart_count} 张")
             logger.info("=" * 80)
+            job_logger.end_job_success(records_processed=len(df))
+
             return pdf_path
 
         except Exception as e:
             import traceback
             logger.error(f"报告生成失败: {e}")
             logger.error(traceback.format_exc())
+            job_logger.end_job_failed(str(e), traceback.format_exc())
             raise
 
 

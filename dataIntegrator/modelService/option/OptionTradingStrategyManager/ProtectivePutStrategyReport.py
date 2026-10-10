@@ -33,6 +33,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from dataIntegrator import CommonLib, CommonParameters
+from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 logger = CommonLib.logger
@@ -134,6 +135,7 @@ class ProtectivePutStrategyReport:
             'theta_cost_daily', 'theta_cost_total', 'theta_cost_pct_of_premium',
             'breakeven_S_T', 'breakeven_S_T_pct', 'upside_giveup_pct',
             'portfolio_delta', 'residual_exposure_pct',
+            'score', 'contract_rank',
             'risk_free_rate', 'dividend_yield',
         ] + [f'scenario_pnl_{f:.2f}'.replace('.', '_') + suf
              for f in self.SCENARIO_FACTORS for suf in ('', '_cny', '_pct')] \
@@ -399,7 +401,14 @@ class ProtectivePutStrategyReport:
             y2_col='portfolio_delta', y2_label='组合净Delta (1+Δput)')
 
     def gen_chart7_payoff_curve(self, df):
-        """图7：到期盈亏曲线（最新交易日）：X=S_T 连续，对冲组合 vs 未对冲"""
+        """图7：教科书到期收益结构（两线图）— 代表合约=当日评分第一
+
+        - 红实线加粗为组合到期收益 (S_T-S0) + max(0, K-S_T) - P；
+        - 红虚线为最大亏损平台 K-P-S0（S_T<=K 亏损封底，'保底厂字'）；
+        - 绿点为盈亏平衡点 S0+P（上行需涨过此点组合才盈利）；
+        - 橙点线为行权价拐点 K，灰虚线为未对冲现货（与组合的间距即保费成本）；
+        - 盈利/亏损区域着色，其余行权价合约淡化为背景。
+        """
         latest_date = df['trade_date'].max()
         df_latest = df[df['trade_date'] == latest_date].dropna(
             subset=['spot_price', 'exercise_price', 'premium'])
@@ -407,44 +416,108 @@ class ProtectivePutStrategyReport:
             return None
 
         S0 = float(df_latest['spot_price'].iloc[0])
-        x = np.linspace(0.75 * S0, 1.25 * S0, 200)
         label_map = self._build_label_map(df)
 
+        # ---- 代表合约：同日评分第一（保险效率最高），无评分时回退平值 ATM ----
+        rep = None
+        if 'contract_rank' in df_latest.columns:
+            mask = df_latest['contract_rank'].fillna(0).astype(int) == 1
+            if mask.any():
+                rep = df_latest[mask].iloc[0]
+        if rep is None:
+            rep = df_latest.loc[(df_latest['exercise_price'] - S0).abs().idxmin()]
+        K, P = float(rep['exercise_price']), float(rep['premium'])
+        rep_name = label_map.get(rep['ts_code'], rep['ts_code'])
+
+        x = np.linspace(0.75 * S0, 1.25 * S0, 400)
+        payoff_spot = x - S0
+        payoff_combo = payoff_spot + np.maximum(K - x, 0) - P
+
         fig, ax = plt.subplots(figsize=(20, 10))
-        fig.suptitle(f'图7：Protective Put 到期盈亏曲线（{latest_date}）— '
-                     f'X轴=到期标的价 S_T，对冲组合(彩线) vs 未对冲(灰虚线)',
+        fig.suptitle(f'图7：Protective Put 教科书到期收益结构（两线图）— '
+                     f'{rep_name}（{latest_date}，当日评分第1）',
                      fontsize=14, fontweight='bold', color='#1a1a2e')
 
-        # 未对冲基准
-        ax.plot(x, x - S0, color=self.UNHEDGED_COLOR, linewidth=2.5, linestyle='--',
-                alpha=0.9, label='未对冲 (仅持有现货)')
-
+        # ---- 其余合约的组合线淡化为背景 ----
         for idx, (_, row) in enumerate(df_latest.iterrows()):
-            K, P = float(row['exercise_price']), float(row['premium'])
-            y = (x - S0) + np.maximum(K - x, 0) - P
+            if row['ts_code'] == rep['ts_code']:
+                continue
+            y_i = (x - S0) + np.maximum(float(row['exercise_price']) - x, 0) \
+                - float(row['premium'])
+            ax.plot(x, y_i, color=self.CHART_COLORS[idx % len(self.CHART_COLORS)],
+                    linewidth=0.7, alpha=0.25)
+
+        # ---- 盈亏区间着色 ----
+        ax.fill_between(x, payoff_combo, 0, where=(payoff_combo > 0), color='#27ae60',
+                        alpha=0.10, label='盈利区间')
+        ax.fill_between(x, payoff_combo, 0, where=(payoff_combo <= 0), color='#c0392b',
+                        alpha=0.10, label='亏损区间')
+
+        # ---- 两线：未对冲现货（灰虚线）+ 对冲组合（红实线加粗） ----
+        ax.plot(x, payoff_spot, color=self.UNHEDGED_COLOR, linewidth=1.8, linestyle='--',
+                alpha=0.85, label='未对冲: S_T - S0')
+        ax.plot(x, payoff_combo, color='#c0392b', linewidth=3.2, zorder=9,
+                label=f'对冲组合: (S_T-S0) + max(K-S_T, 0) - P  [K={K:.4g}, P={P:.4g}]')
+
+        # ---- 关键标注：最大亏损平台（左侧保底） ----
+        floor = K - P - S0
+        ax.axhline(y=floor, color='#c0392b', linewidth=1.4, linestyle='--', alpha=0.9, zorder=6)
+        ax.text(x[0], floor, f' 最大亏损平台 = K-P-S0 = {floor:.4g}\n (S_T<=K, 亏损封底)',
+                fontsize=9.5, color='#c0392b', va='top', ha='left', fontweight='bold')
+        # 行权价拐点 K
+        ax.axvline(x=K, color='#f39c12', linewidth=1.6, linestyle=':', alpha=0.95, zorder=6)
+        ax.text(K, 0.02, f' 行权价拐点 K = {K:.4g}', transform=ax.get_xaxis_transform(),
+                fontsize=9.5, color='#f39c12', va='bottom', fontweight='bold')
+
+        # ---- 盈亏平衡点 S0+P ----
+        ax.plot([S0 + P], [0], marker='o', markersize=10, color='#27ae60', zorder=11)
+        ax.annotate(f'盈亏平衡点 = S0+P = {S0 + P:.4g}\n'
+                    f'（需上涨 {P / S0 * 100:.2f}% 组合才开始盈利）',
+                    xy=(S0 + P, 0), xytext=(12, 40), textcoords='offset points',
+                    fontsize=10, fontweight='bold', color='#27ae60',
+                    arrowprops=dict(arrowstyle='->', color='#27ae60', linewidth=1.2),
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                              edgecolor='#27ae60', alpha=0.9), zorder=12)
+
+        # ---- 当前现货位置 ----
+        ax.axvline(x=S0, color=self.SPOT_COLOR, linewidth=1.0, linestyle=':', alpha=0.6, zorder=5)
+        ax.text(S0, 0.55, f' 当前现货 S0 = {S0:.4g}', transform=ax.get_xaxis_transform(),
+                fontsize=9, color=self.SPOT_COLOR, va='center', rotation=90, alpha=0.8)
+
+        # ---- 右端名称标签（学习图6）：标明每条线对应的合约 ----
+        xlim = ax.get_xlim()
+        if xlim[1] > xlim[0]:
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.22)
+        ax.annotate('未对冲现货', xy=(x[-1], payoff_spot[-1]), xytext=(6, 10),
+                    textcoords='offset points', color=self.UNHEDGED_COLOR, fontsize=8.5,
+                    fontweight='bold', va='center', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor=self.UNHEDGED_COLOR, linewidth=0.6, alpha=0.9),
+                    zorder=10)
+        ax.annotate(f'{rep_name}·对冲组合', xy=(x[-1], payoff_combo[-1]), xytext=(6, -24),
+                    textcoords='offset points', color='#c0392b', fontsize=8.5,
+                    fontweight='bold', va='center', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor='#c0392b', linewidth=0.6, alpha=0.95), zorder=11)
+        # 背景合约右端小标签（哪条淡化线对应哪个行权价合约）
+        for idx, (_, row) in enumerate(df_latest.iterrows()):
+            if row['ts_code'] == rep['ts_code']:
+                continue
+            y_end = payoff_spot[-1] - float(row['premium'])
             color = self.CHART_COLORS[idx % len(self.CHART_COLORS)]
-            name = label_map.get(row['ts_code'], row['ts_code'])
-            ax.plot(x, y, color=color, linewidth=1.2, alpha=0.8, label=name)
-            # 右端标签
-            ax.annotate(name, xy=(x[-1], y[-1]), xytext=(6, 0),
-                        textcoords='offset points', color=color, fontsize=7,
-                        fontweight='bold', va='center', ha='left',
-                        bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
-                                  edgecolor=color, linewidth=0.5, alpha=0.85))
+            nm = label_map.get(row['ts_code'], row['ts_code'])
+            ax.annotate(nm, xy=(x[-1], y_end), xytext=(6, (idx % 5 - 2) * 13),
+                        textcoords='offset points', color=color, fontsize=6.5,
+                        fontweight='bold', va='center', ha='left', alpha=0.9,
+                        bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                                  edgecolor=color, linewidth=0.4, alpha=0.8), zorder=9)
 
-        # 现价 / 零线标注
-        ax.axvline(x=S0, color=self.SPOT_COLOR, linewidth=1.2, linestyle=':', alpha=0.8)
-        ax.text(S0, ax.get_ylim()[0], f' S0={S0:.3f}', fontsize=8,
-                color=self.SPOT_COLOR, va='bottom')
         ax.axhline(y=0, color='gray', linewidth=0.8, linestyle='-', alpha=0.6)
-
         ax.set_xlabel('到期标的价 S_T', fontsize=12, fontweight='bold')
         ax.set_ylabel('组合盈亏 (元/单位)', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, linestyle='--')
-
-        n_items = len(df_latest) + 1
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), fontsize=6.5,
-                  ncol=min(n_items, 8), frameon=True, handlelength=1.2)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), fontsize=8.5,
+                  ncol=2, frameon=True, handlelength=1.6)
         plt.tight_layout()
         return self._fig_to_bytesio(fig)
 
@@ -632,13 +705,19 @@ class ProtectivePutStrategyReport:
         """最新交易日核心指标总览表数据"""
         col_h = 'scenario_pnl_0_90K'
         col_u = 'unhedged_pnl_0_90K'
+        # 按同日评分排名排序（1=当日保险效率最高的行权价），无排名时回退行权价排序
+        if 'contract_rank' in latest.columns and latest['contract_rank'].notna().any():
+            latest_sorted = latest.sort_values('contract_rank')
+        else:
+            latest_sorted = latest.sort_values('exercise_price')
         rows = []
-        for _, r in latest.sort_values('exercise_price').iterrows():
+        for _, r in latest_sorted.iterrows():
             name = label_map.get(r['ts_code'], r['ts_code'])
             if len(name) > 14:
                 name = name[:13] + '…'
             rows.append([
                 name,
+                self._fmt(r.get('contract_rank'), '{:.0f}'),
                 self._fmt(r['exercise_price'], '{:.4g}'),
                 self._fmt(r['premium'], '{:.4g}'),
                 self._fmt(r['implied_vol'] * 100 if pd.notna(r.get('implied_vol')) else np.nan, '{:.1f}'),
@@ -651,12 +730,13 @@ class ProtectivePutStrategyReport:
                 self._fmt(r.get('breakeven_S_T_pct'), '{:+.2f}'),
                 self._fmt(r.get('portfolio_delta'), '{:.3f}'),
                 self._fmt(r.get('downside_capture'), '{:.2f}'),
+                self._fmt(r.get('score'), '{:.2f}'),
                 self._fmt(r.get(col_h), '{:+.4g}') + ' / ' + self._fmt(r.get(col_u), '{:+.4g}'),
                 str(r.get('trade_signal', '')),
             ])
-        header = ['合约名称', '行权价K', '权利金P', 'IV%', 'IV分位',
+        header = ['合约名称', '排名', '行权价K', '权利金P', 'IV%', 'IV分位',
                   '价值底K-P', '最大亏损%', '成本比%', '年化成本%',
-                  '保险杠杆', '平衡涨幅%', '净Delta', '下跌捕获',
+                  '保险杠杆', '平衡涨幅%', '净Delta', '下跌捕获', '评分',
                   '0.90K盈亏(对冲/未对冲)', '信号']
         return header, rows
 
@@ -695,15 +775,17 @@ class ProtectivePutStrategyReport:
                           f"对照现货长期年化收益，年化保护成本超过 {ac:.0f}% 时，"
                           f"保护策略将显著侵蚀组合收益，需要严格控制对冲比例。"))
 
-        # ---- 3. 最优保护合约推荐 ----
-        cand = latest[latest['protection_per_cost'].notna()]
+        # ---- 3. 最优保护合约推荐（评分第一：保险效率最高） ----
+        score_col = 'score' if 'score' in latest.columns else 'protection_per_cost'
+        cand = latest[latest[score_col].notna()]
         if len(cand) > 0:
-            best = cand.loc[cand['protection_per_cost'].idxmax()]
+            best = cand.loc[cand[score_col].idxmax()]
             name = label_map.get(best['ts_code'], best['ts_code'])
-            paras.append(('最优保护合约（保险杠杆维度）',
+            paras.append(('最优保护合约（保险效率评分维度）',
                           f"{name}：行权价 K={best['exercise_price']:.4g}、权利金 P={best['premium']:.4g}、"
-                          f"保险杠杆 (K-P)/P = {best['protection_per_cost']:.2f}"
-                          f"（每 1 元保费锁定 {best['protection_per_cost']:.1f} 元下行价值），"
+                          f"保险效率评分 = {best[score_col]:.2f}"
+                          f"（每 1 元保费保护 {best[score_col]:.1f} 元下行幅度）、"
+                          f"保险杠杆 (K-P)/P = {best['protection_per_cost']:.2f}，"
                           f"最大亏损占现价 {best['max_loss_pct_of_spot']:+.2f}%，"
                           f"IV分位 {self._fmt(best.get('iv_rank'), '{:.2f}')}，"
                           f"信号：{best.get('trade_signal', 'N/A')}。"
@@ -881,7 +963,9 @@ class ProtectivePutStrategyReport:
         story.append(self._make_table(header, rows, col_widths))
         story.append(Spacer(1, 0.08 * inch))
         story.append(Paragraph(
-            '注：最大亏损% = (K-P-S0)/S0（对冲后最大回撤）；成本比% = P/S0；保险杠杆 = (K-P)/P；'
+            '注：排名 = 同日按评分（保险效率）降序（1=当日保险效率最高的行权价）；'
+            '评分 = (S0-(K-P))/P（每1元保费保护的下行幅度）；'
+            '最大亏损% = (K-P-S0)/S0（对冲后最大回撤）；成本比% = P/S0；保险杠杆 = (K-P)/P；'
             '平衡涨幅% = P/S0（上行需涨过 S0+P 组合才盈利）；净Delta = 1+Δput（残余方向敞口）；'
             '下跌捕获 = 0.90K情景对冲后亏损/未对冲亏损（0=完全保护）；IV分位基于合约近60日IV历史。',
             styles['table_note']))
@@ -923,9 +1007,12 @@ class ProtectivePutStrategyReport:
                                    f"净Delta越接近0对冲越充分，但注意 Delta 的动态性——上涨时敞口会自动恢复。"))
         if chart_buffers.get('chart7'):
             be_mean = latest['breakeven_S_T_pct'].mean()
-            chart_sections.append(('chart7', '图7：到期盈亏曲线',
-                                   f"彩线为对冲组合、灰虚线为未对冲。对冲曲线左侧被价值底 K-P 托底（水平段），"
-                                   f"右侧与未对冲平行但低一个权利金 P。平均盈亏平衡涨幅 {be_mean:+.2f}%。"))
+            chart_sections.append(('chart7', '图7：教科书到期收益结构（两线图）',
+                                   f"代表合约为当日评分第一（保险效率最高）的合约。红实线为组合到期收益："
+                                   f"左侧被价值底 K-P 托底形成最大亏损平台 K-P-S0（红虚线，亏损封底），"
+                                   f"右侧与未对冲（灰虚线）平行但低一个权利金 P；绿点为盈亏平衡点 S0+P"
+                                   f"（平均需上涨 {be_mean:+.2f}%），橙点线为行权价拐点 K。"
+                                   f"彩色细线为其余行权价合约（淡化背景）——行权价越高，保护底越高但保费越贵。"))
         if chart_buffers.get('chart8'):
             chart_sections.append(('chart8', '图8：多情景盈亏对比',
                                    "横轴为情景因子（0.80K~1.10K）。下跌情景下对冲线（彩）明显高于未对冲线（灰），"
@@ -948,7 +1035,15 @@ class ProtectivePutStrategyReport:
             story.append(Spacer(1, 0.08 * inch))
             buf = chart_buffers.get(key)
             if buf is not None:
-                story.append(RLImage(buf, width=page_width, height=page_width * 0.42))
+                # 按图片真实宽高比等比缩放：宽度撑满页面、高度封顶，
+                # 避免固定 0.42 比例把高图（如图7三线图）纵向压扁
+                img = RLImage(buf)
+                w0, h0 = float(img.imageWidth), float(img.imageHeight)
+                max_h = 390  # landscape(A4) 可用高度约 530pt，预留标题与说明文字
+                scale = min(page_width / w0, max_h / h0)
+                img.drawWidth = w0 * scale
+                img.drawHeight = h0 * scale
+                story.append(img)
             story.append(Spacer(1, 0.06 * inch))
             story.append(Paragraph(note, styles['normal']))
             story.append(PageBreak())
@@ -1003,6 +1098,9 @@ class ProtectivePutStrategyReport:
             "下跌捕获 downside_capture：0.90K 情景对冲后亏损 ÷ 未对冲亏损，0=完全保护，1=无保护。<br/>"
             "组合净Delta portfolio_delta = 1+Δput：对冲后残余方向性敞口。<br/>"
             "IV分位 iv_rank：当日 IV 在该合约近 60 日 IV 历史中的分位数（0~1），衡量保险贵贱。<br/>"
+            "评分与排名：score = (S0-(K-P))/P = 保险效率（每 1 元保费保护的下行幅度，同日候选行权价横向可比）；"
+            "contract_rank = 同日按 score 降序排名（1=当日最优保护合约）。"
+            "虚值 Put 分数高（便宜的大灾难保险）、平值分数低（保护细腻但贵），按保护需求选择。<br/>"
             "信号规则：STRONG_BUY = 保险杠杆≥3 且 IV分位≤0.35 且 Put 低估；"
             "BUY = 杠杆≥2 且 IV分位≤0.55；CONSIDER = 杠杆≥1.5；NEUTRAL = 杠杆≥1.0；其余 AVOID。"
         )
@@ -1046,6 +1144,15 @@ class ProtectivePutStrategyReport:
                           functionName="run",
                           event=f"Generating ProtectivePutStrategyReport: {name}")
 
+        # 报表任务日志（与 BondYieldComparator 相同的 ReportJobLogger 机制）
+        job_logger = ReportJobLogger()
+        job_logger.start_job(self.__class__.__name__, 'OptionStrategyReport',
+                             params={'report_name': config.get('name'),
+                                     'start_date': config.get('start_date'),
+                                     'end_date': config.get('end_date'),
+                                     'call_put': config.get('call_put'),
+                                     'symbol_filter': config.get('symbol_filter')})
+
         try:
             # Step 1: 拉取数据
             logger.info(f"Step 1/3: 拉取 {self.TABLE_SOURCE} 数据 "
@@ -1054,6 +1161,7 @@ class ProtectivePutStrategyReport:
                                  symbol_filter=symbol_filter, call_put=call_put)
             if df.empty:
                 logger.warning("数据为空（请先运行 ProtectivePutStrategyAnalysis 落库），流程终止")
+                job_logger.end_job_success(records_processed=0)
                 return None
 
             # Step 2: 清洗 + 图表
@@ -1085,12 +1193,15 @@ class ProtectivePutStrategyReport:
             logger.info(f"   Data rows: {len(df)}")
             logger.info(f"   Charts: {chart_count} 张")
             logger.info("=" * 80)
+            job_logger.end_job_success(records_processed=len(df))
+
             return pdf_path
 
         except Exception as e:
             import traceback
             logger.error(f"报告生成失败: {e}")
             logger.error(traceback.format_exc())
+            job_logger.end_job_failed(str(e), traceback.format_exc())
             raise
 
 

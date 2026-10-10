@@ -1,5 +1,5 @@
 -- 期权交易策略指标分析表（Spot + Long Call 策略）
--- 数据来源：OptionTradingStrategyAnalyzer.py 计算后的策略指标（与 Excel 报表各 Sheet 内容一致）
+-- 数据来源：OptionTradingSingleStrategyAnalyzer.py 计算后的策略指标（与 Excel 报表各 Sheet 内容一致）
 -- 字段 = Excel 报表写入内容并集：策略盈亏总览 + LongCall详细分析 + 多情景盈亏 + 交易信号
 -- 支持多日增量写入：按 trade_date + call_put + ts_code 过滤条件增量删除后插入
 --drop table indexsysdb.tb_option_trading_strategy_indicator

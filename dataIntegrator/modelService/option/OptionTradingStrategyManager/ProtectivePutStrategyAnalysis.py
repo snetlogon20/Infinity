@@ -93,6 +93,8 @@ class ProtectivePutStrategyAnalysis(OptionStrategyBase):
         'unhedged_pnl_1_05K', 'unhedged_pnl_1_05K_pct',
         'scenario_pnl_1_10K', 'scenario_pnl_1_10K_cny', 'scenario_pnl_1_10K_pct',
         'unhedged_pnl_1_10K', 'unhedged_pnl_1_10K_pct',
+        # 评分与排名（同日候选行权价横向比较）
+        'score', 'contract_rank',
         # 交易信号
         'trade_signal', 'signal_reason',
     ]
@@ -202,6 +204,14 @@ class ProtectivePutStrategyAnalysis(OptionStrategyBase):
             ['严重低估', '低估', '公允', '高估', '严重高估'],
             default='N/A'
         )
+
+        # ---------- 6. 评分与排名（保险效率） ----------
+        # score = (S0-(K-P))/P：每 1 元保费保护多少下行幅度。
+        # 虚值 Put 保费便宜、灾难保护效率高（分数大）；平值保护细腻但贵（分数小）。
+        df['score'] = np.where(
+            (P > 0) & (K > 0) & (S > 0), (S - (K - P)) / P, np.nan)
+        df['contract_rank'] = df.groupby('trade_date')['score'].rank(
+            ascending=False, method='first').fillna(0).astype(int)
 
         # ---------- 摘要日志 ----------
         logger.info(f"Strategy P&L calculated for {len(df)} rows")

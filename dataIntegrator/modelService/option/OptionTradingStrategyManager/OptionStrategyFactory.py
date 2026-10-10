@@ -23,6 +23,36 @@ from dataIntegrator.modelService.option.OptionTradingStrategyManager.BullCallSpr
 from dataIntegrator.modelService.option.OptionTradingStrategyManager.BearPutSpreadStrategyAnalysis import (
     BearPutSpreadStrategyAnalysis
 )
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.ButterflySpreadStrategyAnalysis import (
+    ButterflySpreadStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.LongStraddleStrategyAnalysis import (
+    LongStraddleStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.ShortStraddleStrategyAnalysis import (
+    ShortStraddleStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.StripStrategyAnalysis import (
+    StripStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.StrapStrategyAnalysis import (
+    StrapStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.LongStrangleStrategyAnalysis import (
+    LongStrangleStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.ShortStrangleStrategyAnalysis import (
+    ShortStrangleStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.CalendarSpreadStrategyAnalysis import (
+    CalendarSpreadStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.SyntheticLongStockStrategyAnalysis import (
+    SyntheticLongStockStrategyAnalysis
+)
+from dataIntegrator.modelService.option.OptionTradingStrategyManager.SyntheticShortStockStrategyAnalysis import (
+    SyntheticShortStockStrategyAnalysis
+)
 
 from dataIntegrator import CommonLib
 
@@ -70,3 +100,13 @@ OptionStrategyFactory._registry['PROTECTIVE_PUT'] = ProtectivePutStrategyAnalysi
 OptionStrategyFactory._registry['COVERED_CALL'] = CoveredCallStrategyAnalysis
 OptionStrategyFactory._registry['BULL_CALL_SPREAD'] = BullCallSpreadStrategyAnalysis
 OptionStrategyFactory._registry['BEAR_PUT_SPREAD'] = BearPutSpreadStrategyAnalysis
+OptionStrategyFactory._registry['BUTTERFLY_SPREAD'] = ButterflySpreadStrategyAnalysis
+OptionStrategyFactory._registry['LONG_STRADDLE'] = LongStraddleStrategyAnalysis
+OptionStrategyFactory._registry['SHORT_STRADDLE'] = ShortStraddleStrategyAnalysis
+OptionStrategyFactory._registry['STRIP'] = StripStrategyAnalysis
+OptionStrategyFactory._registry['STRAP'] = StrapStrategyAnalysis
+OptionStrategyFactory._registry['LONG_STRANGLE'] = LongStrangleStrategyAnalysis
+OptionStrategyFactory._registry['SHORT_STRANGLE'] = ShortStrangleStrategyAnalysis
+OptionStrategyFactory._registry['CALENDAR'] = CalendarSpreadStrategyAnalysis
+OptionStrategyFactory._registry['SYNTHETIC_LONG_STOCK'] = SyntheticLongStockStrategyAnalysis
+OptionStrategyFactory._registry['SYNTHETIC_SHORT_STOCK'] = SyntheticShortStockStrategyAnalysis
