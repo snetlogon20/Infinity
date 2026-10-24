@@ -17,6 +17,7 @@ from dataIntegrator.AKShareService.AkShareFinancialDataIndicatorService import A
 from dataIntegrator.AKShareService.AkShareMacroUsaUnemploymentRateService import AkShareMacroUsaUnemploymentRateService
 from dataIntegrator.AKShareService.AkShareMacroUsaNonFarmService import AkShareMacroUsaNonFarmService
 from dataIntegrator.AKShareService.AkShareCboeVixService import AkShareCboeVixService
+from dataIntegrator.AKShareService.NYFedSofrDailyService import NYFedSofrDailyService
 from dataIntegrator.AKShareService.AkShareJobLogger import AkShareJobLogger
 from dataIntegrator.common.FileType import FileType
 
@@ -794,6 +795,65 @@ class AkShareServiceManager():
         logger.info("callAkShareCboeVixService ended...")
 
     @classmethod
+    def callNYFedSofrDailyService(self, days=30):
+        """
+        调用 纽约联储 SOFR（担保隔夜融资利率）日线数据服务
+
+        Args:
+            days (int): 拉取最近 days 天的 SOFR 数据
+        """
+        logger.info(f"callNYFedSofrDailyService started... days={days}")
+
+        file_path = os.path.join(CommonParameters.outBoundPath, 'nyfed_sofr_daily.xlsx')
+        job_logger = AkShareJobLogger()
+
+        try:
+            # 记录任务开始
+            job_logger.start_job('callNYFedSofrDailyService', {
+                'days': days
+            })
+
+            nyFedService = NYFedSofrDailyService()
+
+            # 获取原始数据
+            dataFrame = nyFedService.prepareDataFrame(days=days)
+
+            if dataFrame is None or dataFrame.empty:
+                logger.warning("没有获取到任何 SOFR 数据")
+                job_logger.end_job_success(records_processed=0)
+                return
+
+            # 保存到磁盘
+            nyFedService.saveDateFrameToDisk(dataFrame, file_path, FileType.EXCEL)
+
+            # 从磁盘读取
+            dataFrame = nyFedService.readDataFrameFromDisk(file_path, FileType.EXCEL)
+
+            # 删除 ClickHouse 中的旧数据（使用最早和最晚的日期）
+            if not dataFrame.empty:
+                min_date = dataFrame['date'].min()
+                max_date = dataFrame['date'].max()
+                nyFedService.deleteDateFromClickHouse(min_date, max_date)
+
+            # 转换数据格式
+            dataFrame = nyFedService.transformDataFrame(dataFrame)
+
+            # 保存到 ClickHouse
+            nyFedService.saveDateToClickHouse(dataFrame)
+
+            # 记录任务成功
+            records_processed = len(dataFrame) if dataFrame is not None else 0
+            job_logger.end_job_success(records_processed=records_processed)
+
+        except Exception as e:
+            logger.error('Exception: %s', e)
+            # 记录任务失败
+            job_logger.end_job_failed(str(e))
+            raise e
+
+        logger.info("callNYFedSofrDailyService ended...")
+
+    @classmethod
     def callAkShareService(self, start_date = "20260101", end_date = CommonParameters.today):
         try:
             logger.info("callAkShareService started")
@@ -822,6 +882,7 @@ class AkShareServiceManager():
             self.callAkShareStockYjbbEmService(date=end_date)                                         ## A股业绩快报
             self.callAkShareMacroUsaUnemploymentRateService()                                            ## 美国失业率
             self.callAkShareMacroUsaNonFarmService()                                                     ## 美国非农
+            self.callNYFedSofrDailyService()                                                             ## SOFR 隔夜融资利率
         except Exception as e:
             logger.error('==============================================')
             logger.error('Exception: %s', e)

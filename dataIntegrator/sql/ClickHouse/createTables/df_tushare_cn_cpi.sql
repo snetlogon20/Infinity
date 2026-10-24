@@ -16,32 +16,4 @@ cnt_accu     Float64
 )
 ENGINE=SummingMergeTree(trade_date)
 order by (trade_date)
-SETTINGS index_granularity = 8192
-
-trade_date,
-nt_val    ,
-nt_yoy    ,
-nt_mom    ,
-nt_accu   ,
-town_val  ,
-town_yoy  ,
-town_mom  ,
-town_accu ,
-cnt_val   ,
-cnt_yoy   ,
-cnt_mom   ,
-cnt_accu
-
-'trade_date',
-'nt_val',
-'nt_yoy',
-'nt_mom',
-'nt_accu',
-'town_val',
-'town_yoy',
-'town_mom',
-'town_accu',
-'cnt_val',
-'cnt_yoy',
-'cnt_mom',
-'cnt_accu'
+SETTINGS index_granularity = 8192;

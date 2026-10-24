@@ -8,11 +8,12 @@ from dataIntegrator.common.CommonParameters import CommonParameters
 
 logger = CommonLib.logger
 
+
 class SparkAI(AIAgent):
+    """讯飞星火 Agent(sparkai SDK), 统一返回 str"""
 
-
-    @classmethod
-    def inquiry(self, prompt: str, question: str):
+    def inquiry(self, prompt: str, question: str = "",
+                history_messages: list = None) -> str:
         spark = ChatSparkLLM(
             request_timeout=CommonParameters.SPARKAI_URL_REQUEST_TIMEOUT,
             spark_api_url=CommonParameters.SPARKAI_URL,
@@ -22,17 +23,23 @@ class SparkAI(AIAgent):
             spark_llm_domain=CommonParameters.SPARKAI_DOMAIN,
             streaming=False,
         )
-        logger.info(rf"正在查询 Spark LLM，请稍等/Inquiry Spark LLM for: {prompt}")
         logger.info(rf"正在查询 Spark LLM，请稍等/Inquiry Spark LLM for: {question}")
 
         try:
-            messages = [ChatMessage(role="user", content=prompt)]
+            messages = []
+            if history_messages:
+                messages.extend(ChatMessage(role=m["role"], content=m["content"])
+                                for m in history_messages)
+            messages.append(ChatMessage(role="user", content=prompt))
             handler = ChunkPrintHandler()
             response = spark.generate([messages], callbacks=[handler])
+            answer = response.generations[0][0].text
         except SparkAIConnectionError as e:
-            print(f"连接异常（错误码 {e}")
-        except Exception as e:
-            print(f"其他异常: {e}")
+            logger.error(f"Spark LLM 连接异常: {e}")
+            raise
+        except Exception:
+            logger.exception("Spark LLM 调用失败")
+            raise
 
-        logger.info(rf"查询 Spark LLM，已完成, response: {response.generations[0][0].text}")
-        return response
+        logger.info(rf"查询 Spark LLM，已完成, response: {answer}")
+        return answer

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from dataIntegrator import CommonLib
-from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 from dataIntegrator.common.CommonParameters import CommonParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
@@ -2099,12 +2099,12 @@ class ConvertibleBondManagerReport:
             logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析报告")
             return "（模拟 AI 分析报告）mocked AI analysis..."
 
-        logger.info(f"正在调用 ZhipuGLM4 生成 AI 分析报告，输入 {n} 只债券数据")
+        question = f"从 {n} 只可转债中选出 5 只构建投资组合并给出推荐权重"
+        logger.info(f"正在通过 AIAgentFactory 降级链生成 AI 分析报告，输入 {n} 只债券数据")
         try:
-            #result = SparkX2.inquiry(prompt, "")
-            result = ZhipuGLM4.inquiry(prompt, "")
-            logger.info("ZhipuGLM4 AI 分析报告生成成功")
-            return result
+            failover = AIAgentFactory.call_agent_failover(prompt, question)
+            logger.info(f"AI 分析报告生成成功, 应答引擎: {failover.engine}")
+            return failover.answer
         except Exception as e:
             logger.error(f"AI 分析报告生成失败: {e}")
             return f"AI 分析报告生成失败: {e}"

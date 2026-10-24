@@ -14,16 +14,4 @@ tick_qty        Int64
 )
 ENGINE=SummingMergeTree(trade_date)
 order by (trade_date, ts_code )
-SETTINGS index_granularity = 8192
-
-ts_code,
-trade_date,
-bid_open,
-bid_close,
-bid_high,
-bid_low,
-ask_open,
-ask_close,
-ask_high,
-ask_low,
-tick_qty
+SETTINGS index_granularity = 8192;

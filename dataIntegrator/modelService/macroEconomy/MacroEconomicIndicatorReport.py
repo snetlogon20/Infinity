@@ -34,7 +34,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
-from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 
 logger = CommonLib.logger
 
@@ -1418,7 +1418,7 @@ class MacroEconomicIndicatorReport:
         return df_ye, raw_cols
 
     def _generate_ai_macro_analysis(self, df):
-        """将每年年底数据发给 ZhipuGLM4，获得专业宏观经济分析（学习 ConvertibleBondManagerReport 模式）"""
+        """将每年年底数据通过 AIAgentFactory 降级链发给 AI，获得专业宏观经济分析（学习 ConvertibleBondManagerReport 模式）"""
         df_ye, raw_cols = self._extract_year_end_data(df)
         if df_ye.empty or len(raw_cols) < 4:
             logger.info("年底数据不足，跳过 AI 宏观经济分析")
@@ -1480,11 +1480,12 @@ class MacroEconomicIndicatorReport:
             logger.info("IF_ENABLE_MOCKED_AI=True，返回模拟 AI 分析")
             return self._mocked_ai_analysis(df_ye)
 
-        logger.info("正在调用 ZhipuGLM4 生成 AI 宏观经济分析报告...")
+        question = f"基于 {n_years} 年年度宏观经济数据（{df_ye['trade_month'].min()}-{df_ye['trade_month'].max()}）生成专业宏观分析报告"
+        logger.info(f"正在通过 AIAgentFactory 降级链生成 AI 宏观经济分析报告，输入 {n_years} 年数据")
         try:
-            result = ZhipuGLM4.inquiry(prompt, "")
-            logger.info("ZhipuGLM4 AI 分析报告生成成功")
-            return result
+            failover = AIAgentFactory.call_agent_failover(prompt, question)
+            logger.info(f"AI 宏观经济分析报告生成成功, 应答引擎: {failover.engine}")
+            return failover.answer
         except Exception as e:
             logger.error(f"AI 分析报告生成失败: {e}")
             return f"AI 分析报告生成失败: {e}"

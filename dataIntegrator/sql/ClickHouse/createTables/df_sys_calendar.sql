@@ -10,13 +10,4 @@ CREATE TABLE indexsysdb.df_sys_calendar (
 )
 ENGINE=SummingMergeTree(trade_date)
 order by (trade_date)
-SETTINGS index_granularity = 8192
-
-
-trade_date,
-trade_year,
-trade_month,
-trade_day,
-day_of_week,
-quarter,
-calendar_date,
+SETTINGS index_granularity = 8192;

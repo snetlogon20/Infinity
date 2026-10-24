@@ -15,31 +15,4 @@ break_time            Nullable(String)
 )
 ENGINE=SummingMergeTree(ts_code)
 order by (ts_code, name )
-SETTINGS index_granularity = 8192
-
-ts_code,
-name,
-classify ,
-exchange,
-min_unit ,
-max_unit,
-pip ,
-pip_cost,
-traget_spread,
-min_stop_distance,
-trading_hours,
-break_time
-
-'trade_date',
-'nt_val',
-'nt_yoy',
-'nt_mom',
-'nt_accu',
-'town_val',
-'town_yoy',
-'town_mom',
-'town_accu',
-'cnt_val',
-'cnt_yoy',
-'cnt_mom',
-'cnt_accu'
+SETTINGS index_granularity = 8192;

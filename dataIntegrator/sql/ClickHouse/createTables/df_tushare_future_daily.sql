@@ -19,28 +19,4 @@ oi_chg        Float64
 )
 ENGINE=SummingMergeTree(ts_code)
 order by (ts_code, trade_date)
-SETTINGS index_granularity = 8192
-
-ts_code,
-trade_date,
-pre_close,
-pre_settle,
-open,
-high,
-low,
-close,
-settle,
-change1,
-change2,
-vol,
-amount,
-oi,
-oi_chg
-
-
-'ts_code',
-'symbol',
-'name',
-'quote_unit',
-'list_date',
-'delist_date'
+SETTINGS index_granularity = 8192;

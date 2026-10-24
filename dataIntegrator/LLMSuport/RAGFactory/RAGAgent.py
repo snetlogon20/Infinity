@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from dataIntegrator import CommonLib
-from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 from dataIntegrator.common.CustomError import CustomError
 from dataIntegrator.utility.FileUtility import FileUtility
 

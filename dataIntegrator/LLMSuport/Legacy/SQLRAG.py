@@ -2,7 +2,7 @@ import json
 from sparkai.llm.llm import ChatSparkLLM, ChunkPrintHandler
 from sparkai.core.messages import ChatMessage
 
-from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 
 class SQLRAG():

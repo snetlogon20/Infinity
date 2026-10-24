@@ -1,4 +1,4 @@
-from dataIntegrator.LLMSuport.AiAgents.SparkAIX import SparkX2
+from dataIntegrator.LLMSuport.AiAgents.depreciated.SparkAIX import SparkX2
 
 if __name__ == "__main__":
     # result = SparkX2.inquiry("What is the capital of France?","")
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # """
     #
     # step_prompts = [step1_prompt, step2_prompt, step3_prompt]
-    # result = SparkX2.multi_step_inquiry(step_prompts)
+    # result = SparkX2().multi_step_inquiry(step_prompts)
     # print("=" * 60)
     # print("最终结果：")
     # print(result)
@@ -64,5 +64,5 @@ if __name__ == "__main__":
     只需要输出选出的 5 只债券的 ts_code 和理由，不需要计算组合权重。
     """
 
-    result = SparkX2.inquiry(step1_prompt,"")
+    result = SparkX2().inquiry(step1_prompt,"请从这 6 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。")
     print(result)

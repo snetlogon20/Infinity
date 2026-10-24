@@ -9,21 +9,7 @@ delist_date    Nullable(String)
 )
 ENGINE=SummingMergeTree(ts_code)
 order by (ts_code)
-SETTINGS index_granularity = 8192
-
-
-ts_code,
-name,
-enname,
-classify,
-list_date,
-delist_date,
-
-'ts_code',
-'name',
-'classify',
-'list_date',
-'delist_date'
+SETTINGS index_granularity = 8192;
 
 INSERT INTO df_tushare_us_stock_basic (ts_code,name,enname,classify,list_date,delist_date) VALUES
 	 ('AAPL','苹果','APPLE','EQ','19801212','Nan'),

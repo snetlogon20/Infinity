@@ -1,9 +1,11 @@
-from dataIntegrator.LLMSuport.AiAgents.BailianAI import BailianAI
+from dataIntegrator.LLMSuport.AiAgents.depreciated.BailianAI import BailianAI
 
 if __name__ == "__main__":
-    # ===== 简单测试 =====
-    # result = BailianAI.inquiry("What is the capital of France?", "")
-    # print(result)
+    # ===== 单轮(简单验证) =====
+    prompt = "What is the capital of France?"
+    question = "What is the capital of France?"
+    result = BailianAI().inquiry(prompt, question)
+    print(result)
 
     # ===== 多步推理：拆分长 prompt，避免上下文超时 =====
     # 第 1 步：选券（只选，不算）
@@ -40,8 +42,8 @@ if __name__ == "__main__":
 """
 
     step_prompts = [step1_prompt, step2_prompt, step3_prompt]
-    result = BailianAI.multi_step_inquiry(step_prompts)
+    result = BailianAI().multi_step_inquiry(step_prompts,
+                                            question="6只可转债的三种组合策略分析")
     print("=" * 60)
     print("最终结果：")
     print(result)
-

@@ -1,8 +1,6 @@
 import requests
 
 from dataIntegrator import CommonLib
-from dataIntegrator.LLMSuport.AiAgents import AIAgent
-from dataIntegrator.common.MyTokens import MyTokens
 
 logger = CommonLib.logger
 
@@ -10,6 +8,7 @@ logger = CommonLib.logger
 from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
 
 if __name__ == "__main__":
+    question = "请从这 10 只中，选出最适合构建投资组合的 5 只债券，并逐只简要说明选择理由。"
     step1_prompt = """
 你是一个资深的银行债券交易员。
 以下是 10 只可转债的量化数据（ts_code, name, ytm, duration, dv01, price, es_price_99, current_yield, effective_convexity）：
@@ -29,5 +28,5 @@ if __name__ == "__main__":
 再输出选出的 5 只债券的 ts_code，评级 和理由后，增加推荐的组合权重。
 """
 
-    result = ZhipuGLM4.inquiry(step1_prompt, "")
+    result = ZhipuGLM4().inquiry(step1_prompt, question)
     print(result)

@@ -34,7 +34,7 @@ from dataIntegrator import CommonLib, CommonParameters
 from dataIntegrator.common.CommonDataParameters import CommonDataParameters
 from dataIntegrator.common.ReportJobLogger import ReportJobLogger
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
-from dataIntegrator.LLMSuport.AiAgents.ZhipuGLM4 import ZhipuGLM4
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 
 logger = CommonLib.logger
 
@@ -136,8 +136,10 @@ class PDAnalysisReport:
             WHERE symbol = %(symbol)s
             ORDER BY date ASC
         """
+        logger.info(f"[{symbol}] 查询 matrics 表数据: {self.MATRICS_TABLE}")
         result = ClickhouseService.clickhouseClient.execute(sql, {'symbol': symbol})
         if not result:
+            logger.warning(f"[{symbol}] matrics 表查询结果为空")
             return pd.DataFrame()
 
         columns = [
@@ -162,6 +164,8 @@ class PDAnalysisReport:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
+        logger.info(f"[{symbol}] 获取 {len(df)} 行 matrics 数据，"
+                    f"日期范围 {df['date'].min()} ~ {df['date'].max()}")
         return df
 
     # ========================= 图表生成 =========================
@@ -827,11 +831,12 @@ class PDAnalysisReport:
                     "5. 投资组合配置建议: ...\n\n"
                     "（以上为 MOCK 数据，实际分析请设置 IF_ENABLE_MOCKED_AI=False）")
 
+        question = f"对 {n} 只股票的 PD 违约概率分析数据给出交易与风控结论"
         try:
-            logger.info("正在调用 ZhipuGLM4 生成 AI PD 分析...")
-            result = ZhipuGLM4.inquiry(prompt, "")
-            logger.info("ZhipuGLM4 AI PD 分析生成成功")
-            return result
+            logger.info(f"正在通过 AIAgentFactory 降级链生成 AI PD 分析，输入 {n} 只股票数据")
+            failover = AIAgentFactory.call_agent_failover(prompt, question)
+            logger.info(f"AI PD 分析生成成功, 应答引擎: {failover.engine}")
+            return failover.answer
         except Exception as e:
             logger.error(f"AI PD 分析生成失败: {e}")
             import traceback
@@ -1510,9 +1515,12 @@ class PDAnalysisReport:
         story = []
 
         # ---- 生成图表 ----
-        logger.info(f"  生成图表...")
+        logger.info(f"  [{stock_label}] 生成图表...")
         chart1_buf = self._chart_zscore_pd(df, stock_label)
         chart2_buf = self._chart_pd_el(df, stock_label)
+        logger.info(f"  [{stock_label}] 图表1(Z-Score+PD): "
+                    f"{'成功' if chart1_buf else '失败'}, "
+                    f"图表2(PD+EL): {'成功' if chart2_buf else '失败'}")
 
         # ---- 股票标题 ----
         stock_title_style = ParagraphStyle(
@@ -1534,6 +1542,7 @@ class PDAnalysisReport:
         data_table = self._build_data_table(df)
         story.append(data_table)
         story.append(Spacer(1, 0.3 * cm))
+        logger.info(f"  [{stock_label}] 核心指标数据表已构建（{len(df)} 行）")
 
         # ---- 章节2: 图表1 (Z-Score + PD) ----
         story.append(Paragraph('<b>二、Z-Score 与 PD 违约概率 趋势图</b>', section_style))
@@ -1564,10 +1573,10 @@ class PDAnalysisReport:
             spaceBefore=4, spaceAfter=6, alignment=TA_JUSTIFY,
         )
         commentary = self._generate_professional_commentary(df, stock_label)
-        for para in commentary.strip().split('\n'):
-            para = para.strip()
-            if para:
-                story.append(Paragraph(para, commentary_style))
+        commentary_paras = [p.strip() for p in commentary.strip().split('\n') if p.strip()]
+        for para in commentary_paras:
+            story.append(Paragraph(para, commentary_style))
+        logger.info(f"  [{stock_label}] 交易员深度分析已生成（{len(commentary_paras)} 段）")
 
         return story
 
@@ -1950,9 +1959,12 @@ class PDAnalysisReport:
 
         stock_name = df['name'].iloc[0] if 'name' in df.columns and pd.notna(df['name'].iloc[0]) else symbol
         stock_label = f"{stock_name} ({symbol})"
+        logger.info(f"  股票: {stock_label}，{len(df)} 期数据，"
+                    f"日期范围 {df['date'].min()} ~ {df['date'].max()}")
 
         # 2. 构建内容
         story = self._build_stock_section(symbol, df, stock_label)
+        logger.info(f"  {stock_label} 报告内容已构建（{len(story)} 个元素）")
 
         # ---- 附录: 免责声明 ----
         footer_style = ParagraphStyle(
@@ -1982,6 +1994,7 @@ class PDAnalysisReport:
             topMargin=1 * cm,
             bottomMargin=0.8 * cm,
         )
+        logger.info(f"  构建 PDF: {pdf_filename}")
         doc.build(story)
         logger.info(f"✅ PDF 报告已生成: {pdf_path}")
         return pdf_path
@@ -2303,15 +2316,3 @@ class PDAnalysisReport:
         logger.info("=" * 80)
 
         return pdf_path
-
-
-if __name__ == "__main__":
-    report = PDAnalysisReport()
-
-    # ---- 模式选择 ----
-
-    # 模式1: 单只股票报告
-    # report.generate_single_stock_report(symbol='002093')
-
-    # 模式2: 批量生成所有股票报告
-    report.generate_all_stocks_report()

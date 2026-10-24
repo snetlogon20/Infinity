@@ -17,19 +17,4 @@ settle_dire     Nullable(String)
 )
 ENGINE=SummingMergeTree(trade_date)
 order by (trade_date, ts_code )
-SETTINGS index_granularity = 8192
-
-ts_code,
-trade_date,
-close,
-open,
-high,
-low,
-price_avg,
-change,
-pct_change,
-vol,
-amount,
-oi,
-settle_vol,
-settle_dire
+SETTINGS index_granularity = 8192;

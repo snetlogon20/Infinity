@@ -10,19 +10,4 @@ delist_date    String
 )
 ENGINE=SummingMergeTree(ts_code)
 order by (ts_code)
-SETTINGS index_granularity = 8192
-
-ts_code,
-symbol,
-name,
-quote_unit,
-list_date,
-delist_date
-
-
-'ts_code',
-'symbol',
-'name',
-'quote_unit',
-'list_date',
-'delist_date'
+SETTINGS index_granularity = 8192;

@@ -1,6 +1,6 @@
 import json
 
-from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 from dataIntegrator.LLMSuport.RAGFactory.RAGAgent import RAGAgent
 from dataIntegrator.dataService.ClickhouseService import ClickhouseService
 from dataIntegrator.utility.FileUtility import FileUtility

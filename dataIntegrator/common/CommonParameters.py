@@ -36,7 +36,7 @@ class CommonParameters():
 
     tuShareToken = MyTokens.tuShareToken
 
-    clickhouseHostName='192.168.23.128'
+    clickhouseHostName='192.168.23.140'
     clickhouseHostDatabase='indexsysdb'
 
     oracle_config = {
@@ -47,8 +47,6 @@ class CommonParameters():
         'password': 'citi@citi',
         'oracle_client': r'C:\app\ASUS\product\11.2.0\client_2'
     }
-
-    Default_AI_Engine = 'spark'
 
     CALENDAR_PRIMARY_KEY_FILED = 'trade_date'
 
@@ -65,7 +63,7 @@ class CommonParameters():
     #SPARKAI_URL = 'wss://spark-api.xf-yun.com/v3.5/chat'
     #SPARKAI_URL = 'wss://spark-api.xf-yun.com/chat/max-32k'  #超长文本时使用
     SPARKAI_URL = "wss://spark-api.xf-yun.com/v4.0/chat"
-    SPARKAI_DOMAIN = 'spark-x'  # 仅支持 spark-x/x1/asean
+    SPARKAI_DOMAIN = '4.0Ultra'  # v4.0/chat 接口必须配 4.0Ultra；'spark-x' 仅用于 SparkAIX 的 OpenAI 兼容接口
     SPARK_APPID = "c4c24a9d"
     SPARK_API_SECRET = "YmI5MGEwOWQ5NzMyMWMzYTk0YjE4MDA2"
     SPARK_API_KEY = "7ee29f75c407872e608b2cc7e19115fb"
@@ -80,8 +78,14 @@ class CommonParameters():
     IS_STREAMLIT_ON = False
     # IS_STREAMLIT_ON = True
 
-    IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
-    # IF_ENABLE_MOCKED_AI = False  # use real AI answer
+    # IF_ENABLE_MOCKED_AI = True   # use stored mocked AI answer
+    IF_ENABLE_MOCKED_AI = False  # use real AI answer
+    Default_AI_Engine = 'zhipu'
+
+    # 引擎降级顺序(AIAgentFactory.call_agent_failover 依次尝试,
+    # 前一个引擎异常时自动切下一个; mockedai 放链尾兜底, 不需要可删)
+    AI_ENGINE_FAILOVER_ORDER = ['hunyuan', 'zhipu', 'mockedai']
+
 
     # STOCK_LIST=[
     #         {'ts_code': '002093.SZ', 'name': '国脉科技'},

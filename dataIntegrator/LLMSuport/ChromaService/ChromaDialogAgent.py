@@ -1,7 +1,7 @@
 from typing import Dict, Tuple
 import uuid
 from datetime import datetime
-from dataIntegrator.LLMSuport.AiAgents.AiAgentFactory import AIAgentFactory
+from dataIntegrator.LLMSuport.AiAgents.AIAgentFactory import AIAgentFactory
 import json
 
 from dataIntegrator.LLMSuport.ChromaService.ChromaLLMService import ChromaLLMService

@@ -16,32 +16,4 @@ CREATE TABLE indexsysdb.df_tushare_us_treasury_yield_cruve(
 )
 ENGINE=SummingMergeTree(trade_date)
 order by (trade_date)
-SETTINGS index_granularity = 8192
-
-trade_date,
-m1,
-m2,
-m3,
-m6,
-y1,
-y2,
-y3,
-y5,
-y7,
-y1,
-y2,
-y30
-
-'trade_date’,
-'m1'    ,
-'m2'    ,
-'m3'    ,
-'m6'    ,
-'y1'    ,
-'y2'    ,
-'y3'    ,
-'y5'    ,
-'y7'    ,
-'y10'   ,
-'y20'   ,
-'y30'
+SETTINGS index_granularity = 8192;

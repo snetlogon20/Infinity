@@ -1,50 +1,28 @@
 --drop table indexsysdb.df_tushare_us_stock_daily
-CREATE TABLE indexsysdb.df_tushare_us_stock_daily(
-ts_code    String,
-trade_date String,
-close_point	   float,
-open_point	   float,
-high_point	   float,
-low_point	       float,
-pre_close  float,
-change_point	   float,
-pct_change	float,
-vol	        float,
-amount	    float,
-vwap	    float,
-turnover_ratio	float,
-total_mv	float,
-pe	float,
-pb	float
+-- indexsysdb.df_tushare_us_stock_daily definition
+
+create table indexsysdb.df_tushare_us_stock_daily
+(
+
+    `ts_code` String,
+`trade_date` String,
+`close_point` Float32,
+`open_point` Float32,
+`high_point` Float32,
+`low_point` Float32,
+`pre_close` Float32,
+`change_point` Float32,
+`pct_change` Float32,
+`vol` Float32,
+`amount` Float32,
+`vwap` Float32,
+`turnover_ratio` Float32,
+`total_mv` Float32,
+`pe` Float32,
+`pb` Float32
 )
-ENGINE=SummingMergeTree(trade_date, ts_code)
-order by (trade_date, ts_code )
-SETTINGS index_granularity = 8192
-
-trade_date,
-nt_val    ,
-nt_yoy    ,
-nt_mom    ,
-nt_accu   ,
-town_val  ,
-town_yoy  ,
-town_mom  ,
-town_accu ,
-cnt_val   ,
-cnt_yoy   ,
-cnt_mom   ,
-cnt_accu
-
-'trade_date',
-'nt_val',
-'nt_yoy',
-'nt_mom',
-'nt_accu',
-'town_val',
-'town_yoy',
-'town_mom',
-'town_accu',
-'cnt_val',
-'cnt_yoy',
-'cnt_mom',
-'cnt_accu'
+engine = SummingMergeTree(ts_code)
+order by
+(trade_date,
+ts_code)
+settings index_granularity = 8192;
